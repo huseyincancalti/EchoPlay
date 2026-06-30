@@ -40,19 +40,23 @@ the video** — and remembers your choice for next time.
 
 ## Download & Install
 
-> Requires [mpv for Windows](https://mpv.io/installation/) (official build or `scoop install mpv`).
+**No prerequisites.** You don't need to know what mpv is — if it isn't already on your system, the
+installer downloads a portable copy for you.
 
-1. Download this repository (**Code → Download ZIP**, or `git clone`) and unzip it.
+1. Download the latest [**EchoPlay release**](https://github.com/huseyincancalti/EchoPlay/releases/latest)
+   (or **Code → Download ZIP**) and unzip it.
 2. Open **PowerShell** in the EchoPlay folder and run:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File install.ps1
    ```
 
-   The installer copies the EchoPlay config into mpv's config directory, downloads **uosc /
-   thumbfast / memo**, embeds the EchoPlay logo and name into `mpv.exe`, and registers EchoPlay in
-   the Windows *"Open with"* list. The target is detected automatically (scoop's `portable_config`,
-   otherwise `%APPDATA%\mpv`); override with `-ConfigDir "C:\path"`, or `-Portable` for a portable build.
+   The installer: detects mpv (or **downloads a portable build automatically** if you don't have
+   one), copies the EchoPlay config in, downloads **uosc / thumbfast / memo**, embeds the EchoPlay
+   logo and name into the player, and registers EchoPlay in the Windows *"Open with"* list.
+
+   <sub>Flags: `-ConfigDir "C:\path"` to choose the config dir · `-Portable` to force a portable
+   layout · `-SkipMpvDownload` to never auto-download mpv · `-SkipAssoc` to skip the file association.</sub>
 
 3. To make it your default player: right-click any video → **Open with → EchoPlay → Always**.
 

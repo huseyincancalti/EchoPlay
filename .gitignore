@@ -1,0 +1,12 @@
+# User's previous local setup (not part of the project)
+_old/
+
+# Third-party components are fetched by install.ps1 into the mpv config dir,
+# not committed here.
+mpv/scripts/uosc/
+mpv/scripts/thumbfast.lua
+mpv/scripts/memo.lua
+mpv/script-opts/uosc.conf
+mpv/script-opts/memo.conf
+mpv/script-opts/thumbfast.conf
+mpv/fonts/

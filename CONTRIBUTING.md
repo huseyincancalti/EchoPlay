@@ -1,0 +1,37 @@
+# Contributing
+
+Extending EchoPlay is as easy as dropping in a file — no coding required.
+
+## 🌐 Add a language
+
+1. In the player, open **Settings → Language → Open language folder** (this is `script-opts/`).
+2. Copy `echoplay-en.json` and rename it `echoplay-<code>.json` (e.g. `echoplay-de.json` for German).
+3. Translate the values. Set `"lang_name"` to the language's own name (e.g. `"Deutsch"`).
+4. Save and restart mpv — the new language appears in the **Language** menu automatically.
+5. To make it official, open a pull request adding the file under `mpv/script-opts/`.
+
+## 🎨 Add a theme
+
+Built-in **Dark / Light + accent color** live in **Settings → Theme**. A theme *pack* is for a
+fuller custom look — it can override any uosc option, not just the accent.
+
+1. Open **Settings → Theme → Open theme folder** (this is `themes/`).
+2. Copy `amoled.conf` and rename it `<name>.conf`.
+3. The first `# Comment` line is the name shown in the menu. Every other line is a uosc option:
+   `key=value` — for example `color=foreground=ff5500`, `border_radius=14`, `opacity=menu=0.85`.
+   Full option list: <https://github.com/tomasklaen/uosc>.
+4. Save — the theme shows up under **Custom Themes** and applies live when selected.
+5. Share it with a pull request under `mpv/themes/`.
+
+## Project structure
+
+| Path | Contents |
+|------|----------|
+| `mpv/scripts/echoplay-audio.lua` | EchoPlay's only original code (mixer + menus + theming) |
+| `mpv/script-opts/echoplay-*.json` | Language packs |
+| `mpv/themes/*.conf` | Theme packs |
+| `mpv/mpv.conf`, `mpv/input.conf` | Player + shortcut settings |
+| `install.ps1` | Installer (downloads uosc/thumbfast/memo, icon, branding, association) |
+
+uosc / thumbfast / memo are downloaded from upstream — don't modify them here; contribute to their
+own repositories instead. EchoPlay stays as close to upstream mpv as possible.

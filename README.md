@@ -40,27 +40,35 @@ the video** — and remembers your choice for next time.
 
 ## Download & Install
 
-**No prerequisites.** You don't need to know what mpv is — if it isn't already on your system, the
-installer downloads a portable copy for you.
+**No prerequisites, no terminal.** You don't need to know what mpv is — everything (player engine,
+UI, fonts) is bundled in one installer.
 
-1. Download the latest [**EchoPlay release**](https://github.com/huseyincancalti/EchoPlay/releases/latest)
-   (or **Code → Download ZIP**) and unzip it.
-2. Open **PowerShell** in the EchoPlay folder and run:
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File install.ps1
-   ```
-
-   The installer: detects mpv (or **downloads a portable build automatically** if you don't have
-   one), copies the EchoPlay config in, downloads **uosc / thumbfast / memo**, embeds the EchoPlay
-   logo and name into the player, and registers EchoPlay in the Windows *"Open with"* list.
-
-   <sub>Flags: `-ConfigDir "C:\path"` to choose the config dir · `-Portable` to force a portable
-   layout · `-SkipMpvDownload` to never auto-download mpv · `-SkipAssoc` to skip the file association.</sub>
-
+1. Download [**EchoPlay-Setup.exe**](https://github.com/huseyincancalti/EchoPlay/releases/latest)
+   from the latest release.
+2. Double-click it and click through the wizard (no admin rights needed — it installs to your
+   user folder).
 3. To make it your default player: right-click any video → **Open with → EchoPlay → Always**.
 
-That's it — open a video, right-click (or press `a`) for **Settings**.
+That's it — open a video, right-click (or press `a`) for **Settings**. "EchoPlay" is what Windows
+shows everywhere: the taskbar, Task Manager, and the "Open with" list — never "mpv".
+
+<details>
+<summary>Advanced: portable / scripted install (<code>install.ps1</code>)</summary>
+
+If you already manage your own mpv (e.g. via scoop) or want a portable, no-installer layout,
+download the source zip ("Code → Download ZIP") and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+The script: detects mpv (or downloads a portable build automatically if you don't have one),
+copies the EchoPlay config in, downloads uosc / thumbfast / memo, and registers the file
+association. Flags: `-ConfigDir "C:\path"` to choose the config dir · `-Portable` to force a
+portable layout · `-SkipMpvDownload` to never auto-download mpv · `-SkipAssoc` to skip the file
+association.
+
+</details>
 
 ### Keyboard shortcuts
 
@@ -136,7 +144,9 @@ volume goes up to 300%. The settings menu, mixer, theming and persistence (a sma
 | [`mpv/script-opts/echoplay-*.json`](mpv/script-opts) | Language packs |
 | [`mpv/themes/*.conf`](mpv/themes) | Community theme packs |
 | [`mpv/mpv.conf`](mpv/mpv.conf), [`mpv/input.conf`](mpv/input.conf) | Player settings & shortcuts |
-| [`install.ps1`](install.ps1) | Installer (fetches uosc/thumbfast/memo, icon, branding, association) |
+| [`installer/EchoPlay.iss`](installer/EchoPlay.iss) | Inno Setup script that builds `EchoPlay-Setup.exe` |
+| [`.github/workflows/release.yml`](.github/workflows/release.yml) | CI: downloads mpv/uosc/thumbfast/memo, brands the exe, builds the installer, publishes the release |
+| [`install.ps1`](install.ps1) | Advanced/portable installer (no GUI wizard) |
 
 ## Credits & license
 

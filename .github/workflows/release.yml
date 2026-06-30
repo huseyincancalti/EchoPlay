@@ -1,0 +1,87 @@
+name: Build installer & release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Download portable mpv
+        shell: pwsh
+        run: |
+          $rel = Invoke-RestMethod -UseBasicParsing -Headers @{ 'User-Agent' = 'EchoPlay-CI' } `
+            -Uri 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest'
+          $asset = $rel.assets | Where-Object { $_.name -match '^mpv-x86_64-[0-9].*\.7z$' } | Select-Object -First 1
+          if (-not $asset) { throw "No baseline x86_64 mpv asset found in latest mpv-winbuild release" }
+          Write-Host "Downloading $($asset.name)"
+          Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile mpv.7z
+          7z x mpv.7z -o"raw-mpv" -y | Out-Null
+
+      - name: Lay out and brand mpv -> EchoPlay.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer\dist\mpv | Out-Null
+          $inner = Get-ChildItem raw-mpv -Directory | Select-Object -First 1
+          $source = if ($inner) { $inner.FullName } else { 'raw-mpv' }
+          Copy-Item "$source\*" installer\dist\mpv -Recurse -Force
+
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe' -OutFile rcedit.exe
+
+          $mpvExe = Join-Path 'installer\dist\mpv' 'mpv.exe'
+          & .\rcedit.exe $mpvExe --set-icon assets\logo.ico `
+            --set-version-string "FileDescription" "EchoPlay" `
+            --set-version-string "ProductName" "EchoPlay" `
+            --set-version-string "CompanyName" "Huseyin Can CALTI" `
+            --set-version-string "OriginalFilename" "EchoPlay.exe" `
+            --set-product-version "${{ env.VERSION }}" `
+            --set-file-version "${{ env.VERSION }}"
+          if ($LASTEXITCODE -ne 0) { throw "rcedit failed branding mpv.exe" }
+
+          Rename-Item $mpvExe 'EchoPlay.exe'
+          # mpv.com is a console-mode shim hardcoded to launch mpv.exe; it has no
+          # purpose for a double-click GUI install, so drop it to avoid confusion.
+          Remove-Item (Join-Path 'installer\dist\mpv' 'mpv.com') -ErrorAction SilentlyContinue
+
+      - name: Download uosc
+        shell: pwsh
+        run: |
+          $uoscVersion = '5.12.0'
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/tomasklaen/uosc/releases/download/$uoscVersion/uosc.zip" -OutFile uosc.zip
+          Expand-Archive -Path uosc.zip -DestinationPath installer\dist\uosc -Force
+
+      - name: Download thumbfast & memo
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/thumbfast/master/thumbfast.lua' -OutFile installer\dist\thumbfast.lua
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/memo/master/memo.lua' -OutFile installer\dist\memo.lua
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/memo/master/memo.conf' -OutFile installer\dist\memo.conf
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="${{ env.VERSION }}" installer\EchoPlay.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC compile failed" }
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer\Output\EchoPlay-Setup.exe
+          generate_release_notes: true

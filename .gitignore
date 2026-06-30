@@ -1,12 +1,16 @@
 # User's previous local setup (not part of the project)
 _old/
 
-# Third-party components are fetched by install.ps1 into the mpv config dir,
-# not committed here.
+# Third-party components are fetched by install.ps1 (or the release CI) into
+# the mpv config dir, not committed here. uosc.conf IS committed (mpv/script-opts/uosc.conf)
+# since it carries EchoPlay's own control-bar/theme overrides, not upstream defaults.
 mpv/scripts/uosc/
 mpv/scripts/thumbfast.lua
 mpv/scripts/memo.lua
-mpv/script-opts/uosc.conf
 mpv/script-opts/memo.conf
 mpv/script-opts/thumbfast.conf
 mpv/fonts/
+
+# Local build artifacts from compiling the Inno Setup installer.
+installer/dist/
+installer/Output/

@@ -378,14 +378,19 @@ end
 local function apply_appearance()
     mp.commandv('change-list', 'script-opts', 'append', 'uosc-color=' .. color_string())
 end
+-- refresh_menu() rebuilds the whole tree; uosc 5.x keeps us in the same submenu
+-- (matched by its stable title id) and preserves the selection, so the radio
+-- icons update live without bouncing back to the menu root.
 local function set_mode(m)
     mode = m; apply_appearance(); save_state()
     osd(string.format(t('theme_osd'), m == 'light' and t('theme_light') or t('theme_dark')))
+    refresh_menu()
 end
 local function set_accent(hex)
     accent = hex; apply_appearance(); save_state()
     local key = accent_name(hex)
     osd(string.format(t('accent_osd'), key and t(key) or hex))
+    refresh_menu()
 end
 -- Community theme pack: applies its raw uosc options live (advanced preview, not persisted).
 local function apply_theme_pack(name)

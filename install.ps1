@@ -1,17 +1,20 @@
 <#
-EchoPlay installer.
-  - Copies EchoPlay config into your mpv config directory.
+EchoPlay installer - zero-friction setup.
+  - If mpv isn't installed, downloads a portable mpv build automatically.
+  - Copies EchoPlay config into the mpv config directory.
   - Downloads upstream components (uosc, thumbfast, memo) into the same directory.
   - Patches uosc controls to show the EchoPlay audio button.
-  - Optionally registers mpv for the Windows "Open with" list.
+  - Rebrands mpv.exe to EchoPlay and registers it for the Windows "Open with" list.
 
 Usage:
-  powershell -ExecutionPolicy Bypass -File install.ps1 [-ConfigDir <path>] [-SkipAssoc]
+  powershell -ExecutionPolicy Bypass -File install.ps1
+  [-ConfigDir <path>] [-Portable] [-SkipAssoc] [-SkipMpvDownload]
 #>
 param(
     [string]$ConfigDir = "",
     [switch]$Portable,
-    [switch]$SkipAssoc
+    [switch]$SkipAssoc,
+    [switch]$SkipMpvDownload
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,11 +26,49 @@ $UOSC_VERSION = '5.12.0'
 function Info($m) { Write-Host "[EchoPlay] $m" -ForegroundColor Cyan }
 function Warn($m) { Write-Host "[EchoPlay] $m" -ForegroundColor Yellow }
 
-# --- 1. Locate mpv.exe and decide config directory --------------------------
+# Standalone 7-Zip extractor (PowerShell's Expand-Archive can't read .7z).
+function Get-SevenZip {
+    $z = Join-Path $env:TEMP 'echoplay-7zr.exe'
+    if (-not (Test-Path $z)) {
+        Invoke-WebRequest -UseBasicParsing -Uri 'https://www.7-zip.org/a/7zr.exe' -OutFile $z
+    }
+    return $z
+}
+
+# Download a portable mpv build (shinchiro builds mirrored on GitHub with direct
+# download URLs) and extract it into $Dest. Returns the path to mpv.exe.
+function Install-PortableMpv {
+    param([string]$Dest)
+    Info "mpv bulunamadi -> tasinabilir mpv indiriliyor (tek seferlik, ~32 MB)..."
+    $rel = Invoke-RestMethod -UseBasicParsing -Headers @{ 'User-Agent' = 'EchoPlay' } `
+        -Uri 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest'
+    # baseline x86_64 build (the -v3- variant needs a newer CPU with AVX2)
+    $asset = $rel.assets | Where-Object { $_.name -match '^mpv-x86_64-[0-9].*\.7z$' } | Select-Object -First 1
+    if (-not $asset) { throw "mpv build asseti bulunamadi" }
+    $arc = Join-Path $env:TEMP $asset.name
+    Info "Indiriliyor: $($asset.name)"
+    Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $arc
+    New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+    & (Get-SevenZip) x "-o$Dest" $arc -y | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "mpv arsivi cikartilamadi" }
+    Remove-Item $arc -Force -ErrorAction SilentlyContinue
+    $exe = Get-ChildItem -Path $Dest -Recurse -Filter 'mpv.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $exe) { throw "mpv.exe cikartilan dosyalarda bulunamadi" }
+    Info "Tasinabilir mpv kuruldu: $($exe.FullName)"
+    return $exe.FullName
+}
+
+# --- 1. Locate mpv.exe (download a portable build if missing) ---------------
 $mpv = (Get-Command mpv -ErrorAction SilentlyContinue).Source
 if (-not $mpv) {
     $guess = "$env:LOCALAPPDATA\Programs\mpv\mpv.exe"
     if (Test-Path $guess) { $mpv = $guess }
+}
+if (-not $mpv -and -not $SkipMpvDownload) {
+    try {
+        $mpv = Install-PortableMpv -Dest (Join-Path $env:LOCALAPPDATA 'Programs\EchoPlay')
+        $Portable = $true   # use a self-contained portable_config next to the new mpv.exe
+    } catch { Warn "Otomatik mpv kurulumu basarisiz: $($_.Exception.Message)" }
 }
 if (-not $ConfigDir) {
     if ($env:MPV_HOME) {
@@ -99,35 +140,29 @@ try {
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# --- 6. File association (best effort; Win11 default must be confirmed by user)
+# --- 6. Register EchoPlay in the Windows "Open with" list (no UAC, branded).
 if (-not $SkipAssoc -and $mpv) {
     try {
-        $bat = Join-Path (Split-Path -Parent $mpv) 'installer\mpv-install.bat'
-        if (Test-Path $bat) {
-            Info "mpv-install.bat calistiriliyor..."
-            Start-Process -FilePath $bat -WorkingDirectory (Split-Path -Parent $bat) -Verb RunAs -Wait
-        } else {
-            # Register mpv.exe (GUI subsystem) as a proper app so it shows up in the
-            # Windows "Open with" list as "EchoPlay". NOT mpv.com / the scoop
-            # shim, which are console subsystem and pop a terminal behind the player.
-            $mpvGui = $mpv -replace '\.com$', '.exe'
-            if (-not (Test-Path $mpvGui)) { $mpvGui = $mpv }
-            $base = 'HKCU:\Software\Classes\Applications\mpv.exe'
-            New-Item -Path "$base\shell\open\command" -Force | Out-Null
-            Set-ItemProperty -Path "$base\shell\open\command" -Name '(default)' -Value "`"$mpvGui`" `"%1`""
-            Set-ItemProperty -Path $base -Name 'FriendlyAppName' -Value 'EchoPlay'
-            $icon = "$mpvGui,0"
-            $logo = Join-Path $root 'assets\logo.ico'
-            if (Test-Path $logo) { Copy-Item $logo (Join-Path $ConfigDir 'logo.ico') -Force; $icon = Join-Path $ConfigDir 'logo.ico' }
-            New-Item -Path "$base\DefaultIcon" -Force | Out-Null
-            Set-ItemProperty -Path "$base\DefaultIcon" -Name '(default)' -Value $icon
-            New-Item -Path "$base\SupportedTypes" -Force | Out-Null
-            foreach ($ext in '.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.ts','.flv','.mp3','.flac','.m4a','.wav','.ogg','.opus') {
-                Set-ItemProperty -Path "$base\SupportedTypes" -Name $ext -Value ''
-            }
-            Info "Player 'Birlikte ac' listesine 'EchoPlay' olarak eklendi."
-            Warn "Varsayilan yapmak icin: videoya sag tik > Birlikte ac > 'EchoPlay' > 'Her zaman'."
+        # Register mpv.exe (GUI subsystem) as a proper app so it shows up in the
+        # Windows "Open with" list as "EchoPlay". NOT mpv.com / a console shim,
+        # which are console subsystem and pop a terminal behind the player.
+        $mpvGui = $mpv -replace '\.com$', '.exe'
+        if (-not (Test-Path $mpvGui)) { $mpvGui = $mpv }
+        $base = 'HKCU:\Software\Classes\Applications\mpv.exe'
+        New-Item -Path "$base\shell\open\command" -Force | Out-Null
+        Set-ItemProperty -Path "$base\shell\open\command" -Name '(default)' -Value "`"$mpvGui`" `"%1`""
+        Set-ItemProperty -Path $base -Name 'FriendlyAppName' -Value 'EchoPlay'
+        $icon = "$mpvGui,0"
+        $logo = Join-Path $root 'assets\logo.ico'
+        if (Test-Path $logo) { Copy-Item $logo (Join-Path $ConfigDir 'logo.ico') -Force; $icon = Join-Path $ConfigDir 'logo.ico' }
+        New-Item -Path "$base\DefaultIcon" -Force | Out-Null
+        Set-ItemProperty -Path "$base\DefaultIcon" -Name '(default)' -Value $icon
+        New-Item -Path "$base\SupportedTypes" -Force | Out-Null
+        foreach ($ext in '.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.ts','.flv','.mp3','.flac','.m4a','.wav','.ogg','.opus') {
+            Set-ItemProperty -Path "$base\SupportedTypes" -Name $ext -Value ''
         }
+        Info "Player 'Birlikte ac' listesine 'EchoPlay' olarak eklendi."
+        Warn "Varsayilan yapmak icin: videoya sag tik > Birlikte ac > 'EchoPlay' > 'Her zaman'."
     } catch { Warn "Dosya iliskilendirme atlandi: $($_.Exception.Message)" }
 }
 

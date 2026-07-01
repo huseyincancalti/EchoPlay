@@ -1,25 +1,43 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="EchoPlay" width="160" />
+<img src="assets/logo.png" alt="EchoPlay — Windows video player for NVIDIA ShadowPlay and OBS Studio dual audio track recordings" width="160" />
 
 # EchoPlay
 
-**A modern, friendly Windows video player built on mpv — for clips with more than one audio track.**
+**The Windows video player for dual-audio-track recordings — NVIDIA ShadowPlay, NVIDIA App, and
+OBS Studio clips with separate game/mic tracks, mixed live.**
+
+[![Latest release](https://img.shields.io/github/v/release/huseyincancalti/EchoPlay?label=download&color=ee7733)](https://github.com/huseyincancalti/EchoPlay/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D6)](#download--install)
 
 </div>
 
 ---
 
-## What is EchoPlay?
+## What is EchoPlay? A player built for NVIDIA ShadowPlay & OBS dual audio tracks
 
 EchoPlay is a curated **distribution of [mpv](https://mpv.io)** — *not a fork*. It wraps the
 upstream engine with a modern [uosc](https://github.com/tomasklaen/uosc) interface and a single
 small script, so you get a clean, YouTube-style player that adds the features mpv leaves to you.
 
-It was born from one annoyance: **NVIDIA ShadowPlay / NVIDIA App** recordings ship with two audio
-tracks (game/system sound + microphone). Most players force you to pick one, or re-encode the file
-to mix them. EchoPlay mixes any combination of tracks **live, with no re-encode and no reloading
-the video** — and remembers your choice for next time.
+It was born from one annoyance: **NVIDIA ShadowPlay**, the **NVIDIA App** overlay, and **OBS
+Studio** (recording with "Track 1 = desktop/game audio, Track 2 = microphone") all save clips with
+**two separate audio tracks** instead of one mixed track. Most players force you to pick a single
+track, or make you re-encode the file in an editor just to mix them. EchoPlay mixes any combination
+of tracks **live, with no re-encode and no reloading the video** — and remembers your choice for
+next time.
+
+### Who EchoPlay is for
+
+- 🎮 **NVIDIA ShadowPlay / NVIDIA App users** whose Instant Replay or manual recordings capture
+  game and mic audio on separate tracks.
+- 🎥 **OBS Studio streamers & recorders** using multi-track audio output (desktop + mic on
+  separate tracks) who want to remix a clip after recording without re-exporting from OBS.
+- ✂️ **Editors and YouTubers** who receive dual-track clips from someone else and just need to
+  balance, mute, or re-center a track before uploading.
+- 🎧 Anyone with a **quiet or channel-imbalanced recording** who wants louder, centered audio
+  without opening Audacity or Premiere.
 
 ### Highlights
 
@@ -37,6 +55,17 @@ the video** — and remembers your choice for next time.
   theme & language packs (see below).
 - 💾 **Persistent** — your mixer, mono, accent, language and speed choices survive restarts, and
   every file resumes where you left off.
+
+### EchoPlay vs. VLC, PotPlayer & vanilla mpv for dual-audio-track video
+
+| | VLC / PotPlayer | Vanilla mpv | **EchoPlay** |
+|---|---|---|---|
+| Play a specific audio track | ✅ (pick one) | ✅ (pick one) | ✅ |
+| **Mix multiple tracks together, live** | ❌ | ⚙️ manual `lavfi-complex` | ✅ one click |
+| Per-track volume / mute | ❌ | ⚙️ manual | ✅ |
+| Fix a mic that's only in one ear (mono) | ❌ | ⚙️ manual | ✅ one click |
+| Remembers your mix per file | ❌ | ❌ | ✅ |
+| Setup | Install only | Install + hand-written config | **One installer, ready to go** |
 
 ## Download & Install
 
@@ -80,6 +109,26 @@ association.
 | `g` | Toggle fixed speed (factor set in the menu) |
 | `Ctrl`+`1/2/3` | Toggle audio track 1 / 2 / 3 |
 | Right-click / `a` | Settings menu |
+
+### FAQ
+
+**Why does my NVIDIA ShadowPlay / OBS recording have two audio tracks?**
+NVIDIA's recorder and OBS Studio (with multi-track audio enabled) both save game/system sound and
+your microphone as two independent audio tracks in the same video file, instead of mixing them
+into one. Most players only let you pick a single track to play.
+
+**How do I play a video with 2 audio tracks on Windows?**
+Set EchoPlay as your default player (see [Download & Install](#download--install) above), then
+open the file — every audio track is auto-detected and shown in the mixer, and EchoPlay mixes
+them for you by default.
+
+**Can I merge two audio tracks without re-encoding the video?**
+Yes — that's the whole point. EchoPlay rebuilds mpv's audio filter graph live (`lavfi-complex`),
+so the video stream is never touched and there's no export or re-encode step.
+
+**Does EchoPlay work with OBS Studio recordings?**
+Yes. Any file with multiple audio tracks — OBS multi-track output, ShadowPlay, NVIDIA App, or
+manually muxed files — is handled the same way.
 
 ---
 

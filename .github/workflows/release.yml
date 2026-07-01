@@ -93,6 +93,7 @@ jobs:
   build-macos:
     runs-on: macos-14
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: arm64
@@ -108,7 +109,7 @@ jobs:
       - name: Download upstream mpv.app bundle
         run: |
           set -euo pipefail
-          curl -sfL -H "User-Agent: EchoPlay-CI" \
+          curl -sfL --retry 3 --retry-delay 5 -H "User-Agent: EchoPlay-CI" \
             https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release -o release.json
           URL=$(python3 -c "
           import json, re
@@ -121,7 +122,7 @@ jobs:
           ")
           if [ -z "$URL" ]; then echo "No mpv.app asset matched ${{ matrix.asset_pattern }}" >&2; exit 1; fi
           echo "Downloading $URL"
-          curl -sfL -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
+          curl -sfL --retry 3 --retry-delay 5 -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
           mkdir -p build
           unzip -q mpv.zip -d build
           tar -xzf build/mpv.tar.gz -C build
@@ -283,9 +284,6 @@ jobs:
           cp installer/linux/echoplay.desktop "$APPDIR/echoplay.desktop"
           desktop-file-validate "$APPDIR/echoplay.desktop"
 
-          cp installer/linux/AppRun "$APPDIR/AppRun"
-          chmod +x "$APPDIR/AppRun"
-
       - name: Build AppImage
         run: |
           set -euo pipefail
@@ -296,9 +294,12 @@ jobs:
           # linuxdeploy finds its "appimage" output plugin by looking for
           # linuxdeploy-plugin-appimage(.AppImage) on PATH.
           export PATH="$PWD:$PATH"
+          # --custom-apprun must point at a file OUTSIDE the AppDir: linuxdeploy
+          # copies it in as AppDir/AppRun itself, and source==dest fails.
+          chmod +x installer/linux/AppRun
           ./linuxdeploy.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/mpv \
-            --custom-apprun AppDir/AppRun \
+            --custom-apprun installer/linux/AppRun \
             --desktop-file AppDir/echoplay.desktop \
             --icon-file AppDir/echoplay.png \
             --output appimage

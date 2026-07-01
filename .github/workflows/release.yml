@@ -22,8 +22,14 @@ jobs:
 
       - name: Download portable mpv
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $rel = Invoke-RestMethod -UseBasicParsing -Headers @{ 'User-Agent' = 'EchoPlay-CI' } `
+          # Authenticated with the workflow's own token: unauthenticated
+          # api.github.com calls are capped at 60/hour per source IP (the
+          # macOS job hit this in practice, HTTP 403); the token raises it
+          # to 5000/hour and needs no extra permissions for public repos.
+          $rel = Invoke-RestMethod -UseBasicParsing -Headers @{ 'User-Agent' = 'EchoPlay-CI'; 'Authorization' = "Bearer $env:GH_TOKEN" } `
             -Uri 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest'
           $asset = $rel.assets | Where-Object { $_.name -match '^mpv-x86_64-[0-9].*\.7z$' } | Select-Object -First 1
           if (-not $asset) { throw "No baseline x86_64 mpv asset found in latest mpv-winbuild release" }
@@ -107,11 +113,19 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Download upstream mpv.app bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           echo "Fetching release metadata..."
+          # Authenticated with the workflow's own token: unauthenticated
+          # api.github.com calls are capped at 60/hour per source IP, and
+          # GitHub-hosted macOS runners share a small enough IP pool that
+          # this limit gets hit in practice (confirmed via HTTP 403 here).
+          # The token raises that to 5000/hour and needs no extra permissions
+          # for reading a public repo's release metadata.
           curl -fL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 15 -w 'HTTP %{http_code}\n' \
-            -H "User-Agent: EchoPlay-CI" \
+            -H "User-Agent: EchoPlay-CI" -H "Authorization: Bearer ${GH_TOKEN}" \
             https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release -o release.json
           URL=$(python3 -c "
           import json, re

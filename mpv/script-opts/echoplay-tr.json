@@ -45,5 +45,44 @@
   "subtitles": "Altyazı",
   "audio_device": "Ses Cihazı",
   "config_dir": "Program Klasörü",
-  "single_track": "Bu videoda tek ses parçası var"
+  "single_track": "Bu videoda tek ses parçası var",
+
+  "perf_mode": "Performans Modu",
+  "perf_auto": "Otomatik",
+  "perf_on": "Açık (zorla)",
+  "perf_off": "Kapalı",
+  "perf_hint_active": "Etkin",
+  "perf_auto_on": "Takılma tespit edildi - Performans Modu açıldı",
+  "perf_auto_off": "Performans Modu kapatıldı",
+  "perf_manual_on": "Performans Modu: Açık",
+  "perf_manual_off": "Performans Modu: Kapalı",
+  "perf_manual_auto": "Performans Modu: Otomatik",
+
+  "shortcuts": "Klavye Kısayolları",
+  "sc_rclick": "sağ tık",
+  "sc_menu": "Ayarlar menüsünü aç",
+  "sc_speed": "Sabit hızı aç/kapat",
+  "sc_mute": "Sesi kapat/aç",
+  "sc_volume": "Sesi artır / azalt",
+  "sc_seek": "10 saniye geri/ileri sar",
+  "sc_track_toggle": "1., 2., 3. ses parçasını aç/kapat",
+  "sc_screenshot": "Ekran görüntüsü al (altyazı dahil)",
+  "sc_screenshot_video": "Ekran görüntüsü al (yalnızca video)",
+  "sc_screenshot_window": "Ekran görüntüsü al (tüm pencere)",
+  "sc_deinterlace": "Deinterlace aç/kapat (çoğu video için görünür etkisi yoktur)",
+
+  "screenshot_location": "Ekran Görüntüsü Konumu",
+  "screenshot_desktop": "Masaüstü",
+  "screenshot_videos": "Videolar",
+  "screenshot_pictures": "Resimler",
+  "screenshot_video_folder": "Video ile aynı klasör",
+  "screenshot_osd": "Ekran görüntüsü klasörü: %s",
+
+  "make_default": "Varsayılan Uygulama Yap",
+  "ext_video": "Video",
+  "ext_audio": "Ses",
+  "open_default_apps": "Windows Varsayılan Uygulamalar sayfasını aç",
+
+  "menu_hint": "İpucu: Ayarlar için sağ tıklayın veya `a` tuşuna basın",
+  "sec_help": "Yardım"
 }

@@ -45,5 +45,44 @@
   "subtitles": "Subtitles",
   "audio_device": "Audio Device",
   "config_dir": "Program Folder",
-  "single_track": "This video has a single audio track"
+  "single_track": "This video has a single audio track",
+
+  "perf_mode": "Performance Mode",
+  "perf_auto": "Automatic",
+  "perf_on": "On (forced)",
+  "perf_off": "Off",
+  "perf_hint_active": "Active",
+  "perf_auto_on": "Stutter detected - Performance Mode enabled",
+  "perf_auto_off": "Performance Mode disabled",
+  "perf_manual_on": "Performance Mode: On",
+  "perf_manual_off": "Performance Mode: Off",
+  "perf_manual_auto": "Performance Mode: Automatic",
+
+  "shortcuts": "Keyboard Shortcuts",
+  "sc_rclick": "right-click",
+  "sc_menu": "Open the Settings menu",
+  "sc_speed": "Toggle fixed speed",
+  "sc_mute": "Mute / unmute",
+  "sc_volume": "Volume up / down",
+  "sc_seek": "Seek 10 seconds back / forward",
+  "sc_track_toggle": "Toggle audio track 1 / 2 / 3",
+  "sc_screenshot": "Take a screenshot (with subtitles)",
+  "sc_screenshot_video": "Take a screenshot (video only)",
+  "sc_screenshot_window": "Take a screenshot (full window)",
+  "sc_deinterlace": "Toggle deinterlace (no visible effect on most videos)",
+
+  "screenshot_location": "Screenshot Location",
+  "screenshot_desktop": "Desktop",
+  "screenshot_videos": "Videos",
+  "screenshot_pictures": "Pictures",
+  "screenshot_video_folder": "Same folder as video",
+  "screenshot_osd": "Screenshot folder: %s",
+
+  "make_default": "Set as Default App",
+  "ext_video": "Video",
+  "ext_audio": "Audio",
+  "open_default_apps": "Open Windows Default Apps settings",
+
+  "menu_hint": "Tip: right-click or press `a` for Settings",
+  "sec_help": "Help"
 }

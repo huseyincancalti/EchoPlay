@@ -158,7 +158,7 @@ if (-not $SkipAssoc -and $mpv) {
         New-Item -Path "$base\DefaultIcon" -Force | Out-Null
         Set-ItemProperty -Path "$base\DefaultIcon" -Name '(default)' -Value $icon
         New-Item -Path "$base\SupportedTypes" -Force | Out-Null
-        foreach ($ext in '.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.ts','.flv','.mp3','.flac','.m4a','.wav','.ogg','.opus') {
+        foreach ($ext in '.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.ts','.flv','.3gp','.rmvb','.ogm','.mp3','.flac','.m4a','.wav','.ogg','.opus','.aac','.wma','.wv') {
             Set-ItemProperty -Path "$base\SupportedTypes" -Name $ext -Value ''
         }
         Info "Player 'Birlikte ac' listesine 'EchoPlay' olarak eklendi."

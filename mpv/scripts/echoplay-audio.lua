@@ -1,7 +1,7 @@
 -- EchoPlay: one searchable, fully localized Settings menu (right-click / `a` / button).
 --   * Audio mixer lives in its own collapsed submenu (toggle + gain + per-track Mono),
 --     so a 9-track file doesn't dump everything on screen. Mixing is live (lavfi-complex).
---   * Sectioned settings (Playback / Appearance / File) with headings + dividers.
+--   * Sectioned settings (Playback / Appearance / File / Help) with headings + dividers.
 --   * Appearance = Dark/Light mode + an accent color, computed in-script (clean live
 --     switching). Community theme packs (themes/*.conf) still appear as advanced presets.
 --   * Languages are community-extensible: drop a script-opts/echoplay-<code>.json.
@@ -57,6 +57,12 @@ local ACCENTS = {
 local mode = 'dark'        -- 'dark' | 'light'
 local accent = 'ee7733'
 
+-- ---------- new-feature state (performance mode / screenshot location / first-run hint) ----------
+local perf_pref = 'auto'             -- 'auto' | 'on' | 'off'
+local perf_active = false            -- whether the lightweight profile is currently applied
+local screenshot_preset = 'desktop'  -- 'desktop' | 'videos' | 'pictures' | 'video_folder'
+local menu_hint_shown = false
+
 -- Full color override (latest append wins, so switching modes resets cleanly in-session).
 local function color_string()
     if mode == 'light' then
@@ -86,6 +92,9 @@ local function load_state()
     if tonumber(s.speed_factor) then o.speed_factor = tonumber(s.speed_factor) end
     if type(s.gains) == 'table' then saved_gains = s.gains end
     if type(s.mono) == 'table' then saved_mono = s.mono end
+    if s.perf_pref == 'auto' or s.perf_pref == 'on' or s.perf_pref == 'off' then perf_pref = s.perf_pref end
+    if type(s.screenshot_preset) == 'string' and s.screenshot_preset ~= '' then screenshot_preset = s.screenshot_preset end
+    if s.menu_hint_shown then menu_hint_shown = true end
 end
 load_state()
 
@@ -108,6 +117,36 @@ local FALLBACK = {
     open_theme = 'Tema klasörünü aç (tema ekle)', lang_name = 'Türkçe',
     open_file = 'Dosya Aç', playlist = 'Oynatma Listesi', subtitles = 'Altyazı',
     audio_device = 'Ses Cihazı', config_dir = 'Program Klasörü', single_track = 'Bu videoda tek ses parçası var',
+
+    -- Performance mode
+    perf_mode = 'Performans Modu', perf_auto = 'Otomatik', perf_on = 'Açık (zorla)', perf_off = 'Kapalı',
+    perf_hint_active = 'Etkin',
+    perf_auto_on = 'Takılma tespit edildi - Performans Modu açıldı',
+    perf_auto_off = 'Performans Modu kapatıldı',
+    perf_manual_on = 'Performans Modu: Açık', perf_manual_off = 'Performans Modu: Kapalı',
+    perf_manual_auto = 'Performans Modu: Otomatik',
+
+    -- Keyboard shortcuts reference
+    shortcuts = 'Klavye Kısayolları', sc_rclick = 'sağ tık',
+    sc_menu = 'Ayarlar menüsünü aç', sc_speed = 'Sabit hızı aç/kapat', sc_mute = 'Sesi kapat/aç',
+    sc_volume = 'Sesi artır / azalt', sc_seek = '10 saniye geri/ileri sar',
+    sc_track_toggle = '1., 2., 3. ses parçasını aç/kapat',
+    sc_screenshot = 'Ekran görüntüsü al (altyazı dahil)',
+    sc_screenshot_video = 'Ekran görüntüsü al (yalnızca video)',
+    sc_screenshot_window = 'Ekran görüntüsü al (tüm pencere)',
+    sc_deinterlace = 'Deinterlace aç/kapat (çoğu video için görünür etkisi yoktur)',
+
+    -- Screenshot location
+    screenshot_location = 'Ekran Görüntüsü Konumu', screenshot_desktop = 'Masaüstü',
+    screenshot_videos = 'Videolar', screenshot_pictures = 'Resimler',
+    screenshot_video_folder = 'Video ile aynı klasör', screenshot_osd = 'Ekran görüntüsü klasörü: %s',
+
+    -- Default-app helper (Windows only)
+    make_default = 'Varsayılan Uygulama Yap', ext_video = 'Video', ext_audio = 'Ses',
+    open_default_apps = 'Windows Varsayılan Uygulamalar sayfasını aç',
+
+    -- Discoverability
+    menu_hint = 'İpucu: Ayarlar için sağ tıklayın veya `a` tuşuna basın', sec_help = 'Yardım',
 }
 local function load_lang(code)
     return read_json(OPTS_DIR .. '/echoplay-' .. code .. '.json')
@@ -129,6 +168,7 @@ local PLAYER = { ['open-file'] = 'open-file', playlist = 'playlist', subtitles =
 local tracks, info = {}, {}
 local enabled, gain, mono = {}, {}, {}
 local appearance_applied = false
+local perf_pref_applied = false
 
 -- ---------- helpers ----------
 local function label(aid)
@@ -213,7 +253,8 @@ local function save_state()
     local f = io.open(STATE_PATH, 'w')
     if f then
         f:write(utils.format_json({ default_on = don, gains = gains, mono = monos,
-            language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor }))
+            language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
+            perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown }))
         f:close()
     end
 end
@@ -255,7 +296,72 @@ local function lang_items()
     return items
 end
 
--- Main settings menu: grouped into Playback / Appearance / File.
+-- Performance Mode: Auto/On/Off radio, same shape as theme_items()'s mode radio.
+local function perf_items()
+    local items = {}
+    items[#items + 1] = { title = t('perf_auto'), icon = RADIO[perf_pref == 'auto'], value = 'perf:auto', keep_open = true }
+    items[#items + 1] = { title = t('perf_on'), icon = RADIO[perf_pref == 'on'], value = 'perf:on', keep_open = true }
+    items[#items + 1] = { title = t('perf_off'), icon = RADIO[perf_pref == 'off'], value = 'perf:off', keep_open = true }
+    return items
+end
+
+-- Read-only keyboard shortcuts reference: EchoPlay's own bindings (input.conf) plus the
+-- important mpv defaults we deliberately don't override (screenshot variants, deinterlace).
+local function shortcuts_items()
+    local rows = {
+        { 'a / ' .. t('sc_rclick'), t('sc_menu') },
+        { 'g', t('sc_speed') },
+        { 'm', t('sc_mute') },
+        { 'Up / Down', t('sc_volume') },
+        { 'Left / Right', t('sc_seek') },
+        { 'Ctrl+1/2/3', t('sc_track_toggle') },
+        { 's', t('sc_screenshot') },
+        { 'Shift+s', t('sc_screenshot_video') },
+        { 'Ctrl+s', t('sc_screenshot_window') },
+        { 'd', t('sc_deinterlace') },
+    }
+    local items = {}
+    for _, r in ipairs(rows) do
+        items[#items + 1] = { title = r[1], hint = r[2], selectable = false }
+    end
+    return items
+end
+
+-- Screenshot location: preset radio (Desktop / Videos / Pictures / same folder as video).
+local function screenshot_items()
+    local items = {}
+    items[#items + 1] = { title = t('screenshot_desktop'), icon = RADIO[screenshot_preset == 'desktop'], value = 'screenshot:desktop', keep_open = true }
+    items[#items + 1] = { title = t('screenshot_videos'), icon = RADIO[screenshot_preset == 'videos'], value = 'screenshot:videos', keep_open = true }
+    items[#items + 1] = { title = t('screenshot_pictures'), icon = RADIO[screenshot_preset == 'pictures'], value = 'screenshot:pictures', keep_open = true }
+    items[#items + 1] = { title = t('screenshot_video_folder'), icon = RADIO[screenshot_preset == 'video_folder'], value = 'screenshot:video_folder', keep_open = true }
+    return items
+end
+
+-- Supported extensions (kept in sync with installer/windows/EchoPlay.iss's SupportedTypes list).
+local EXT_VIDEO = { '.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', '.wmv', '.ts', '.flv', '.3gp', '.rmvb', '.ogm' }
+local EXT_AUDIO = { '.mp3', '.flac', '.m4a', '.wav', '.ogg', '.opus', '.aac', '.wma', '.wv' }
+
+-- "Set as Default App" (Windows only): EchoPlay can't silently become the default handler for a
+-- file type (Windows has blocked that since Windows 8, hardened further in 2024) - the extension
+-- list here is a fast on-ramp into Windows' own per-app Default Apps page, where the user makes
+-- the final confirming click themselves.
+local function default_apps_items()
+    local items = {}
+    items[#items + 1] = heading(t('ext_video'))
+    for _, ext in ipairs(EXT_VIDEO) do
+        items[#items + 1] = { title = ext, icon = 'movie', value = 'default-apps' }
+    end
+    items[#items + 1] = separator()
+    items[#items + 1] = heading(t('ext_audio'))
+    for _, ext in ipairs(EXT_AUDIO) do
+        items[#items + 1] = { title = ext, icon = 'audiotrack', value = 'default-apps' }
+    end
+    items[#items + 1] = separator()
+    items[#items + 1] = { title = t('open_default_apps'), icon = 'open_in_new', value = 'default-apps' }
+    return items
+end
+
+-- Main settings menu: grouped into Playback / Appearance / File / Help.
 local function menu_data()
     local items = {}
     -- Playback
@@ -271,6 +377,8 @@ local function menu_data()
         { title = t('end_loop'), icon = RADIO[e == 'loop'], value = 'end:loop' },
         { title = t('end_stop'), icon = RADIO[e == 'stop'], value = 'end:stop' },
     } }
+    items[#items + 1] = { title = t('perf_mode'), icon = 'speed',
+        hint = perf_active and t('perf_hint_active') or nil, items = perf_items() }
     -- Appearance
     items[#items + 1] = separator()
     items[#items + 1] = heading(t('sec_appearance'))
@@ -283,7 +391,15 @@ local function menu_data()
     items[#items + 1] = { title = t('playlist'), icon = 'list', value = 'playlist' }
     items[#items + 1] = { title = t('subtitles'), icon = 'subtitles', value = 'subtitles' }
     items[#items + 1] = { title = t('audio_device'), icon = 'speaker', value = 'audio-device' }
+    items[#items + 1] = { title = t('screenshot_location'), icon = 'photo_camera', items = screenshot_items() }
     items[#items + 1] = { title = t('config_dir'), icon = 'settings', value = 'config-dir' }
+    -- Help
+    items[#items + 1] = separator()
+    items[#items + 1] = heading(t('sec_help'))
+    items[#items + 1] = { title = t('shortcuts'), icon = 'keyboard', items = shortcuts_items() }
+    if mp.get_property_native('platform') == 'windows' then
+        items[#items + 1] = { title = t('make_default'), icon = 'apps', items = default_apps_items() }
+    end
     return { type = MENU_TYPE, title = t('settings'), search_style = 'palette',
         callback = { SCRIPT, 'menu-event' }, items = items }
 end
@@ -433,6 +549,106 @@ local function set_language(code)
     update_button(); open_menu()
 end
 
+-- ---------- screenshot location ----------
+-- mpv only has a built-in '~~desktop/' alias; Videos/Pictures need resolving per platform.
+local resolved_videos_dir, resolved_pictures_dir = nil, nil
+local function platform_special_dir(kind) -- kind = 'MyVideos' | 'MyPictures'
+    local platform = mp.get_property_native('platform')
+    if platform == 'windows' then
+        -- playback_only=false: this can be invoked from the idle screen (no file loaded), where
+        -- mpv would otherwise kill a playback-tied subprocess immediately.
+        local res = mp.command_native({ name = 'subprocess', playback_only = false, args = {
+            'powershell', '-NoProfile', '-Command', '[Environment]::GetFolderPath("' .. kind .. '")'
+        }, capture_stdout = true })
+        local out = res and res.stdout and res.stdout:gsub('%s+$', '')
+        return (out and out ~= '') and out or nil
+    end
+    local name = (kind == 'MyVideos') and '~/Videos' or '~/Pictures'
+    return mp.command_native({ 'expand-path', name })
+end
+local function apply_screenshot_preset()
+    local dir
+    if screenshot_preset == 'videos' then
+        resolved_videos_dir = resolved_videos_dir or platform_special_dir('MyVideos')
+        dir = resolved_videos_dir
+    elseif screenshot_preset == 'pictures' then
+        resolved_pictures_dir = resolved_pictures_dir or platform_special_dir('MyPictures')
+        dir = resolved_pictures_dir
+    elseif screenshot_preset == 'video_folder' then
+        local path = mp.get_property('path')
+        if path then dir = utils.split_path(path) end
+    else
+        dir = mp.command_native({ 'expand-path', '~~desktop/' })
+    end
+    if dir and dir ~= '' then mp.set_property('screenshot-directory', dir) end
+end
+local function set_screenshot_preset(preset)
+    screenshot_preset = preset
+    apply_screenshot_preset()
+    save_state()
+    osd(string.format(t('screenshot_osd'), t('screenshot_' .. preset)))
+    refresh_menu()
+end
+
+-- ---------- "set as default app" (Windows only) ----------
+-- Windows blocks silent/programmatic default-app changes since Windows 8 (hardened further by
+-- the UCPD driver in 2024); this just opens Windows' own per-app Default Apps page so the user
+-- can make the final confirming click themselves.
+local function open_default_apps()
+    mp.command_native_async({ name = 'subprocess', playback_only = false, args = {
+        'powershell', '-NoProfile', '-WindowStyle', 'Hidden', '-Command',
+        'Start-Process ms-settings:defaultapps?registeredAppUser=EchoPlay'
+    }, detach = true }, function() end)
+end
+
+-- ---------- automatic low-performance mode ----------
+local PERF_POLL_INTERVAL = 2
+local PERF_DROP_THRESHOLD = 6
+local PERF_BAD_STREAK_NEEDED = 3
+local PERF_GOOD_STREAK_NEEDED = 5
+local perf_last_count, perf_bad_streak, perf_good_streak = nil, 0, 0
+
+local function set_perf_active(active, reason_key)
+    if active == perf_active then return end
+    perf_active = active
+    if active then mp.commandv('apply-profile', 'echoplay-performance')
+    else mp.commandv('apply-profile', 'echoplay-performance', 'restore') end
+    if reason_key then osd(t(reason_key)) end
+    refresh_menu()
+end
+local function perf_poll()
+    if perf_pref == 'off' then
+        perf_last_count = nil; perf_bad_streak, perf_good_streak = 0, 0
+        return
+    end
+    local count = mp.get_property_number('frame-drop-count') or 0
+    if perf_last_count == nil then perf_last_count = count; return end
+    local delta = count - perf_last_count
+    perf_last_count = count
+    if delta < 0 then delta = 0 end -- defensive: counter reset mid-window (new file, or wrapped)
+    if perf_pref == 'on' then return end -- already forced on; nothing to poll-decide
+    if delta >= PERF_DROP_THRESHOLD then
+        perf_bad_streak = perf_bad_streak + 1; perf_good_streak = 0
+        if perf_bad_streak >= PERF_BAD_STREAK_NEEDED and not perf_active then
+            set_perf_active(true, 'perf_auto_on')
+        end
+    else
+        perf_good_streak = perf_good_streak + 1; perf_bad_streak = 0
+        if perf_good_streak >= PERF_GOOD_STREAK_NEEDED and perf_active then
+            set_perf_active(false, 'perf_auto_off')
+        end
+    end
+end
+local function set_perf_pref(pref)
+    perf_pref = pref
+    save_state()
+    if pref == 'on' then set_perf_active(true, 'perf_manual_on')
+    elseif pref == 'off' then set_perf_active(false, 'perf_manual_off')
+    else osd(t('perf_manual_auto')) end -- 'auto': don't force a state change, let next poll decide
+    refresh_menu()
+end
+mp.add_periodic_timer(PERF_POLL_INTERVAL, perf_poll)
+
 local function handle(value, action)
     if value == 'open-mixer' then open_mixer()
     elseif value == 'back' then open_menu()
@@ -449,6 +665,9 @@ local function handle(value, action)
     elseif type(value) == 'string' and value:sub(1, 7) == 'accent:' then set_accent(value:sub(8))
     elseif type(value) == 'string' and value:sub(1, 6) == 'theme:' then apply_theme_pack(value:sub(7))
     elseif type(value) == 'string' and value:sub(1, 5) == 'lang:' then set_language(value:sub(6))
+    elseif type(value) == 'string' and value:sub(1, 5) == 'perf:' then set_perf_pref(value:sub(6))
+    elseif type(value) == 'string' and value:sub(1, 11) == 'screenshot:' then set_screenshot_preset(value:sub(12))
+    elseif value == 'default-apps' then close_menu(); open_default_apps()
     elseif value == 'lang-folder' then close_menu(); open_folder(OPTS_DIR)
     elseif value == 'theme-folder' then close_menu(); open_folder(THEMES_DIR)
     elseif PLAYER[value] then close_menu(); mp.commandv('script-binding', 'uosc/' .. PLAYER[value])
@@ -478,6 +697,18 @@ mp.register_script_message('echoplay-speed', speed_toggle)
 mp.register_event('start-file', function() mp.set_property('lavfi-complex', '') end)
 mp.register_event('file-loaded', function()
     if not appearance_applied then appearance_applied = true; apply_appearance() end
+    if not perf_pref_applied then
+        perf_pref_applied = true
+        if perf_pref == 'on' then set_perf_active(true, nil) end
+    end
+    apply_screenshot_preset() -- static presets are idempotent; 'video_folder' needs this per file
+    if not menu_hint_shown then
+        menu_hint_shown = true
+        save_state()
+        mp.add_timeout(1.5, function() osd(t('menu_hint')) end)
+    end
+    perf_last_count = nil
+    perf_bad_streak, perf_good_streak = 0, 0
     scan()
     enabled, gain, mono = {}, {}, {}
     if o.default_on == 'all' then

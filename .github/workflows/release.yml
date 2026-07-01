@@ -109,7 +109,9 @@ jobs:
       - name: Download upstream mpv.app bundle
         run: |
           set -euo pipefail
-          curl -sfL --retry 5 --retry-all-errors --retry-delay 5 -H "User-Agent: EchoPlay-CI" \
+          echo "Fetching release metadata..."
+          curl -fL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 15 -w 'HTTP %{http_code}\n' \
+            -H "User-Agent: EchoPlay-CI" \
             https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release -o release.json
           URL=$(python3 -c "
           import json, re
@@ -122,7 +124,9 @@ jobs:
           ")
           if [ -z "$URL" ]; then echo "No mpv.app asset matched ${{ matrix.asset_pattern }}" >&2; exit 1; fi
           echo "Downloading $URL"
-          curl -sfL --retry 5 --retry-all-errors --retry-delay 5 -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
+          curl -fL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 15 -w 'HTTP %{http_code}\n' \
+            -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
+          echo "Download complete, extracting..."
           mkdir -p build
           unzip -q mpv.zip -d build
           tar -xzf build/mpv.tar.gz -C build
@@ -303,8 +307,13 @@ jobs:
             --desktop-file AppDir/echoplay.desktop \
             --icon-file AppDir/echoplay.png \
             --output appimage
-          mv EchoPlay*.AppImage "EchoPlay-${VERSION}-x86_64.AppImage"
-          chmod +x "EchoPlay-${VERSION}-x86_64.AppImage"
+          # linuxdeploy-plugin-appimage already names its output using the
+          # VERSION env var we exported earlier, so this is usually a no-op -
+          # only rename if it produced something different.
+          APPIMAGE_OUT=$(ls EchoPlay*.AppImage | head -1)
+          TARGET="EchoPlay-${VERSION}-x86_64.AppImage"
+          [ "$APPIMAGE_OUT" = "$TARGET" ] || mv "$APPIMAGE_OUT" "$TARGET"
+          chmod +x "$TARGET"
 
       - uses: actions/upload-artifact@v4
         with:

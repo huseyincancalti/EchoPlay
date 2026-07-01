@@ -167,15 +167,15 @@ prints the manual "Open With" steps. Flag: `--config-dir <path>` to choose a dif
 | `←` / `→` | Seek 10s back / forward |
 | `m` | Mute |
 | `g` | Toggle fixed speed (factor set in the menu) |
+| `s` / `d` | Slow down / speed up (step is customizable in the menu) |
 | `Ctrl`+`1/2/3` | Toggle audio track 1 / 2 / 3 |
 | Right-click / `a` | Settings menu |
-| `s` | Screenshot (with subtitles) |
+| `F1` | Screenshot (with subtitles) |
 | `Shift`+`s` | Screenshot (video only) |
 | `Ctrl`+`s` | Screenshot (full window) |
-| `d` | Toggle deinterlace (no visible effect on most videos) |
 
-Screenshot save location and a keyboard-shortcuts reference (including the two above) are also
-available from the Settings menu.
+Screenshot save location (including a "choose folder" picker) and a full keyboard-shortcuts
+reference are also available from the Settings menu.
 
 ### FAQ
 

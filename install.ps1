@@ -158,11 +158,18 @@ if (-not $SkipAssoc -and $mpv) {
         New-Item -Path "$base\DefaultIcon" -Force | Out-Null
         Set-ItemProperty -Path "$base\DefaultIcon" -Name '(default)' -Value $icon
         New-Item -Path "$base\SupportedTypes" -Force | Out-Null
-        foreach ($ext in '.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.ts','.flv','.3gp','.rmvb','.ogm','.mp3','.flac','.m4a','.wav','.ogg','.opus','.aac','.wma','.wv') {
+        $exts = '.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.ts','.flv','.3gp','.rmvb','.ogm','.mp3','.flac','.m4a','.wav','.ogg','.opus','.aac','.wma','.wv'
+        foreach ($ext in $exts) {
             Set-ItemProperty -Path "$base\SupportedTypes" -Name $ext -Value ''
         }
         Info "Player 'Birlikte ac' listesine 'EchoPlay' olarak eklendi."
         Warn "Varsayilan yapmak icin: videoya sag tik > Birlikte ac > 'EchoPlay' > 'Her zaman'."
+        # NOTE: a Capabilities/RegisteredApplications ("Default Programs") registration was tried
+        # here so EchoPlay could deep-link straight to its own page in Windows Settings, but was
+        # reverted after live testing: Windows 11's Default Apps search only recognizes apps
+        # registered under HKLM (every real app checked - Adobe Acrobat, VLC, PotPlayer - is HKLM),
+        # not HKCU, and HKLM needs admin. EchoPlay's in-app "Set as Default App" instead opens the
+        # plain ms-settings:defaultapps page and points the user at "Choose defaults by file type".
     } catch { Warn "Dosya iliskilendirme atlandi: $($_.Exception.Message)" }
 }
 

@@ -60,8 +60,10 @@ local accent = 'ee7733'
 -- ---------- new-feature state (performance mode / screenshot location / first-run hint) ----------
 local perf_pref = 'auto'             -- 'auto' | 'on' | 'off'
 local perf_active = false            -- whether the lightweight profile is currently applied
-local screenshot_preset = 'desktop'  -- 'desktop' | 'videos' | 'pictures' | 'video_folder'
+local screenshot_preset = 'desktop'  -- 'desktop' | 'videos' | 'pictures' | 'video_folder' | 'custom'
+local screenshot_custom_path = ''
 local menu_hint_shown = false
+local speed_step = 0.1               -- s/d fine speed-adjust step, user-configurable
 
 -- Full color override (latest append wins, so switching modes resets cleanly in-session).
 local function color_string()
@@ -94,7 +96,9 @@ local function load_state()
     if type(s.mono) == 'table' then saved_mono = s.mono end
     if s.perf_pref == 'auto' or s.perf_pref == 'on' or s.perf_pref == 'off' then perf_pref = s.perf_pref end
     if type(s.screenshot_preset) == 'string' and s.screenshot_preset ~= '' then screenshot_preset = s.screenshot_preset end
+    if type(s.screenshot_custom_path) == 'string' then screenshot_custom_path = s.screenshot_custom_path end
     if s.menu_hint_shown then menu_hint_shown = true end
+    if tonumber(s.speed_step) then speed_step = tonumber(s.speed_step) end
 end
 load_state()
 
@@ -131,19 +135,29 @@ local FALLBACK = {
     sc_menu = 'Ayarlar menüsünü aç', sc_speed = 'Sabit hızı aç/kapat', sc_mute = 'Sesi kapat/aç',
     sc_volume = 'Sesi artır / azalt', sc_seek = '10 saniye geri/ileri sar',
     sc_track_toggle = '1., 2., 3. ses parçasını aç/kapat',
+    sc_speed_down = 'Videoyu yavaşlat (adım Ayarlar\'dan değiştirilebilir)',
+    sc_speed_up = 'Videoyu hızlandır (adım Ayarlar\'dan değiştirilebilir)',
     sc_screenshot = 'Ekran görüntüsü al (altyazı dahil)',
     sc_screenshot_video = 'Ekran görüntüsü al (yalnızca video)',
     sc_screenshot_window = 'Ekran görüntüsü al (tüm pencere)',
-    sc_deinterlace = 'Deinterlace aç/kapat (çoğu video için görünür etkisi yoktur)',
 
     -- Screenshot location
     screenshot_location = 'Ekran Görüntüsü Konumu', screenshot_desktop = 'Masaüstü',
     screenshot_videos = 'Videolar', screenshot_pictures = 'Resimler',
-    screenshot_video_folder = 'Video ile aynı klasör', screenshot_osd = 'Ekran görüntüsü klasörü: %s',
+    screenshot_video_folder = 'Video ile aynı klasör', screenshot_custom = 'Klasör Seç...',
+    screenshot_osd = 'Ekran görüntüsü klasörü: %s',
+
+    -- Fine speed control (s/d keys)
+    speed_fine = 'Video Hızı', speed_step_label = 'Hız Adımı',
+
+    -- Mixer
+    mono_hint = 'Mono: tek kulaktan gelen sesi ortalar',
 
     -- Default-app helper (Windows only)
     make_default = 'Varsayılan Uygulama Yap', ext_video = 'Video', ext_audio = 'Ses',
-    open_default_apps = 'Windows Varsayılan Uygulamalar sayfasını aç',
+    open_default_apps = 'Windows Varsayılan Uygulamalar Ayarlarını Aç',
+    open_default_apps_osd = "Açılan pencerede 'Dosya türüne göre varsayılan uygulamaları seç' bağlantısına tıklayın",
+    open_default_apps_hint = "Windows açılınca 'Dosya türüne göre varsayılan uygulamaları seç' bağlantısına tıklayıp EchoPlay'i seçin",
 
     -- Discoverability
     menu_hint = 'İpucu: Ayarlar için sağ tıklayın veya `a` tuşuna basın', sec_help = 'Yardım',
@@ -254,7 +268,8 @@ local function save_state()
     if f then
         f:write(utils.format_json({ default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
-            perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown }))
+            perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
+            screenshot_custom_path = screenshot_custom_path, speed_step = speed_step }))
         f:close()
     end
 end
@@ -296,6 +311,17 @@ local function lang_items()
     return items
 end
 
+-- Speed step (used by the s/d fine speed-adjust keys) - radio presets, same shape
+-- as theme_items()'s accent-color radio.
+local function speed_step_items()
+    local items = {}
+    for _, step in ipairs({ 0.05, 0.1, 0.2, 0.5 }) do
+        items[#items + 1] = { title = string.format('%.2gx', step), icon = RADIO[speed_step == step],
+            value = 'speed-step:' .. step, keep_open = true }
+    end
+    return items
+end
+
 -- Performance Mode: Auto/On/Off radio, same shape as theme_items()'s mode radio.
 local function perf_items()
     local items = {}
@@ -306,19 +332,20 @@ local function perf_items()
 end
 
 -- Read-only keyboard shortcuts reference: EchoPlay's own bindings (input.conf) plus the
--- important mpv defaults we deliberately don't override (screenshot variants, deinterlace).
+-- mpv screenshot-variant defaults we deliberately don't override.
 local function shortcuts_items()
     local rows = {
         { 'a / ' .. t('sc_rclick'), t('sc_menu') },
         { 'g', t('sc_speed') },
+        { 's', t('sc_speed_down') },
+        { 'd', t('sc_speed_up') },
         { 'm', t('sc_mute') },
         { 'Up / Down', t('sc_volume') },
         { 'Left / Right', t('sc_seek') },
         { 'Ctrl+1/2/3', t('sc_track_toggle') },
-        { 's', t('sc_screenshot') },
+        { 'F1', t('sc_screenshot') },
         { 'Shift+s', t('sc_screenshot_video') },
         { 'Ctrl+s', t('sc_screenshot_window') },
-        { 'd', t('sc_deinterlace') },
     }
     local items = {}
     for _, r in ipairs(rows) do
@@ -334,6 +361,13 @@ local function screenshot_items()
     items[#items + 1] = { title = t('screenshot_videos'), icon = RADIO[screenshot_preset == 'videos'], value = 'screenshot:videos', keep_open = true }
     items[#items + 1] = { title = t('screenshot_pictures'), icon = RADIO[screenshot_preset == 'pictures'], value = 'screenshot:pictures', keep_open = true }
     items[#items + 1] = { title = t('screenshot_video_folder'), icon = RADIO[screenshot_preset == 'video_folder'], value = 'screenshot:video_folder', keep_open = true }
+    if screenshot_preset == 'custom' then
+        items[#items + 1] = { title = screenshot_custom_path, icon = RADIO[true], value = 'screenshot:custom', keep_open = true }
+    end
+    if mp.get_property_native('platform') == 'windows' then
+        items[#items + 1] = separator()
+        items[#items + 1] = { title = t('screenshot_custom'), icon = 'folder_open', value = 'screenshot-pick' }
+    end
     return items
 end
 
@@ -347,6 +381,7 @@ local EXT_AUDIO = { '.mp3', '.flac', '.m4a', '.wav', '.ogg', '.opus', '.aac', '.
 -- the final confirming click themselves.
 local function default_apps_items()
     local items = {}
+    items[#items + 1] = { title = t('open_default_apps_hint'), selectable = false, muted = true }
     items[#items + 1] = heading(t('ext_video'))
     for _, ext in ipairs(EXT_VIDEO) do
         items[#items + 1] = { title = ext, icon = 'movie', value = 'default-apps' }
@@ -371,6 +406,10 @@ local function menu_data()
     items[#items + 1] = { title = string.format('%s: %.2gx', t('speed'), o.speed_factor),
         icon = CHECK[speed_on()], value = 'speed', keep_open = true,
         actions = { { name = 'down', icon = 'remove', label = t('slower') }, { name = 'up', icon = 'add', label = t('faster') } } }
+    items[#items + 1] = { title = string.format('%s: %.2gx', t('speed_fine'), mp.get_property_number('speed') or 1),
+        icon = 'speed', value = 'speed-fine', keep_open = true,
+        actions = { { name = 'down', icon = 'remove', label = t('slower') }, { name = 'up', icon = 'add', label = t('faster') } } }
+    items[#items + 1] = { title = t('speed_step_label'), icon = 'speed', items = speed_step_items() }
     local e = cur_end()
     items[#items + 1] = { title = t('video_end'), icon = 'restart_alt', items = {
         { title = t('end_next'), icon = RADIO[e == 'next'], value = 'end:next' },
@@ -412,9 +451,10 @@ local function mixer_data()
         { name = 'mono', icon = 'surround_sound', label = t('mono') },
     }
     local items = {}
+    if #tracks > 0 then items[#items + 1] = { title = t('mono_hint'), selectable = false, muted = true } end
     for _, aid in ipairs(tracks) do
-        items[#items + 1] = { title = label(aid), hint = hint(aid), icon = CHECK[enabled[aid] == true],
-            value = aid, actions = actions, keep_open = true }
+        items[#items + 1] = { title = label(aid) .. (mono[aid] and (' · ' .. t('mono_short')) or ''),
+            hint = hint(aid), icon = CHECK[enabled[aid] == true], value = aid, actions = actions, keep_open = true }
     end
     if #tracks == 0 then items[#items + 1] = { title = t('single_track'), selectable = false, muted = true } end
     items[#items + 1] = separator()
@@ -494,6 +534,25 @@ local function speed_adjust(delta)
     o.speed_factor = math.max(1.25, math.min(4.0, o.speed_factor + delta))
     if speed_on() then mp.set_property_number('speed', o.speed_factor) end
     save_state(); osd(string.format(t('speed_osd'), tostring(o.speed_factor))); refresh_menu()
+end
+
+-- Continuous live-speed nudge via s/d, independent of the g/speed_factor toggle above.
+local function speed_nudge(delta)
+    local cur = mp.get_property_number('speed') or 1
+    local new = math.max(0.1, math.min(100, cur + delta))
+    mp.set_property_number('speed', new)
+    osd(string.format(t('speed_osd'), tostring(new)))
+    refresh_menu()
+end
+local function speed_reset()
+    mp.set_property_number('speed', 1)
+    osd(string.format(t('speed_osd'), '1'))
+    refresh_menu()
+end
+local function set_speed_step(step)
+    speed_step = step
+    save_state()
+    refresh_menu()
 end
 
 local function set_end(mode_)
@@ -577,6 +636,8 @@ local function apply_screenshot_preset()
     elseif screenshot_preset == 'video_folder' then
         local path = mp.get_property('path')
         if path then dir = utils.split_path(path) end
+    elseif screenshot_preset == 'custom' then
+        dir = screenshot_custom_path
     else
         dir = mp.command_native({ 'expand-path', '~~desktop/' })
     end
@@ -586,18 +647,38 @@ local function set_screenshot_preset(preset)
     screenshot_preset = preset
     apply_screenshot_preset()
     save_state()
-    osd(string.format(t('screenshot_osd'), t('screenshot_' .. preset)))
+    osd(string.format(t('screenshot_osd'), preset == 'custom' and screenshot_custom_path or t('screenshot_' .. preset)))
     refresh_menu()
+end
+
+-- Real Windows folder-browser dialog (Klasör Seç...), for a fully custom path beyond the presets.
+-- Async: the dialog can stay open for a while, and a synchronous mp.command_native() call would
+-- block this script (and menu interactions) until the user closes it.
+local function pick_custom_screenshot_dir()
+    mp.command_native_async({ name = 'subprocess', playback_only = false, capture_stdout = true, args = {
+        'powershell', '-NoProfile', '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; $f=New-Object System.Windows.Forms.FolderBrowserDialog; if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){$f.SelectedPath}'
+    } }, function(success, res)
+        local out = res and res.stdout and res.stdout:gsub('%s+$', '')
+        if out and out ~= '' then
+            screenshot_custom_path = out
+            set_screenshot_preset('custom')
+        end
+    end)
 end
 
 -- ---------- "set as default app" (Windows only) ----------
 -- Windows blocks silent/programmatic default-app changes since Windows 8 (hardened further by
--- the UCPD driver in 2024); this just opens Windows' own per-app Default Apps page so the user
--- can make the final confirming click themselves.
+-- the UCPD driver in 2024). A ?registeredAppUser=EchoPlay deep link was tried to jump straight to
+-- EchoPlay's own page, but real testing showed Windows 11's Default Apps search only recognizes
+-- apps registered under HKLM (needs admin - not compatible with this installer's no-UAC design).
+-- So this opens the plain Default Apps page and tells the user exactly which link to click next:
+-- "Choose defaults by file type" lists every extension (.mp4, .mkv, ...) with a one-click chooser.
 local function open_default_apps()
+    osd(t('open_default_apps_osd'))
     mp.command_native_async({ name = 'subprocess', playback_only = false, args = {
         'powershell', '-NoProfile', '-WindowStyle', 'Hidden', '-Command',
-        'Start-Process ms-settings:defaultapps?registeredAppUser=EchoPlay'
+        'Start-Process ms-settings:defaultapps'
     }, detach = true }, function() end)
 end
 
@@ -660,6 +741,11 @@ local function handle(value, action)
         if action == 'up' then speed_adjust(0.25)
         elseif action == 'down' then speed_adjust(-0.25)
         else speed_toggle() end
+    elseif value == 'speed-fine' then
+        if action == 'up' then speed_nudge(speed_step)
+        elseif action == 'down' then speed_nudge(-speed_step)
+        else speed_reset() end
+    elseif type(value) == 'string' and value:sub(1, 11) == 'speed-step:' then set_speed_step(tonumber(value:sub(12)))
     elseif type(value) == 'string' and value:sub(1, 4) == 'end:' then set_end(value:sub(5))
     elseif type(value) == 'string' and value:sub(1, 5) == 'mode:' then set_mode(value:sub(6))
     elseif type(value) == 'string' and value:sub(1, 7) == 'accent:' then set_accent(value:sub(8))
@@ -667,6 +753,7 @@ local function handle(value, action)
     elseif type(value) == 'string' and value:sub(1, 5) == 'lang:' then set_language(value:sub(6))
     elseif type(value) == 'string' and value:sub(1, 5) == 'perf:' then set_perf_pref(value:sub(6))
     elseif type(value) == 'string' and value:sub(1, 11) == 'screenshot:' then set_screenshot_preset(value:sub(12))
+    elseif value == 'screenshot-pick' then pick_custom_screenshot_dir()
     elseif value == 'default-apps' then close_menu(); open_default_apps()
     elseif value == 'lang-folder' then close_menu(); open_folder(OPTS_DIR)
     elseif value == 'theme-folder' then close_menu(); open_folder(THEMES_DIR)
@@ -693,6 +780,8 @@ mp.register_script_message('echoplay-toggle', function(id) handle(tonumber(id), 
 mp.register_script_message('echoplay-all', function() handle('all', nil) end)
 mp.register_script_message('echoplay-none', function() handle('none', nil) end)
 mp.register_script_message('echoplay-speed', speed_toggle)
+mp.register_script_message('echoplay-speed-down', function() speed_nudge(-speed_step) end)
+mp.register_script_message('echoplay-speed-up', function() speed_nudge(speed_step) end)
 
 mp.register_event('start-file', function() mp.set_property('lavfi-complex', '') end)
 mp.register_event('file-loaded', function()

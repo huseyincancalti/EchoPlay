@@ -117,6 +117,15 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".wma"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".wv"; ValueData: ""
 
+; NOTE: a Capabilities/RegisteredApplications registration (the "Default Programs" mechanism)
+; was tried here to let "Set as Default App" deep-link straight to EchoPlay's own page in Windows
+; Settings, but was reverted after live testing: on real Windows 11, the Default Apps search/list
+; only recognizes apps registered under HKLM (every real app checked - Adobe Acrobat, VLC,
+; PotPlayer - registers there), not HKCU. HKLM would require admin, which conflicts with this
+; installer's no-UAC design. "Set as Default App" instead opens the plain ms-settings:defaultapps
+; page and tells the user to click "Choose defaults by file type" - see open_default_apps() in
+; echoplay-audio.lua.
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch EchoPlay"; Flags: postinstall nowait skipifsilent unchecked
 

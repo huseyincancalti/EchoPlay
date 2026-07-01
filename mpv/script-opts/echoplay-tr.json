@@ -66,22 +66,31 @@
   "sc_volume": "Sesi artır / azalt",
   "sc_seek": "10 saniye geri/ileri sar",
   "sc_track_toggle": "1., 2., 3. ses parçasını aç/kapat",
+  "sc_speed_down": "Videoyu yavaşlat (adım Ayarlar'dan değiştirilebilir)",
+  "sc_speed_up": "Videoyu hızlandır (adım Ayarlar'dan değiştirilebilir)",
   "sc_screenshot": "Ekran görüntüsü al (altyazı dahil)",
   "sc_screenshot_video": "Ekran görüntüsü al (yalnızca video)",
   "sc_screenshot_window": "Ekran görüntüsü al (tüm pencere)",
-  "sc_deinterlace": "Deinterlace aç/kapat (çoğu video için görünür etkisi yoktur)",
 
   "screenshot_location": "Ekran Görüntüsü Konumu",
   "screenshot_desktop": "Masaüstü",
   "screenshot_videos": "Videolar",
   "screenshot_pictures": "Resimler",
   "screenshot_video_folder": "Video ile aynı klasör",
+  "screenshot_custom": "Klasör Seç...",
   "screenshot_osd": "Ekran görüntüsü klasörü: %s",
+
+  "speed_fine": "Video Hızı",
+  "speed_step_label": "Hız Adımı",
+
+  "mono_hint": "Mono: tek kulaktan gelen sesi ortalar",
 
   "make_default": "Varsayılan Uygulama Yap",
   "ext_video": "Video",
   "ext_audio": "Ses",
-  "open_default_apps": "Windows Varsayılan Uygulamalar sayfasını aç",
+  "open_default_apps": "Windows Varsayılan Uygulamalar Ayarlarını Aç",
+  "open_default_apps_osd": "Açılan pencerede 'Dosya türüne göre varsayılan uygulamaları seç' bağlantısına tıklayın",
+  "open_default_apps_hint": "Windows açılınca 'Dosya türüne göre varsayılan uygulamaları seç' bağlantısına tıklayıp EchoPlay'i seçin",
 
   "menu_hint": "İpucu: Ayarlar için sağ tıklayın veya `a` tuşuna basın",
   "sec_help": "Yardım"

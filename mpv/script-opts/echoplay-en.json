@@ -66,22 +66,31 @@
   "sc_volume": "Volume up / down",
   "sc_seek": "Seek 10 seconds back / forward",
   "sc_track_toggle": "Toggle audio track 1 / 2 / 3",
+  "sc_speed_down": "Slow the video down (step is customizable in Settings)",
+  "sc_speed_up": "Speed the video up (step is customizable in Settings)",
   "sc_screenshot": "Take a screenshot (with subtitles)",
   "sc_screenshot_video": "Take a screenshot (video only)",
   "sc_screenshot_window": "Take a screenshot (full window)",
-  "sc_deinterlace": "Toggle deinterlace (no visible effect on most videos)",
 
   "screenshot_location": "Screenshot Location",
   "screenshot_desktop": "Desktop",
   "screenshot_videos": "Videos",
   "screenshot_pictures": "Pictures",
   "screenshot_video_folder": "Same folder as video",
+  "screenshot_custom": "Choose folder...",
   "screenshot_osd": "Screenshot folder: %s",
+
+  "speed_fine": "Video Speed",
+  "speed_step_label": "Speed Step",
+
+  "mono_hint": "Mono: centers audio that only comes through one ear",
 
   "make_default": "Set as Default App",
   "ext_video": "Video",
   "ext_audio": "Audio",
-  "open_default_apps": "Open Windows Default Apps settings",
+  "open_default_apps": "Open Windows Default Apps Settings",
+  "open_default_apps_osd": "In the window that opens, click 'Choose defaults by file type'",
+  "open_default_apps_hint": "Once Windows opens, click 'Choose defaults by file type' and pick EchoPlay",
 
   "menu_hint": "Tip: right-click or press `a` for Settings",
   "sec_help": "Help"

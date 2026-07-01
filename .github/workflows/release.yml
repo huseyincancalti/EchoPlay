@@ -109,7 +109,7 @@ jobs:
       - name: Download upstream mpv.app bundle
         run: |
           set -euo pipefail
-          curl -sfL --retry 3 --retry-delay 5 -H "User-Agent: EchoPlay-CI" \
+          curl -sfL --retry 5 --retry-all-errors --retry-delay 5 -H "User-Agent: EchoPlay-CI" \
             https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release -o release.json
           URL=$(python3 -c "
           import json, re
@@ -122,7 +122,7 @@ jobs:
           ")
           if [ -z "$URL" ]; then echo "No mpv.app asset matched ${{ matrix.asset_pattern }}" >&2; exit 1; fi
           echo "Downloading $URL"
-          curl -sfL --retry 3 --retry-delay 5 -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
+          curl -sfL --retry 5 --retry-all-errors --retry-delay 5 -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
           mkdir -p build
           unzip -q mpv.zip -d build
           tar -xzf build/mpv.tar.gz -C build

@@ -29,19 +29,19 @@ jobs:
           if (-not $asset) { throw "No baseline x86_64 mpv asset found in latest mpv-winbuild release" }
           Write-Host "Downloading $($asset.name)"
           Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile mpv.7z
-          7z x mpv.7z -o"raw-mpv" -y | Out-Null
+          # zhongfly/mpv-winbuild ships mpv.exe/mpv.com at the archive root (no wrapping folder).
+          New-Item -ItemType Directory -Force -Path installer\dist\mpv | Out-Null
+          7z x mpv.7z -o"installer\dist\mpv" -y | Out-Null
 
       - name: Lay out and brand mpv -> EchoPlay.exe
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path installer\dist\mpv | Out-Null
-          $inner = Get-ChildItem raw-mpv -Directory | Select-Object -First 1
-          $source = if ($inner) { $inner.FullName } else { 'raw-mpv' }
-          Copy-Item "$source\*" installer\dist\mpv -Recurse -Force
+          $mpvExe = Get-ChildItem -Path installer\dist\mpv -Recurse -Filter 'mpv.exe' | Select-Object -First 1
+          if (-not $mpvExe) { throw "mpv.exe not found in extracted archive" }
+          $mpvExe = $mpvExe.FullName
 
           Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe' -OutFile rcedit.exe
 
-          $mpvExe = Join-Path 'installer\dist\mpv' 'mpv.exe'
           & .\rcedit.exe $mpvExe --set-icon assets\logo.ico `
             --set-version-string "FileDescription" "EchoPlay" `
             --set-version-string "ProductName" "EchoPlay" `
@@ -52,9 +52,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "rcedit failed branding mpv.exe" }
 
           Rename-Item $mpvExe 'EchoPlay.exe'
-          # mpv.com is a console-mode shim hardcoded to launch mpv.exe; it has no
-          # purpose for a double-click GUI install, so drop it to avoid confusion.
-          Remove-Item (Join-Path 'installer\dist\mpv' 'mpv.com') -ErrorAction SilentlyContinue
+          # Drop pieces of the upstream mpv package that don't apply once the exe
+          # is renamed/managed by our own installer: mpv.com (console shim hardcoded
+          # to launch mpv.exe), the *-register.bat scripts (would try to register a
+          # "mpv.exe" that no longer exists), the self-updater, and the PDF manual.
+          $mpvRoot = 'installer\dist\mpv'
+          Remove-Item (Join-Path $mpvRoot 'mpv.com'), (Join-Path $mpvRoot 'mpv-register.bat'), `
+            (Join-Path $mpvRoot 'mpv-unregister.bat'), (Join-Path $mpvRoot 'updater.bat') -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $mpvRoot 'doc'), (Join-Path $mpvRoot 'installer') -Recurse -ErrorAction SilentlyContinue
 
       - name: Download uosc
         shell: pwsh

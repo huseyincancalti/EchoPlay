@@ -1,7 +1,8 @@
 ; EchoPlay installer.
-; Built by .github/workflows/release.yml, which first populates installer\dist\
-; with a branded, renamed mpv engine (EchoPlay.exe) plus uosc/thumbfast/memo,
-; then runs `iscc EchoPlay.iss` to produce EchoPlay-Setup.exe.
+; Built by .github/workflows/release.yml, which first populates
+; installer\windows\dist\ with a branded, renamed mpv engine (EchoPlay.exe)
+; plus uosc/thumbfast/memo, then runs `iscc EchoPlay.iss` to produce
+; EchoPlay-Setup.exe.
 ;
 ; mpv.exe is renamed to EchoPlay.exe (and re-branded with rcedit) before this
 ; script runs, so every Windows surface - Open With, taskbar, Task Manager,
@@ -29,7 +30,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=Output
 OutputBaseFilename=EchoPlay-Setup
-SetupIconFile=..\assets\logo.ico
+SetupIconFile=..\..\assets\logo.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -52,8 +53,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; mpv engine, already renamed to EchoPlay.exe and branded by the CI workflow.
 Source: "dist\mpv\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 
+; thumbfast spawns a background "mpv" subprocess to render thumbnails and
+; defaults to looking for that literal name; Windows resolves an unqualified
+; exe name by checking the calling app's own directory first, so shipping a
+; second copy of the same (already-branded) binary under the literal name
+; "mpv.exe" alongside EchoPlay.exe lets thumbfast find it with zero extra
+; config. Nothing is ever registered/shortcut-launched under this name -
+; Explorer, Task Manager and "Open With" only ever see EchoPlay.exe.
+Source: "dist\mpv\EchoPlay.exe"; DestDir: "{app}"; DestName: "mpv.exe"; Flags: ignoreversion
+
 ; EchoPlay's own config (mpv.conf, input.conf, scripts, language packs, themes, uosc.conf).
-Source: "..\mpv\*"; DestDir: "{app}\portable_config"; Flags: recursesubdirs ignoreversion
+Source: "..\..\mpv\*"; DestDir: "{app}\portable_config"; Flags: recursesubdirs ignoreversion
 
 ; uosc UI engine.
 Source: "dist\uosc\scripts\*"; DestDir: "{app}\portable_config\scripts"; Flags: recursesubdirs ignoreversion
@@ -65,7 +75,10 @@ Source: "dist\memo.lua"; DestDir: "{app}\portable_config\scripts"; Flags: ignore
 Source: "dist\memo.conf"; DestDir: "{app}\portable_config\script-opts"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Logo, used for shortcuts and the "Open with" entry icon.
-Source: "..\assets\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\assets\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+
+; GPL-3.0/LGPL-2.1/MPL-2.0 notices for uosc/memo/thumbfast/mpv.
+Source: "..\..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\EchoPlay"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\logo.ico"

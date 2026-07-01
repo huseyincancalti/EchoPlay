@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=EchoPlay
+Comment=Video player for dual-audio-track recordings (NVIDIA ShadowPlay, OBS)
+Exec=AppRun %f
+Icon=echoplay
+Terminal=false
+Categories=AudioVideo;Player;
+MimeType=video/mp4;video/x-matroska;video/x-msvideo;video/quicktime;video/webm;video/x-m4v;video/x-ms-wmv;video/mp2t;video/x-flv;video/3gpp;application/vnd.rn-realmedia-vbr;video/ogg;audio/mpeg;audio/flac;audio/mp4;audio/x-wav;audio/ogg;audio/opus;

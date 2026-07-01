@@ -1,0 +1,16 @@
+#!/bin/bash
+# Explicit --config-dir wiring: portable_config-style auto-detection is
+# Windows-only in mpv, so EchoPlay's config is passed explicitly here instead
+# of relying on any Linux-side auto-detection. readlink -f resolves the real
+# AppDir mount path even when the AppImage is invoked via a relative path or
+# symlink.
+HERE="$(dirname "$(readlink -f "${0}")")"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+# The bundled binary keeps its literal upstream name "mpv" (not renamed) and
+# usr/bin is put on PATH: thumbfast spawns a background "mpv" subprocess to
+# render thumbnails and defaults to looking for exactly that name. Unlike
+# Windows/macOS, the underlying binary's filename here is never user-visible
+# (the .desktop file's Name=EchoPlay is what every "Open With" dialog shows),
+# so there's no branding reason to rename it - only a functional reason not to.
+export PATH="${HERE}/usr/bin:${PATH}"
+exec "${HERE}/usr/bin/mpv" --config-dir="${HERE}/usr/share/echoplay/config" "$@"

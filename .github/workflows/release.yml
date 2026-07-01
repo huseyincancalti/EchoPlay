@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,13 +30,13 @@ jobs:
           Write-Host "Downloading $($asset.name)"
           Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile mpv.7z
           # zhongfly/mpv-winbuild ships mpv.exe/mpv.com at the archive root (no wrapping folder).
-          New-Item -ItemType Directory -Force -Path installer\dist\mpv | Out-Null
-          7z x mpv.7z -o"installer\dist\mpv" -y | Out-Null
+          New-Item -ItemType Directory -Force -Path installer\windows\dist\mpv | Out-Null
+          7z x mpv.7z -o"installer\windows\dist\mpv" -y | Out-Null
 
       - name: Lay out and brand mpv -> EchoPlay.exe
         shell: pwsh
         run: |
-          $mpvExe = Get-ChildItem -Path installer\dist\mpv -Recurse -Filter 'mpv.exe' | Select-Object -First 1
+          $mpvExe = Get-ChildItem -Path installer\windows\dist\mpv -Recurse -Filter 'mpv.exe' | Select-Object -First 1
           if (-not $mpvExe) { throw "mpv.exe not found in extracted archive" }
           $mpvExe = $mpvExe.FullName
 
@@ -56,7 +56,7 @@ jobs:
           # is renamed/managed by our own installer: mpv.com (console shim hardcoded
           # to launch mpv.exe), the *-register.bat scripts (would try to register a
           # "mpv.exe" that no longer exists), the self-updater, and the PDF manual.
-          $mpvRoot = 'installer\dist\mpv'
+          $mpvRoot = 'installer\windows\dist\mpv'
           Remove-Item (Join-Path $mpvRoot 'mpv.com'), (Join-Path $mpvRoot 'mpv-register.bat'), `
             (Join-Path $mpvRoot 'mpv-unregister.bat'), (Join-Path $mpvRoot 'updater.bat') -ErrorAction SilentlyContinue
           Remove-Item (Join-Path $mpvRoot 'doc'), (Join-Path $mpvRoot 'installer') -Recurse -ErrorAction SilentlyContinue
@@ -66,14 +66,14 @@ jobs:
         run: |
           $uoscVersion = '5.12.0'
           Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/tomasklaen/uosc/releases/download/$uoscVersion/uosc.zip" -OutFile uosc.zip
-          Expand-Archive -Path uosc.zip -DestinationPath installer\dist\uosc -Force
+          Expand-Archive -Path uosc.zip -DestinationPath installer\windows\dist\uosc -Force
 
       - name: Download thumbfast & memo
         shell: pwsh
         run: |
-          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/thumbfast/master/thumbfast.lua' -OutFile installer\dist\thumbfast.lua
-          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/memo/master/memo.lua' -OutFile installer\dist\memo.lua
-          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/memo/master/memo.conf' -OutFile installer\dist\memo.conf
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/thumbfast/master/thumbfast.lua' -OutFile installer\windows\dist\thumbfast.lua
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/memo/master/memo.lua' -OutFile installer\windows\dist\memo.lua
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/po5/memo/master/memo.conf' -OutFile installer\windows\dist\memo.conf
 
       - name: Install Inno Setup
         shell: pwsh
@@ -82,11 +82,252 @@ jobs:
       - name: Compile installer
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="${{ env.VERSION }}" installer\EchoPlay.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="${{ env.VERSION }}" installer\windows\EchoPlay.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC compile failed" }
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: installer\Output\EchoPlay-Setup.exe
+          name: echoplay-windows
+          path: installer\windows\Output\EchoPlay-Setup.exe
+
+  build-macos:
+    runs-on: macos-14
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            asset_pattern: 'macos-15-arm\.zip$'
+          - arch: x86_64
+            asset_pattern: 'macos-15-intel\.zip$'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Download upstream mpv.app bundle
+        run: |
+          set -euo pipefail
+          curl -sfL -H "User-Agent: EchoPlay-CI" \
+            https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release -o release.json
+          URL=$(python3 -c "
+          import json, re
+          with open('release.json') as f:
+              d = json.load(f)
+          pat = re.compile(r'${{ matrix.asset_pattern }}')
+          for a in d['assets']:
+              if pat.search(a['name']):
+                  print(a['browser_download_url']); break
+          ")
+          if [ -z "$URL" ]; then echo "No mpv.app asset matched ${{ matrix.asset_pattern }}" >&2; exit 1; fi
+          echo "Downloading $URL"
+          curl -sfL -H "User-Agent: EchoPlay-CI" -o mpv.zip "$URL"
+          mkdir -p build
+          unzip -q mpv.zip -d build
+          tar -xzf build/mpv.tar.gz -C build
+          if [ ! -f build/mpv.app/Contents/MacOS/mpv ]; then
+            echo "Contents/MacOS/mpv not found after extraction - upstream bundle layout may have changed" >&2
+            exit 1
+          fi
+
+      - name: Rename and restructure to EchoPlay.app
+        run: |
+          set -euo pipefail
+          mv build/mpv.app build/EchoPlay.app
+          mv build/EchoPlay.app/Contents/MacOS/mpv build/EchoPlay.app/Contents/MacOS/EchoPlay-bin
+          # Upstream's own default mpv.conf is replaced by EchoPlay's config.
+          rm -f build/EchoPlay.app/Contents/Resources/mpv.conf
+
+      - name: Generate icon.icns from assets/logo.png
+        run: |
+          set -euo pipefail
+          ICONSET=EchoPlay.iconset
+          mkdir -p "$ICONSET"
+          for size in 16 32 64 128 256 512; do
+            sips -z $size $size assets/logo.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+            double=$((size * 2))
+            sips -z $double $double assets/logo.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$ICONSET" -o build/EchoPlay.app/Contents/Resources/icon.icns
+          rm -rf "$ICONSET"
+
+      - name: Patch Info.plist from template
+        run: |
+          set -euo pipefail
+          sed "s/\${VERSION}/${VERSION}/g" installer/macos/Info.plist.template \
+            > build/EchoPlay.app/Contents/Info.plist
+
+      - name: Embed EchoPlay config
+        run: |
+          set -euo pipefail
+          CONF=build/EchoPlay.app/Contents/Resources/echoplay-config
+          mkdir -p "$CONF"
+          cp -R mpv/. "$CONF/"
+
+      - name: Download uosc / thumbfast / memo
+        run: |
+          set -euo pipefail
+          CONF=build/EchoPlay.app/Contents/Resources/echoplay-config
+          curl -sfL -o uosc.zip "https://github.com/tomasklaen/uosc/releases/download/5.12.0/uosc.zip"
+          unzip -q uosc.zip -d uosc_extracted
+          cp -R uosc_extracted/scripts/. "$CONF/scripts/"
+          cp -R uosc_extracted/fonts/. "$CONF/fonts/"
+          curl -sfL -o "$CONF/scripts/thumbfast.lua" "https://raw.githubusercontent.com/po5/thumbfast/master/thumbfast.lua"
+          curl -sfL -o "$CONF/scripts/memo.lua" "https://raw.githubusercontent.com/po5/memo/master/memo.lua"
+          curl -sfL -o "$CONF/script-opts/memo.conf" "https://raw.githubusercontent.com/po5/memo/master/memo.conf"
+
+      - name: Add launcher wrapper (explicit config-dir)
+        run: |
+          set -euo pipefail
+          # portable_config-style auto-detection is Windows-only in mpv, so the
+          # config dir is passed explicitly here rather than relying on any
+          # macOS-side auto-detection.
+          BIN=build/EchoPlay.app/Contents/MacOS
+          cat > "$BIN/EchoPlay" <<'SCRIPT'
+          #!/bin/bash
+          DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          exec "$DIR/EchoPlay-bin" --config-dir="$DIR/../Resources/echoplay-config" "$@"
+          SCRIPT
+          chmod +x "$BIN/EchoPlay"
+
+      - name: Copy license notices
+        run: |
+          mkdir -p build/EchoPlay.app/Contents/Resources/licenses
+          cp THIRD_PARTY_NOTICES.md build/EchoPlay.app/Contents/Resources/
+          cp licenses/*.txt build/EchoPlay.app/Contents/Resources/licenses/
+
+      - name: Ad-hoc codesign
+        run: |
+          set -euo pipefail
+          codesign --deep --force --options runtime -s - \
+            --entitlements installer/macos/entitlements.plist \
+            build/EchoPlay.app
+          codesign --verify --deep --strict build/EchoPlay.app
+
+      - name: Create DMG
+        run: |
+          set -euo pipefail
+          STAGING=dmg-staging
+          mkdir -p "$STAGING"
+          cp -R build/EchoPlay.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "EchoPlay" -srcfolder "$STAGING" \
+            -ov -format UDZO "EchoPlay-${VERSION}-${{ matrix.arch }}.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echoplay-macos-${{ matrix.arch }}
+          path: EchoPlay-${{ env.VERSION }}-${{ matrix.arch }}.dmg
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Install mpv + tooling
+        run: |
+          sudo apt-get update
+          # libfuse2 lets the downloaded AppImage tools (linuxdeploy) run directly;
+          # GitHub's ubuntu-22.04 runner image doesn't ship it by default.
+          sudo apt-get install -y mpv imagemagick desktop-file-utils libfuse2
+
+      - name: Download linuxdeploy + plugin (pinned versions)
+        run: |
+          set -euo pipefail
+          curl -sfL -o linuxdeploy.AppImage \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage"
+          curl -sfL -o linuxdeploy-plugin-appimage.AppImage \
+            "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-appimage-x86_64.AppImage"
+          chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage
+
+      - name: Build AppDir
+        run: |
+          set -euo pipefail
+          APPDIR=AppDir
+          mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/echoplay/config" \
+                   "$APPDIR/usr/share/applications" \
+                   "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
+                   "$APPDIR/usr/share/echoplay/licenses"
+
+          # Kept as literal "mpv" (not renamed): thumbfast's thumbnail-generator
+          # subprocess defaults to spawning exactly that name, and unlike
+          # Windows/macOS the binary's filename here is never user-visible
+          # (the .desktop file's Name=EchoPlay is what "Open With" shows).
+          MPV_BIN=$(command -v mpv)
+          cp "$MPV_BIN" "$APPDIR/usr/bin/mpv"
+
+          cp -R mpv/. "$APPDIR/usr/share/echoplay/config/"
+
+          curl -sfL -o uosc.zip "https://github.com/tomasklaen/uosc/releases/download/5.12.0/uosc.zip"
+          unzip -q uosc.zip -d uosc_extracted
+          cp -R uosc_extracted/scripts/. "$APPDIR/usr/share/echoplay/config/scripts/"
+          cp -R uosc_extracted/fonts/. "$APPDIR/usr/share/echoplay/config/fonts/"
+          curl -sfL -o "$APPDIR/usr/share/echoplay/config/scripts/thumbfast.lua" \
+            "https://raw.githubusercontent.com/po5/thumbfast/master/thumbfast.lua"
+          curl -sfL -o "$APPDIR/usr/share/echoplay/config/scripts/memo.lua" \
+            "https://raw.githubusercontent.com/po5/memo/master/memo.lua"
+          curl -sfL -o "$APPDIR/usr/share/echoplay/config/script-opts/memo.conf" \
+            "https://raw.githubusercontent.com/po5/memo/master/memo.conf"
+
+          cp THIRD_PARTY_NOTICES.md "$APPDIR/usr/share/echoplay/"
+          cp licenses/*.txt "$APPDIR/usr/share/echoplay/licenses/"
+
+          convert assets/logo.png -resize 256x256 \
+            "$APPDIR/usr/share/icons/hicolor/256x256/apps/echoplay.png"
+          cp "$APPDIR/usr/share/icons/hicolor/256x256/apps/echoplay.png" "$APPDIR/echoplay.png"
+
+          cp installer/linux/echoplay.desktop "$APPDIR/usr/share/applications/echoplay.desktop"
+          cp installer/linux/echoplay.desktop "$APPDIR/echoplay.desktop"
+          desktop-file-validate "$APPDIR/echoplay.desktop"
+
+          cp installer/linux/AppRun "$APPDIR/AppRun"
+          chmod +x "$APPDIR/AppRun"
+
+      - name: Build AppImage
+        run: |
+          set -euo pipefail
+          export NO_STRIP=1
+          # Defense in depth alongside libfuse2: self-extract-and-run avoids any
+          # remaining FUSE/sandbox quirks on GitHub-hosted runners.
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          # linuxdeploy finds its "appimage" output plugin by looking for
+          # linuxdeploy-plugin-appimage(.AppImage) on PATH.
+          export PATH="$PWD:$PATH"
+          ./linuxdeploy.AppImage --appdir AppDir \
+            --executable AppDir/usr/bin/mpv \
+            --custom-apprun AppDir/AppRun \
+            --desktop-file AppDir/echoplay.desktop \
+            --icon-file AppDir/echoplay.png \
+            --output appimage
+          mv EchoPlay*.AppImage "EchoPlay-${VERSION}-x86_64.AppImage"
+          chmod +x "EchoPlay-${VERSION}-x86_64.AppImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echoplay-linux-x86_64
+          path: EchoPlay-${{ env.VERSION }}-x86_64.AppImage
+
+  release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifact layout
+        run: |
+          set -euo pipefail
+          mkdir -p release-files
+          cp artifacts/echoplay-windows/EchoPlay-Setup.exe release-files/
+          cp artifacts/echoplay-macos-arm64/*.dmg release-files/
+          cp artifacts/echoplay-macos-x86_64/*.dmg release-files/
+          cp artifacts/echoplay-linux-x86_64/*.AppImage release-files/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
           generate_release_notes: true

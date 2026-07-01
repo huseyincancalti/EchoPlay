@@ -11,6 +11,9 @@ mpv/script-opts/memo.conf
 mpv/script-opts/thumbfast.conf
 mpv/fonts/
 
-# Local build artifacts from compiling the Inno Setup installer.
-installer/dist/
-installer/Output/
+# Local build artifacts from compiling/staging each platform's installer.
+installer/windows/dist/
+installer/windows/Output/
+installer/macos/build/
+installer/linux/AppDir/
+installer/linux/*.AppImage

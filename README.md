@@ -1,15 +1,15 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="EchoPlay — Windows video player for NVIDIA ShadowPlay and OBS Studio dual audio track recordings" width="160" />
+<img src="assets/logo.png" alt="EchoPlay — video player for NVIDIA ShadowPlay and OBS Studio dual audio track recordings on Windows, macOS, and Linux" width="160" />
 
 # EchoPlay
 
-**The Windows video player for dual-audio-track recordings — NVIDIA ShadowPlay, NVIDIA App, and
-OBS Studio clips with separate game/mic tracks, mixed live.**
+**The video player for dual-audio-track recordings — NVIDIA ShadowPlay, NVIDIA App, and OBS
+Studio clips with separate game/mic tracks, mixed live. Windows, macOS, and Linux.**
 
 [![Latest release](https://img.shields.io/github/v/release/huseyincancalti/EchoPlay?label=download&color=ee7733)](https://github.com/huseyincancalti/EchoPlay/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D6)](#download--install)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D6)](#download--install)
 
 </div>
 
@@ -69,11 +69,14 @@ next time.
 
 ## Download & Install
 
-**No prerequisites, no terminal.** You don't need to know what mpv is — everything (player engine,
-UI, fonts) is bundled in one installer.
+**No prerequisites, no terminal.** Everything (player engine, UI, fonts) is bundled — pick your
+platform below. Windows, macOS, and Linux downloads are all on the
+[latest release](https://github.com/huseyincancalti/EchoPlay/releases/latest) page.
 
-1. Download [**EchoPlay-Setup.exe**](https://github.com/huseyincancalti/EchoPlay/releases/latest)
-   from the latest release.
+<details open>
+<summary><strong>Windows</strong></summary>
+
+1. Download **EchoPlay-Setup.exe** from the latest release.
 2. Double-click it and click through the wizard (no admin rights needed — it installs to your
    user folder).
 3. To make it your default player: right-click any video → **Open with → EchoPlay → Always**.
@@ -98,6 +101,63 @@ portable layout · `-SkipMpvDownload` to never auto-download mpv · `-SkipAssoc`
 association.
 
 </details>
+</details>
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+1. Download **EchoPlay-\<version\>-arm64.dmg** (Apple Silicon: M1/M2/M3/M4) or
+   **EchoPlay-\<version\>-x86_64.dmg** (Intel Mac) from the latest release.
+2. Open the DMG and drag **EchoPlay** into **Applications**.
+3. **First launch only:** macOS will say the app "is damaged" or that it "cannot verify the
+   developer" — this is expected, EchoPlay isn't notarized by Apple (that requires a paid Apple
+   Developer account). Right-click (or Control-click) **EchoPlay** in Applications, choose
+   **Open**, then confirm **Open** in the dialog that appears. You only need to do this once.
+4. To make it your default player: right-click a video in Finder → **Get Info → Open with →
+   EchoPlay → Change All...**
+
+<details>
+<summary>Advanced: portable / scripted install (<code>install.sh</code>)</summary>
+
+If you already have mpv (e.g. via `brew install mpv`) or just want EchoPlay's config without the
+signed `.app`, download the source zip ("Code → Download ZIP") and run:
+
+```bash
+bash install.sh
+```
+
+The script copies EchoPlay's config into `~/.config/mpv`, downloads uosc / thumbfast / memo, and
+prints the manual "Open with" steps (there's no scriptable file-association trick on macOS the way
+Windows has one). Flag: `--config-dir <path>` to choose a different config dir.
+
+</details>
+</details>
+
+<details>
+<summary><strong>Linux</strong></summary>
+
+1. Download **EchoPlay-\<version\>-x86_64.AppImage** from the latest release.
+2. Make it executable: `chmod +x EchoPlay-*.AppImage`, then double-click it (or run it from a
+   terminal). Some file managers need "Allow executing file as program" checked in the file's
+   Properties first.
+3. To make it your default player: right-click a video in your file manager → **Open With →
+   Other Application** → browse to the AppImage → set it as default.
+
+<details>
+<summary>Advanced: portable / scripted install (<code>install.sh</code>)</summary>
+
+If you already have mpv via your distro's package manager, download the source zip
+("Code → Download ZIP") and run:
+
+```bash
+bash install.sh
+```
+
+The script copies EchoPlay's config into `~/.config/mpv`, downloads uosc / thumbfast / memo, and
+prints the manual "Open With" steps. Flag: `--config-dir <path>` to choose a different config dir.
+
+</details>
+</details>
 
 ### Keyboard shortcuts
 
@@ -117,7 +177,7 @@ NVIDIA's recorder and OBS Studio (with multi-track audio enabled) both save game
 your microphone as two independent audio tracks in the same video file, instead of mixing them
 into one. Most players only let you pick a single track to play.
 
-**How do I play a video with 2 audio tracks on Windows?**
+**How do I play a video with 2 audio tracks on Windows, macOS, or Linux?**
 Set EchoPlay as your default player (see [Download & Install](#download--install) above), then
 open the file — every audio track is auto-detected and shown in the mixer, and EchoPlay mixes
 them for you by default.
@@ -192,18 +252,25 @@ volume goes up to 300%. The settings menu, mixer, theming and persistence (a sma
 | [`mpv/scripts/echoplay-audio.lua`](mpv/scripts/echoplay-audio.lua) | EchoPlay's only original code — mixer, menus, theming |
 | [`mpv/script-opts/echoplay-*.json`](mpv/script-opts) | Language packs |
 | [`mpv/themes/*.conf`](mpv/themes) | Community theme packs |
-| [`mpv/mpv.conf`](mpv/mpv.conf), [`mpv/input.conf`](mpv/input.conf) | Player settings & shortcuts |
-| [`installer/EchoPlay.iss`](installer/EchoPlay.iss) | Inno Setup script that builds `EchoPlay-Setup.exe` |
-| [`.github/workflows/release.yml`](.github/workflows/release.yml) | CI: downloads mpv/uosc/thumbfast/memo, brands the exe, builds the installer, publishes the release |
-| [`install.ps1`](install.ps1) | Advanced/portable installer (no GUI wizard) |
+| [`mpv/mpv.conf`](mpv/mpv.conf), [`mpv/input.conf`](mpv/input.conf) | Player settings & shortcuts (shared across all 3 platforms) |
+| [`installer/windows/EchoPlay.iss`](installer/windows/EchoPlay.iss) | Inno Setup script that builds `EchoPlay-Setup.exe` |
+| [`installer/macos/Info.plist.template`](installer/macos/Info.plist.template), [`entitlements.plist`](installer/macos/entitlements.plist) | macOS `.app` bundle identity (file associations, icon) + ad-hoc signing entitlements |
+| [`installer/linux/echoplay.desktop`](installer/linux/echoplay.desktop), [`AppRun`](installer/linux/AppRun) | Linux AppImage desktop entry (name/icon/mime types) + launcher |
+| [`.github/workflows/release.yml`](.github/workflows/release.yml) | CI: builds and publishes `EchoPlay-Setup.exe`, macOS `.dmg` (arm64 + x86_64), and the Linux `.AppImage` in one release |
+| [`install.ps1`](install.ps1) | Windows advanced/portable installer (no GUI wizard) |
+| [`install.sh`](install.sh) | Linux/macOS advanced/portable installer |
+| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/`](licenses/) | Bundled upstream license notices (uosc, memo, thumbfast, mpv) |
 
 ## Credits & license
 
 EchoPlay's own code (`echoplay-audio.lua` + config/JSON/theme files) is **MIT** — see
 [LICENSE](LICENSE). It downloads and bundles, under their own licenses:
-[uosc](https://github.com/tomasklaen/uosc) (GPL-3.0) ·
-[thumbfast](https://github.com/po5/thumbfast) · [memo](https://github.com/po5/memo) ·
-and of course [mpv](https://mpv.io) itself.
+[uosc](https://github.com/tomasklaen/uosc) (LGPL-2.1) ·
+[memo](https://github.com/po5/memo) (GPL-3.0) ·
+[thumbfast](https://github.com/po5/thumbfast) (MPL-2.0) ·
+and of course [mpv](https://mpv.io) itself (GPL-2.0/LGPL-2.1). Full license texts
+are in [`licenses/`](licenses/) — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+for details.
 
 ---
 

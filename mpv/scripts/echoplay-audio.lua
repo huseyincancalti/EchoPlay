@@ -32,6 +32,18 @@ local OPTS_DIR = mp.command_native({ 'expand-path', '~~/script-opts' })
 local THEMES_DIR = mp.command_native({ 'expand-path', '~~/themes' })
 local STATE_PATH = mp.command_native({ 'expand-path', '~~/echoplay-state.json' })
 
+-- Open a folder in the OS file manager (Explorer/Finder/whatever handles xdg-open).
+local function open_folder(path)
+    local platform = mp.get_property_native('platform')
+    if platform == 'windows' then
+        mp.commandv('run', 'explorer', path)
+    elseif platform == 'darwin' then
+        mp.commandv('run', 'open', path)
+    else
+        mp.commandv('run', 'xdg-open', path)
+    end
+end
+
 -- ---------- appearance: built-in Dark/Light modes + accent ----------
 -- Accent swatches shown in the Theme submenu. Add more freely.
 local ACCENTS = {
@@ -437,8 +449,8 @@ local function handle(value, action)
     elseif type(value) == 'string' and value:sub(1, 7) == 'accent:' then set_accent(value:sub(8))
     elseif type(value) == 'string' and value:sub(1, 6) == 'theme:' then apply_theme_pack(value:sub(7))
     elseif type(value) == 'string' and value:sub(1, 5) == 'lang:' then set_language(value:sub(6))
-    elseif value == 'lang-folder' then close_menu(); mp.commandv('run', 'explorer', OPTS_DIR)
-    elseif value == 'theme-folder' then close_menu(); mp.commandv('run', 'explorer', THEMES_DIR)
+    elseif value == 'lang-folder' then close_menu(); open_folder(OPTS_DIR)
+    elseif value == 'theme-folder' then close_menu(); open_folder(THEMES_DIR)
     elseif PLAYER[value] then close_menu(); mp.commandv('script-binding', 'uosc/' .. PLAYER[value])
     else
         local aid = tonumber(value)

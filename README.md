@@ -7,7 +7,7 @@
 **The video player for dual-audio-track recordings — NVIDIA ShadowPlay, NVIDIA App, and OBS
 Studio clips with separate game/mic tracks, mixed live. Windows, macOS, and Linux.**
 
-[![Latest release](https://img.shields.io/github/v/release/huseyincancalti/EchoPlay?label=download&color=ee7733)](https://github.com/huseyincancalti/EchoPlay/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/huseyincancalti/EchoPlay?label=download&color=ff7d26)](https://github.com/huseyincancalti/EchoPlay/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D6)](#download--install)
 
@@ -49,12 +49,17 @@ next time.
 - 🪟 **Modern UI** — YouTube-style timeline, hover thumbnails ([thumbfast](https://github.com/po5/thumbfast)),
   watch history & resume ([memo](https://github.com/po5/memo)), a right-edge volume slider, and clean
   keyboard feedback (your own volume / seek indicators, never the system's white bar).
-- ⚙️ **One searchable Settings menu** — right-click (or `a`): mixer, fixed speed, end-of-video
-  behavior, theme, language, and file/subtitle/playlist shortcuts, grouped into clear sections.
+- ⚙️ **One searchable Settings menu** — right-click: audio sources, video speed, picture quality,
+  theme, language, and file/subtitle/playlist shortcuts, grouped into clear, color-coded sections.
 - 🎨 **Theming** — clean Dark / Light modes plus an accent color, switched live. Drop-in community
   theme & language packs (see below).
-- 💾 **Persistent** — your mixer, mono, accent, language and speed choices survive restarts, and
-  every file resumes where you left off.
+- ⌨️ **Every shortcut is yours to remap** — click any shortcut in Settings and press the key or
+  combo you want (up to 3 keys at once); only right-click into the menu itself stays fixed.
+- 🖥️ **Three real picture-quality tiers** — Ultra (zero compromise), Normal (balanced default),
+  Low (weak hardware), or Auto to let EchoPlay pick and adapt live as playback runs.
+- 💾 **Persistent, and it asks before resuming** — your mixer, mono, accent, language, speed, and
+  shortcut choices survive restarts. Playback always starts at 0:00 and offers to jump back to
+  where you left off — it never silently skips ahead.
 
 ### EchoPlay vs. VLC, PotPlayer & vanilla mpv for dual-audio-track video
 
@@ -81,7 +86,7 @@ platform below. Windows, macOS, and Linux downloads are all on the
    user folder).
 3. To make it your default player: right-click any video → **Open with → EchoPlay → Always**.
 
-That's it — open a video, right-click (or press `a`) for **Settings**. "EchoPlay" is what Windows
+That's it — open a video, right-click for **Settings**. "EchoPlay" is what Windows
 shows everywhere: the taskbar, Task Manager, and the "Open with" list — never "mpv".
 
 <details>
@@ -161,21 +166,26 @@ prints the manual "Open With" steps. Flag: `--config-dir <path>` to choose a dif
 
 ### Keyboard shortcuts
 
+Every shortcut below is a default — click it in **Settings → Help → Keyboard Shortcuts** and
+press whatever key or combo (1 to 3 keys) you'd rather use instead. Right-click is the one
+exception, kept fixed as the guaranteed way into the menu.
+
 | Key | Action |
 |-----|--------|
+| Right-click | Settings menu (not remappable) |
 | `↑` / `↓` | Volume up / down (hold to ramp) |
 | `←` / `→` | Seek 10s back / forward |
 | `m` | Mute |
+| `Space` | Pause / play |
 | `g` | Toggle fixed speed (factor set in the menu) |
 | `s` / `d` | Slow down / speed up (step is customizable in the menu) |
 | `Ctrl`+`1/2/3` | Toggle audio track 1 / 2 / 3 |
-| Right-click / `a` | Settings menu |
 | `F1` | Screenshot (with subtitles) |
 | `Shift`+`s` | Screenshot (video only) |
 | `Ctrl`+`s` | Screenshot (full window) |
 
-Screenshot save location (including a "choose folder" picker) and a full keyboard-shortcuts
-reference are also available from the Settings menu.
+Screenshot save location (including a "choose folder" picker) is also available from the
+Settings menu.
 
 ### FAQ
 

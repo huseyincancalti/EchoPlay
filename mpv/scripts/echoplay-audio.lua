@@ -79,18 +79,27 @@ local screenshot_custom_path = ''
 local menu_hint_shown = false
 local speed_step = 0.1               -- s/d fine speed-adjust step, user-configurable
 
--- EchoPlay-owned keyboard shortcuts, rebindable from Settings -> Yardım -> Klavye Kısayolları.
--- Native mpv bindings (seek, volume, mute, right-click) aren't in this list - they're mpv's
--- own defaults, not something this script registers, so there's nothing here to re-point.
+-- Every keyboard shortcut EchoPlay ships is in this list and rebindable from
+-- Settings -> Yardım -> Klavye Kısayolları. The corresponding keys carry `ignore` stubs
+-- in input.conf so mpv's core defaults don't resurrect on a key after it's rebound away.
+-- Only right-click stays fixed: it's the guaranteed way into the menu.
+-- `repeatable` = holding the key keeps firing (volume/seek/speed nudges).
 local KEY_ACTIONS = {
-    { id = 'menu', default_key = 'a', label_key = 'sc_menu' },
     { id = 'speed_toggle', default_key = 'g', label_key = 'sc_speed' },
-    { id = 'speed_down', default_key = 's', label_key = 'sc_speed_down' },
-    { id = 'speed_up', default_key = 'd', label_key = 'sc_speed_up' },
+    { id = 'speed_down', default_key = 's', label_key = 'sc_speed_down', repeatable = true },
+    { id = 'speed_up', default_key = 'd', label_key = 'sc_speed_up', repeatable = true },
     { id = 'screenshot', default_key = 'F1', label_key = 'sc_screenshot' },
+    { id = 'shot_video', default_key = 'S', label_key = 'sc_screenshot_video' },
+    { id = 'shot_window', default_key = 'Ctrl+s', label_key = 'sc_screenshot_window' },
     { id = 'track1', default_key = 'Ctrl+1', label_key = 'sc_track1' },
     { id = 'track2', default_key = 'Ctrl+2', label_key = 'sc_track2' },
     { id = 'track3', default_key = 'Ctrl+3', label_key = 'sc_track3' },
+    { id = 'mute', default_key = 'm', label_key = 'sc_mute' },
+    { id = 'pause', default_key = 'Space', label_key = 'sc_pause' },
+    { id = 'vol_up', default_key = 'Up', label_key = 'sc_vol_up', repeatable = true },
+    { id = 'vol_down', default_key = 'Down', label_key = 'sc_vol_down', repeatable = true },
+    { id = 'seek_fwd', default_key = 'Right', label_key = 'sc_seek_fwd', repeatable = true },
+    { id = 'seek_back', default_key = 'Left', label_key = 'sc_seek_back', repeatable = true },
 }
 local custom_keys = {} -- id -> user-chosen key, only set for actions the user has rebound
 local rebind_capture -- forward-declared; assigned once open_menu/speed_nudge/handle etc. exist
@@ -185,11 +194,14 @@ local FALLBACK = {
     sc_rebind_hint = 'Kalemli satıra tıkla, sonra atamak istediğin tuşa bas',
     sc_rebind_osd = '%s artık: %s',
     sc_rebind_conflict = "'%s' zaten kullanımda: %s",
-    sc_capture_title = "'%s' için yeni tuşa bas",
-    sc_capture_sub = 'Kombinasyon için tuşlara aynı anda bas  ·  Esc: vazgeç',
+    sc_capture_title = "'%s' için yeni tuş",
+    sc_capture_sub = 'Tuşa veya kombinasyona bas (en fazla 3 tuş)  ·  Esc: vazgeç',
+    sc_capture_confirm = '✓ Enter: Onayla      ✗ Esc: İptal',
+    sc_capture_toobig = 'En fazla 3 tuş birleştirilebilir',
     sc_pause = 'Duraklat / oynat', sc_reserved_player = 'oynatıcı kısayolu',
     sc_menu = 'Ayarlar menüsünü aç', sc_speed = 'Sabit hızı aç/kapat', sc_mute = 'Sesi kapat/aç',
-    sc_volume = 'Sesi artır / azalt', sc_seek = '10 saniye geri/ileri sar',
+    sc_vol_up = 'Sesi artır', sc_vol_down = 'Sesi azalt',
+    sc_seek_fwd = '10 saniye ileri sar', sc_seek_back = '10 saniye geri sar',
     sc_track1 = '1. ses parçasını aç/kapat', sc_track2 = '2. ses parçasını aç/kapat',
     sc_track3 = '3. ses parçasını aç/kapat',
     sc_speed_down = 'Videoyu yavaşlat',
@@ -208,7 +220,7 @@ local FALLBACK = {
     speed_fine = 'Video Hızı', speed_step_label = 'Hız Adımı',
 
     -- Discoverability
-    menu_hint = 'İpucu: Ayarlar için sağ tıklayın veya `a` tuşuna basın', sec_help = 'Yardım',
+    menu_hint = 'İpucu: Ayarlar için sağ tıklayın', sec_help = 'Yardım',
 
     -- Resume prompt: position is remembered, but playback always starts from 0 and asks first.
     resume_prompt = "%s'ten devam edilsin mi?", resume_keys = 'Enter: Evet  ·  Esc: Baştan başla',
@@ -419,26 +431,15 @@ end
 -- Read-only keyboard shortcuts reference: EchoPlay's own bindings (input.conf) plus the
 -- mpv screenshot-variant defaults we deliberately don't override.
 -- One continuous list, same shape for every row: description left, key right.
--- Pencil icon = click to rebind (the menu closes, then the pressed key/combo is captured);
--- lock icon = fixed binding this script doesn't own (mpv core / input.conf).
+-- Every row is click-to-rebind except right-click, which stays locked as the guaranteed
+-- way into this very menu (rebind it wrong and there's no way back in).
 local function shortcuts_items()
     local items = {}
     items[#items + 1] = { title = t('sc_rebind_hint'), selectable = false, muted = true }
+    items[#items + 1] = { title = t('sc_menu'), hint = t('sc_rclick'), icon = 'lock', selectable = false }
     for _, action in ipairs(KEY_ACTIONS) do
         items[#items + 1] = { title = t(action.label_key), hint = custom_keys[action.id] or action.default_key,
             icon = 'edit', value = 'rebind:' .. action.id }
-    end
-    local fixed_rows = {
-        { t('sc_menu'), t('sc_rclick') },
-        { t('sc_mute'), 'm' },
-        { t('sc_pause'), 'Space' },
-        { t('sc_volume'), 'Up / Down' },
-        { t('sc_seek'), 'Left / Right' },
-        { t('sc_screenshot_video'), 'Shift+s' },
-        { t('sc_screenshot_window'), 'Ctrl+s' },
-    }
-    for _, r in ipairs(fixed_rows) do
-        items[#items + 1] = { title = r[1], hint = r[2], icon = 'lock', selectable = false }
     end
     return items
 end
@@ -927,23 +928,32 @@ end
 -- KEY_ACTIONS is declared near the top; the actual functions can only be wired up here,
 -- once everything they call (open_menu, speed_nudge, handle, ...) already exists.
 local KEY_ACTION_FN = {
-    menu = open_menu,
     speed_toggle = speed_toggle,
     speed_down = function() speed_nudge(-speed_step) end,
     speed_up = function() speed_nudge(speed_step) end,
     screenshot = function() mp.commandv('screenshot') end,
+    shot_video = function() mp.commandv('screenshot', 'video') end,
+    shot_window = function() mp.commandv('screenshot', 'window') end,
     track1 = function() handle(1, nil) end,
     track2 = function() handle(2, nil) end,
     track3 = function() handle(3, nil) end,
+    mute = function() mp.commandv('cycle', 'mute') end,
+    pause = function() mp.commandv('cycle', 'pause') end,
+    vol_up = function() mp.command('no-osd add volume 5'); mp.commandv('script-binding', 'uosc/flash-volume') end,
+    vol_down = function() mp.command('no-osd add volume -5'); mp.commandv('script-binding', 'uosc/flash-volume') end,
+    seek_fwd = function() mp.command('no-osd seek 10'); mp.commandv('script-binding', 'uosc/flash-timeline') end,
+    seek_back = function() mp.command('no-osd seek -10'); mp.commandv('script-binding', 'uosc/flash-timeline') end,
 }
 local function bind_action(action)
-    mp.add_forced_key_binding(custom_keys[action.id] or action.default_key, action.id, KEY_ACTION_FN[action.id])
+    mp.add_forced_key_binding(custom_keys[action.id] or action.default_key, action.id, KEY_ACTION_FN[action.id],
+        action.repeatable and { repeatable = true } or nil)
 end
 local function rebind_action(action, new_key)
     mp.remove_key_binding(action.id)
     custom_keys[action.id] = new_key
     save_state()
-    mp.add_forced_key_binding(new_key, action.id, KEY_ACTION_FN[action.id])
+    mp.add_forced_key_binding(new_key, action.id, KEY_ACTION_FN[action.id],
+        action.repeatable and { repeatable = true } or nil)
     osd(string.format(t('sc_rebind_osd'), t(action.label_key), new_key))
     refresh_menu()
 end
@@ -969,21 +979,19 @@ local function key_is_valid(key)
 end
 
 -- ---------- press-to-rebind key capture ----------
--- Clicking a pencil row closes the menu and enters capture mode: a centered overlay asks
--- for the new key, and the user PRESSES it (combos arrive as one event, e.g. "ctrl+alt+x" -
--- mpv folds held modifiers into the key name, which is exactly the "press 3 keys at once"
--- behavior wanted). Capture works via a temporary forced input section that routes every
--- candidate key back here as a script-message - one define-section command, the same
--- mechanism mpv's own console.lua uses for its key grab, and being the most recently
--- enabled forced section it outranks all other bindings while active.
+-- Clicking a pencil row closes the menu and enters capture mode: a centered overlay shows
+-- the key live as it's held (combos arrive as one folded event, e.g. holding ctrl+alt and
+-- pressing x is a single "ctrl+alt+x" - exactly the "press up to 3 keys together" behavior
+-- wanted), then asks for an explicit Enter to confirm or Esc to cancel once released - a
+-- crash, timeout, or Esc at any point before that leaves the old shortcut untouched.
+-- Every candidate key is routed to ONE complex script-binding via a temporary forced input
+-- section (same define-section mechanism console.lua uses for its own key grab), which,
+-- being the most recently enabled forced section, outranks every other binding while active.
 local CAPTURE_SECTION = 'echoplay-capture'
--- Keys owned by mpv core / input.conf; capturing one of these shows which feature owns it.
-local RESERVED_INFO = {
-    m = 'sc_mute', space = 'sc_pause', enter = 'sc_reserved_player',
-    up = 'sc_volume', down = 'sc_volume', left = 'sc_seek', right = 'sc_seek',
-    ['shift+s'] = 'sc_screenshot_video', ['ctrl+s'] = 'sc_screenshot_window',
-}
+-- enter/esc are the capture UI's own confirm/cancel keys; esc cancels, enter confirms.
+local RESERVED_INFO = { enter = 'sc_reserved_player' }
 local capture_action, capture_overlay, capture_timeout = nil, nil, nil
+local capture_stage, capture_pending = 'wait', nil -- 'wait' -> 'held' -> 'confirm'
 
 local function capture_candidates()
     local bases = {}
@@ -993,7 +1001,7 @@ local function capture_candidates()
     for _, k in ipairs({ 'tab', 'ins', 'del', 'home', 'end', 'pgup', 'pgdwn', 'space', 'enter',
         'up', 'down', 'left', 'right', 'ö', 'ç', 'ş', 'ğ', 'ü', 'ı',
         ',', '.', ';', '[', ']', '-', '=' }) do bases[#bases + 1] = k end
-    local mods = { '', 'ctrl+', 'alt+', 'shift+', 'ctrl+alt+', 'ctrl+shift+', 'alt+shift+', 'ctrl+alt+shift+' }
+    local mods = { '', 'ctrl+', 'alt+', 'shift+', 'ctrl+alt+', 'ctrl+shift+', 'alt+shift+' }
     local keys = { 'esc' } -- bare esc = cancel; never offered with modifiers
     for _, base in ipairs(bases) do
         for _, mod in ipairs(mods) do
@@ -1011,58 +1019,102 @@ local function capture_candidates()
     return keys
 end
 
+-- 'ctrl+K' -> 'Ctrl+K' for display only; stored/bound names stay exactly as delivered.
+local function pretty_key(key)
+    local MODS = { ctrl = 'Ctrl', alt = 'Alt', shift = 'Shift', meta = 'Meta' }
+    return (key:gsub('([^+]+)', function(part) return MODS[part:lower()] or part end))
+end
+local function combo_size(key)
+    local n = 0
+    for _ in key:gmatch('[^+]+') do n = n + 1 end
+    return n
+end
+
 local function capture_set_text(error_line)
     if not capture_overlay then return end
-    local msg = string.format('{\\an5\\fs34}%s\\N{\\fs20}%s',
-        string.format(t('sc_capture_title'), t(capture_action.label_key)), t('sc_capture_sub'))
-    if error_line then msg = msg .. '\\N{\\fs20}' .. error_line end
-    capture_overlay.data = msg
+    local parts = {
+        string.format('{\\an5\\fs28}%s', string.format(t('sc_capture_title'), t(capture_action.label_key))),
+        string.format('{\\fs46\\b1}%s{\\b0}', capture_pending and pretty_key(capture_pending) or '...'),
+        '{\\fs20}' .. (capture_stage == 'confirm' and t('sc_capture_confirm') or t('sc_capture_sub')),
+    }
+    if error_line then parts[#parts + 1] = '{\\fs20}' .. error_line end
+    capture_overlay.data = table.concat(parts, '\\N')
     capture_overlay:update()
 end
 
 local function capture_stop()
     if not capture_action then return end
     capture_action = nil
+    capture_stage, capture_pending = 'wait', nil
     mp.commandv('disable-section', CAPTURE_SECTION)
     if capture_overlay then capture_overlay:remove(); capture_overlay = nil end
     if capture_timeout then capture_timeout:kill(); capture_timeout = nil end
 end
 
-local function capture_try(key)
+-- Complex script-binding handler: gets down/up events with the full folded key name
+-- (holding ctrl+alt and pressing X arrives as ONE event named "ctrl+alt+x", so the live
+-- display updates as the user builds the combo, modifiers already ordered first). The
+-- rebind is applied ONLY on the final Enter confirm - a crash, timeout, or Esc anywhere
+-- before that leaves the old shortcut untouched.
+local function capture_handler(e)
     if not capture_action then return end
-    if key == 'esc' then capture_stop(); return end
-    local lower = key:lower()
-    local reserved = RESERVED_INFO[lower]
-    -- a bare uppercase letter IS shift+<letter>, so check that reserved spelling too
-    if not reserved and key:match('^%u$') then reserved = RESERVED_INFO['shift+' .. lower] end
-    if reserved then
-        capture_set_text(string.format(t('sc_rebind_conflict'), key, t(reserved)))
-        return -- stay in capture mode so another key can be tried
-    end
-    for _, other in ipairs(KEY_ACTIONS) do
-        if other.id ~= capture_action.id and (custom_keys[other.id] or other.default_key):lower() == lower then
-            capture_set_text(string.format(t('sc_rebind_conflict'), key, t(other.label_key)))
+    local key, ev = e.key_name, e.event
+    if not key or key == '' then return end
+    if capture_timeout then capture_timeout:kill() end
+    capture_timeout = mp.add_timeout(20, capture_stop)
+    -- Named keys (ENTER, ESC, SPACE, ...) arrive in mpv's own canonical uppercase
+    -- regardless of how they were spelled in define-section; plain letters keep
+    -- pressed case (shift+x -> 'X', bare x -> 'x'). Compare case-insensitively.
+    if ev == 'down' or ev == 'press' then
+        if key:lower() == 'esc' then capture_stop(); return end
+        if capture_stage == 'confirm' and key:lower() == 'enter' then
+            local lower = capture_pending:lower()
+            for _, other in ipairs(KEY_ACTIONS) do
+                if other.id ~= capture_action.id and (custom_keys[other.id] or other.default_key):lower() == lower then
+                    capture_stage, capture_pending = 'wait', nil
+                    capture_set_text(string.format(t('sc_rebind_conflict'), pretty_key(lower), t(other.label_key)))
+                    return
+                end
+            end
+            local action, new_key = capture_action, capture_pending
+            capture_stop()
+            rebind_action(action, new_key)
             return
         end
+        local reserved = RESERVED_INFO[key:lower()]
+        if reserved then
+            capture_stage, capture_pending = 'wait', nil
+            capture_set_text(string.format(t('sc_rebind_conflict'), pretty_key(key), t(reserved)))
+            return
+        end
+        if combo_size(key) > 3 then
+            capture_stage, capture_pending = 'wait', nil
+            capture_set_text(t('sc_capture_toobig'))
+            return
+        end
+        capture_pending = key
+        capture_stage = ev == 'press' and 'confirm' or 'held' -- 'press' = down+up in one event
+        capture_set_text(nil)
+    elseif ev == 'up' and capture_stage == 'held' then
+        capture_stage = 'confirm'
+        capture_set_text(nil)
     end
-    local action = capture_action
-    capture_stop()
-    rebind_action(action, key)
 end
-mp.register_script_message('echoplay-captured', capture_try)
+mp.add_key_binding(nil, 'echoplay-cap', capture_handler, { complex = true })
 
 rebind_capture = function(action)
     capture_stop()
     capture_action = action
+    capture_stage, capture_pending = 'wait', nil
     local lines = {}
     for _, key in ipairs(capture_candidates()) do
-        lines[#lines + 1] = key .. ' script-message-to ' .. SCRIPT .. ' echoplay-captured ' .. key
+        lines[#lines + 1] = key .. ' script-binding ' .. SCRIPT .. '/echoplay-cap'
     end
     mp.commandv('define-section', CAPTURE_SECTION, table.concat(lines, '\n'), 'force')
     mp.commandv('enable-section', CAPTURE_SECTION)
     capture_overlay = mp.create_osd_overlay('ass-events')
     capture_set_text(nil)
-    capture_timeout = mp.add_timeout(15, capture_stop)
+    capture_timeout = mp.add_timeout(20, capture_stop)
 end
 
 for _, action in ipairs(KEY_ACTIONS) do

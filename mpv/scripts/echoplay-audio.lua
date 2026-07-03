@@ -348,6 +348,16 @@ end
 -- Section header row: bold + an anchoring icon (uosc renders item icons on the right edge).
 -- Not muted - these are the visual signposts of the menu, they should pop, not fade.
 local function heading(text, icon) return { title = text, icon = icon, selectable = false, bold = true } end
+-- Top-level Settings sections only (menu_data): same as heading(), plus `active = true`,
+-- which makes uosc paint the row as a full-width accent-colored bar even though it's not
+-- selectable - a real uosc rendering rule (not gated on selectable), with text color
+-- resolving to foreground_text automatically for contrast in both light/dark mode. Not
+-- used for in-submenu group labels (theme_items' Mod/Vurgu Rengi/Özel Temalar), since those
+-- submenus already use `active` for the real currently-selected radio row - reusing the same
+-- treatment for a group label there would make "heading" and "selected value" look identical.
+local function section_heading(text, icon)
+    return { title = text, icon = icon, selectable = false, bold = true, active = true }
+end
 
 -- Value labels shown as the muted right-side hint on rows that open submenus, so the
 -- current choice is readable without opening anything ("what will I find in here?").
@@ -473,12 +483,12 @@ local function menu_data()
     -- Layout rules (approved mockup): rows that open a submenu always show the muted
     -- current value + a chevron_right; only leaf/action rows carry a functional icon.
     -- uosc draws one icon slot per row (right edge), so it's chevron OR icon, never both.
-    items[#items + 1] = heading(t('sec_audio'), 'graphic_eq')
+    items[#items + 1] = section_heading(t('sec_audio'), 'graphic_eq')
     items[#items + 1] = { title = mixer_title(), icon = 'chevron_right',
         hint = #tracks > 0 and string.format(t('tracks_on'), #on_list(), #tracks) or nil, value = 'open-mixer' }
     -- Video settings (speed and playback flow)
     items[#items + 1] = separator()
-    items[#items + 1] = heading(t('sec_video'), 'play_circle')
+    items[#items + 1] = section_heading(t('sec_video'), 'play_circle')
     items[#items + 1] = { title = string.format('%s: %.2gx', t('speed_fine'), mp.get_property_number('speed') or 1),
         icon = 'speed', value = 'speed-fine', keep_open = true,
         actions = { { name = 'down', icon = 'remove', label = t('slower') },
@@ -496,7 +506,7 @@ local function menu_data()
     } }
     -- Picture quality (rendering)
     items[#items + 1] = separator()
-    items[#items + 1] = heading(t('sec_quality'), 'high_quality')
+    items[#items + 1] = section_heading(t('sec_quality'), 'high_quality')
     items[#items + 1] = { title = t('perf_mode'), icon = 'chevron_right',
         hint = perf_pref == 'auto'
             and string.format('%s (%s)', t('perf_auto'), t('perf_tier_' .. perf_tier_active))
@@ -504,12 +514,12 @@ local function menu_data()
         items = perf_items() }
     -- Appearance
     items[#items + 1] = separator()
-    items[#items + 1] = heading(t('sec_appearance'), 'palette')
+    items[#items + 1] = section_heading(t('sec_appearance'), 'palette')
     items[#items + 1] = { title = t('theme'), icon = 'chevron_right', hint = theme_label(), items = theme_items() }
     items[#items + 1] = { title = t('language'), icon = 'chevron_right', hint = t('lang_name'), items = lang_items() }
     -- File
     items[#items + 1] = separator()
-    items[#items + 1] = heading(t('sec_file'), 'folder')
+    items[#items + 1] = section_heading(t('sec_file'), 'folder')
     items[#items + 1] = { title = t('open_file'), icon = 'folder_open', value = 'open-file' }
     items[#items + 1] = { title = t('playlist'), icon = 'list', value = 'playlist' }
     items[#items + 1] = { title = t('subtitles'), icon = 'subtitles', value = 'subtitles' }
@@ -517,12 +527,12 @@ local function menu_data()
         hint = screenshot_label(), items = screenshot_items() }
     -- General
     items[#items + 1] = separator()
-    items[#items + 1] = heading(t('sec_general'), 'settings')
+    items[#items + 1] = section_heading(t('sec_general'), 'settings')
     items[#items + 1] = { title = t('audio_device'), icon = 'speaker', value = 'audio-device' }
     items[#items + 1] = { title = t('config_dir'), icon = 'folder_special', value = 'config-dir' }
     -- Help
     items[#items + 1] = separator()
-    items[#items + 1] = heading(t('sec_help'), 'help_outline')
+    items[#items + 1] = section_heading(t('sec_help'), 'help_outline')
     items[#items + 1] = { title = t('shortcuts'), icon = 'chevron_right', items = shortcuts_items() }
     -- Actions stay inside the row ('outside' floats them detached from the menu, which both
     -- looks odd and breaks rapid repeat-clicking of +/- on the speed rows).

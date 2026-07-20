@@ -123,8 +123,7 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 ; only recognizes apps registered under HKLM (every real app checked - Adobe Acrobat, VLC,
 ; PotPlayer - registers there), not HKCU. HKLM would require admin, which conflicts with this
 ; installer's no-UAC design. "Set as Default App" instead opens the plain ms-settings:defaultapps
-; page and tells the user to click "Choose defaults by file type" - see open_default_apps() in
-; echoplay-audio.lua.
+; page and tells the user to click "Choose defaults by file type".
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch EchoPlay"; Flags: postinstall nowait skipifsilent unchecked

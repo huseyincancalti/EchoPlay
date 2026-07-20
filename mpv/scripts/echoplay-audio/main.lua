@@ -8,16 +8,24 @@
 --   * Languages are community-extensible: drop a script-opts/echoplay-<code>.json.
 -- Mixer state / mono / language / accent persist across runs.
 -- Track names come from file metadata (e.g. ShadowPlay "System sounds"/"Microphone").
+--
+-- Split across this directory (mpv's own convention: a script can be a folder with a
+-- main.<ext> entry point, and mpv prepends that folder to Lua's package.path so sibling
+-- files resolve via plain require()): util.lua (JSON helpers), i18n.lua (strings),
+-- quality.lua (picture-quality tiers), resume.lua (resume-position prompt). Menu building,
+-- the audio mixer, and the keyboard-shortcut system stay here - they share too much
+-- module-level state (tracks/gain/mode/accent/etc.) and funnel through one central
+-- handle() dispatcher to split further without adding real complexity for no real gain.
 
 local mp = require 'mp'
 local utils = require 'mp.utils'
 require 'mp.options'
 
--- utils.format_json can return nil (caught live in CI, twice, on an older mpv build than the
--- one this project targets: once in save_state's disk write, once in update_button's
--- mp.commandv call - "argument N is not a string"). Centralized so every JSON-producing call
--- site degrades to an empty object instead of crashing the whole script.
-local function to_json(tbl) return utils.format_json(tbl) or '{}' end
+local util = require 'util'
+local i18n = require 'i18n'
+local quality = require 'quality'
+local resume = require 'resume'
+local to_json = util.to_json
 
 local o = {
     language = 'tr',
@@ -38,6 +46,9 @@ local MENU_TYPE_MIX = 'echoplay-mixer'
 local OPTS_DIR = mp.command_native({ 'expand-path', '~~/script-opts' })
 local THEMES_DIR = mp.command_native({ 'expand-path', '~~/themes' })
 local STATE_PATH = mp.command_native({ 'expand-path', '~~/echoplay-state.json' })
+
+i18n.init(OPTS_DIR, o.language)
+local t = i18n.t
 
 -- Open a folder in the OS file manager (Explorer/Finder/whatever handles xdg-open).
 local function open_folder(path)
@@ -70,16 +81,7 @@ local ACCENT_MIGRATE = {
 local mode = 'dark'        -- 'dark' | 'light'
 local accent = 'ff7d26'
 
--- Picture-quality tiers, best to cheapest. "normal" is the baseline (the tuned lanczos
--- defaults in mpv.conf - no profile to apply/restore). Auto roams the whole ladder: it
--- starts at Normal, steps down on sustained frame drops, and only dares Ultra after a
--- long clean stretch - never re-entering a tier that already proved too heavy (perf_blocked).
-local TIERS = { 'ultra', 'normal', 'low' }
-local TIER_PROFILE = { ultra = 'echoplay-tier-ultra', low = 'echoplay-tier-low' }
-
 -- ---------- new-feature state (performance mode / screenshot location / first-run hint) ----------
-local perf_pref = 'auto'             -- 'auto' | 'ultra' | 'normal' | 'low'
-local perf_tier_active = 'normal'    -- the tier currently in effect (what auto mode is driving)
 local screenshot_preset = 'desktop'  -- 'desktop' | 'videos' | 'pictures' | 'video_folder' | 'custom'
 local screenshot_custom_path = ''
 local menu_hint_shown = false
@@ -139,13 +141,8 @@ end
 -- place that needs to know about a previous schema's format - saves always write CURRENT.
 local CURRENT_SCHEMA = 2
 local saved_gains, saved_mono = {}, {}
-local function read_json(path)
-    local f = io.open(path, 'r'); if not f then return nil end
-    local d = f:read('*a'); f:close()
-    local p = utils.parse_json(d or ''); return type(p) == 'table' and p or nil
-end
 local function load_state()
-    local s = read_json(STATE_PATH); if not s then return end
+    local s = util.read_json(STATE_PATH); if not s then return end
     local schema = tonumber(s._schema) or 1 -- saves before this field existed are schema 1
 
     if s.default_on then o.default_on = s.default_on end
@@ -175,14 +172,14 @@ local function load_state()
     local mode_matched = s.mode == 'light' or s.mode == 'dark'
     if mode_matched then mode = s.mode end
     local perf_matched = s.perf_pref == 'auto' or s.perf_pref == 'ultra' or s.perf_pref == 'normal' or s.perf_pref == 'low'
-    if perf_matched then perf_pref = s.perf_pref end
+    if perf_matched then quality.pref = s.perf_pref end
     -- Schema 1 -> 2: `theme` was renamed `mode`; perf_pref went through a binary on/off
     -- toggle, then a 5-tier set (high/lowest), before landing on the current 4-way scheme.
     if schema < 2 then
         if not mode_matched and (s.theme == 'light' or s.theme == 'dark') then mode = s.theme end
         if not perf_matched then
-            if s.perf_pref == 'on' or s.perf_pref == 'lowest' then perf_pref = 'low'
-            elseif s.perf_pref == 'off' or s.perf_pref == 'high' then perf_pref = 'normal' end
+            if s.perf_pref == 'on' or s.perf_pref == 'lowest' then quality.pref = 'low'
+            elseif s.perf_pref == 'off' or s.perf_pref == 'high' then quality.pref = 'normal' end
         end
     end
 end
@@ -190,79 +187,6 @@ load_state()
 -- Applied here (top-level, before any file loads) rather than per-file: volume is one
 -- mpv session's global property, not something to re-snap on every playlist entry.
 mp.set_property_number('volume', saved_volume)
-
--- ---------- i18n ----------
-local FALLBACK = {
-    title = 'EchoPlay', settings = 'Ayarlar',
-    sec_audio = 'Ses Kaynakları', sec_video = 'Video Ayarları', sec_quality = 'Görüntü Kalitesi',
-    sec_appearance = 'Görünüm', sec_file = 'Dosya', sec_general = 'Genel',
-    mixer = 'Ses Kaynakları', back = 'Geri', tracks_on = '%d/%d açık',
-    all_on = 'Hepsini aç', mute = 'Sustur',
-    gain_down = 'Sesi azalt', gain_up = 'Sesi artır', silent = 'Sessiz',
-    mono = 'Mono yap (L+R birleştir)', mono_short = 'Mono',
-    speed = 'Sabit Hız (g)', speed_osd = 'Hız: %sx', faster = 'Hızlandır', slower = 'Yavaşlat',
-    video_end = 'Video Bitince', end_next = 'Sıradakine geç', end_loop = 'Tekrarla', end_stop = 'Sonda dur',
-    end_osd = 'Video bitince: %s',
-    theme = 'Tema', theme_mode = 'Mod', theme_dark = 'Koyu', theme_light = 'Açık', theme_osd = 'Tema: %s',
-    accent = 'Vurgu Rengi', accent_osd = 'Vurgu: %s', custom_themes = 'Özel Temalar',
-    accent_orange = 'Turuncu', accent_blue = 'Mavi', accent_green = 'Yeşil',
-    accent_purple = 'Mor', accent_pink = 'Pembe', accent_red = 'Kırmızı',
-    language = 'Dil', lang_osd = 'Dil: %s', open_lang = 'Dil klasörünü aç (çeviri ekle)',
-    open_theme = 'Tema klasörünü aç (tema ekle)', lang_name = 'Türkçe',
-    open_file = 'Dosya Aç', playlist = 'Oynatma Listesi', subtitles = 'Altyazı',
-    audio_device = 'Ses Cihazı', config_dir = 'Program Klasörü', single_track = 'Bu videoda tek ses parçası var',
-
-    -- Performance mode (Auto + Ultra/Normal/Low picture-quality ladder)
-    perf_mode = 'Performans Modu', perf_auto = 'Otomatik',
-    perf_tier_ultra = 'Ultra', perf_tier_normal = 'Normal', perf_tier_low = 'Düşük',
-    perf_auto_hint = 'donanıma göre seçer',
-    perf_ultra_hint = 'sıfır kalite kaybı', perf_normal_hint = 'dengeli (önerilen)',
-    perf_low_hint = 'zayıf donanımlar için',
-    perf_manual_auto = 'Otomatik mod: şu an %s', perf_manual_forced = 'Görüntü kalitesi: %s',
-    perf_auto_step_down = 'Takılma tespit edildi, kaliteyi düşürüyorum: %s',
-    perf_auto_step_up = 'Performans iyi, kaliteyi artırıyorum: %s',
-
-    -- Keyboard shortcuts (pencil rows are rebindable: click, then PRESS the new key/combo)
-    shortcuts = 'Klavye Kısayolları', sc_rclick = 'sağ tık',
-    sc_rebind_hint = 'Kalemli satıra tıkla, sonra atamak istediğin tuşa bas',
-    sc_rebind_osd = '%s artık: %s',
-    sc_rebind_conflict = "'%s' zaten kullanımda: %s",
-    sc_capture_title = "'%s' için yeni tuş",
-    sc_capture_sub = 'Tuşa veya kombinasyona bas (en fazla 3 tuş)  ·  Esc: vazgeç',
-    sc_capture_confirm = '✓ Enter: Onayla      ✗ Esc: İptal',
-    sc_capture_toobig = 'En fazla 3 tuş birleştirilebilir',
-    sc_pause = 'Duraklat / oynat', sc_reserved_player = 'oynatıcı kısayolu',
-    sc_menu = 'Ayarlar menüsünü aç', sc_speed = 'Sabit hızı aç/kapat', sc_mute = 'Sesi kapat/aç',
-    sc_vol_up = 'Sesi artır', sc_vol_down = 'Sesi azalt',
-    sc_seek_fwd = '10 saniye ileri sar', sc_seek_back = '10 saniye geri sar',
-    sc_track1 = '1. ses parçasını aç/kapat', sc_track2 = '2. ses parçasını aç/kapat',
-    sc_track3 = '3. ses parçasını aç/kapat',
-    sc_speed_down = 'Videoyu yavaşlat',
-    sc_speed_up = 'Videoyu hızlandır',
-    sc_screenshot = 'Ekran görüntüsü al (altyazı dahil)',
-    sc_screenshot_video = 'Ekran görüntüsü al (yalnızca video)',
-    sc_screenshot_window = 'Ekran görüntüsü al (tüm pencere)',
-
-    -- Screenshot location
-    screenshot_location = 'Ekran Görüntüsü Konumu', screenshot_desktop = 'Masaüstü',
-    screenshot_videos = 'Videolar', screenshot_pictures = 'Resimler',
-    screenshot_video_folder = 'Video ile aynı klasör', screenshot_custom = 'Klasör Seç...',
-    screenshot_osd = 'Ekran görüntüsü klasörü: %s',
-
-    -- Fine speed control (s/d keys)
-    speed_fine = 'Video Hızı', speed_step_label = 'Hız Adımı',
-
-    -- Discoverability
-    menu_hint = 'İpucu: Ayarlar için sağ tıklayın', sec_help = 'Yardım',
-
-    -- Resume prompt: position is remembered, but playback always starts from 0 and asks first.
-    resume_prompt = "%s'ten devam edilsin mi?", resume_keys = 'Enter: Evet  ·  Esc: Baştan başla',
-}
-local function load_lang(code)
-    return read_json(OPTS_DIR .. '/echoplay-' .. code .. '.json')
-end
-local STR = load_lang(o.language) or load_lang('tr') or {}
-local function t(k) return STR[k] or FALLBACK[k] or k end
 
 local custom = {}
 for pair in o.labels:gmatch('[^,]+') do
@@ -278,7 +202,6 @@ local PLAYER = { ['open-file'] = 'open-file', playlist = 'playlist', subtitles =
 local tracks, info = {}, {}
 local enabled, gain, mono = {}, {}, {}
 local appearance_applied = false
-local perf_pref_applied = false
 
 -- ---------- helpers ----------
 local function label(aid)
@@ -329,17 +252,7 @@ local function cur_end()
 end
 local function speed_on() return (mp.get_property_number('speed') or 1) > 1.01 end
 
-local function available_langs()
-    local langs, files = {}, utils.readdir(OPTS_DIR, 'files') or {}
-    for _, fn in ipairs(files) do
-        local code = fn:match('^echoplay%-(%w+)%.json$')
-        if code then
-            local data = load_lang(code)
-            langs[#langs + 1] = { code = code, name = (data and data.lang_name) or code:upper() }
-        end
-    end
-    return langs
-end
+local function available_langs() return i18n.available() end
 -- Community theme packs (full uosc-option overrides) shown as advanced presets.
 local function available_themes()
     local list, files = {}, utils.readdir(THEMES_DIR, 'files') or {}
@@ -375,7 +288,7 @@ local function save_state()
     if f then
         f:write(to_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
-            perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
+            perf_pref = quality.pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
             screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
             volume = saved_volume }))
         f:close()
@@ -474,13 +387,13 @@ end
 -- each with a one-line plain-language hint of who it's for.
 local function perf_items()
     local items = {}
-    local is_auto = perf_pref == 'auto'
+    local is_auto = quality.pref == 'auto'
     items[#items + 1] = {
-        title = is_auto and string.format('%s (%s)', t('perf_auto'), t('perf_tier_' .. perf_tier_active)) or t('perf_auto'),
+        title = is_auto and string.format('%s (%s)', t('perf_auto'), t('perf_tier_' .. quality.tier_active)) or t('perf_auto'),
         hint = t('perf_auto_hint'), icon = RADIO[is_auto], active = is_auto, value = 'perf:auto', keep_open = true }
-    for _, tier in ipairs(TIERS) do
+    for _, tier in ipairs(quality.TIERS) do
         items[#items + 1] = { title = t('perf_tier_' .. tier), hint = t('perf_' .. tier .. '_hint'),
-            icon = RADIO[perf_pref == tier], active = perf_pref == tier, value = 'perf:' .. tier, keep_open = true }
+            icon = RADIO[quality.pref == tier], active = quality.pref == tier, value = 'perf:' .. tier, keep_open = true }
     end
     return items
 end
@@ -555,9 +468,9 @@ local function menu_data()
     items[#items + 1] = separator()
     items[#items + 1] = section_heading(t('sec_quality'), 'high_quality')
     items[#items + 1] = { title = t('perf_mode'), icon = 'chevron_right',
-        hint = perf_pref == 'auto'
-            and string.format('%s (%s)', t('perf_auto'), t('perf_tier_' .. perf_tier_active))
-            or t('perf_tier_' .. perf_tier_active),
+        hint = quality.pref == 'auto'
+            and string.format('%s (%s)', t('perf_auto'), t('perf_tier_' .. quality.tier_active))
+            or t('perf_tier_' .. quality.pref),
         items = perf_items() }
     -- Appearance
     items[#items + 1] = separator()
@@ -743,7 +656,7 @@ local function persist_uosc_language(code)
 end
 local function set_language(code)
     o.language = code
-    STR = load_lang(code) or STR
+    i18n.set(code)
     mp.commandv('change-list', 'script-opts', 'append', 'uosc-languages=' .. code .. ',slang,en')
     persist_uosc_language(code)
     save_state(); osd(string.format(t('lang_osd'), t('lang_name')))
@@ -809,135 +722,8 @@ local function pick_custom_screenshot_dir()
     end)
 end
 
--- ---------- picture-quality tiers (automatic + manual) ----------
-local PERF_POLL_INTERVAL = 2
-local PERF_DROP_THRESHOLD = 6
-local PERF_BAD_STREAK_NEEDED = 3      -- ~6s of sustained drops before stepping down
-local PERF_GOOD_STREAK_NEEDED = 5     -- ~10s clean before stepping back up
-local PERF_ULTRA_STREAK_NEEDED = 15   -- ~30s clean before daring the expensive Ultra tier
-local perf_last_count, perf_bad_streak, perf_good_streak = nil, 0, 0
-local perf_blocked = {} -- tiers that already caused drops on this file - auto won't retry them
-
-local function tier_index(tier)
-    for i, v in ipairs(TIERS) do if v == tier then return i end end
-    return nil
-end
--- Always restores whatever tier profile is currently applied before applying the new one
--- (skips both steps for "normal", since it has no profile - it IS the restored baseline).
-local function apply_tier(tier)
-    if tier == perf_tier_active then return end
-    if TIER_PROFILE[perf_tier_active] then mp.commandv('apply-profile', TIER_PROFILE[perf_tier_active], 'restore') end
-    if TIER_PROFILE[tier] then mp.commandv('apply-profile', TIER_PROFILE[tier]) end
-    perf_tier_active = tier
-    refresh_menu()
-end
-local function perf_poll()
-    if perf_pref ~= 'auto' then
-        perf_last_count = nil; perf_bad_streak, perf_good_streak = 0, 0
-        return
-    end
-    local count = mp.get_property_number('frame-drop-count') or 0
-    if perf_last_count == nil then perf_last_count = count; return end
-    local delta = count - perf_last_count
-    perf_last_count = count
-    if delta < 0 then delta = 0 end -- defensive: counter reset mid-window (new file, or wrapped)
-    local idx = tier_index(perf_tier_active) or 2
-    if delta >= PERF_DROP_THRESHOLD then
-        perf_bad_streak = perf_bad_streak + 1; perf_good_streak = 0
-        if perf_bad_streak >= PERF_BAD_STREAK_NEEDED and idx < #TIERS then
-            perf_bad_streak = 0
-            perf_blocked[TIERS[idx]] = true -- proved too heavy here; don't oscillate back into it
-            local next_tier = TIERS[idx + 1]
-            apply_tier(next_tier)
-            osd(string.format(t('perf_auto_step_down'), t('perf_tier_' .. next_tier)))
-        end
-    else
-        perf_good_streak = perf_good_streak + 1; perf_bad_streak = 0
-        local target = idx > 1 and TIERS[idx - 1] or nil
-        if target and perf_blocked[target] then target = nil end
-        local need = target == 'ultra' and PERF_ULTRA_STREAK_NEEDED or PERF_GOOD_STREAK_NEEDED
-        if target and perf_good_streak >= need then
-            perf_good_streak = 0
-            apply_tier(target)
-            osd(string.format(t('perf_auto_step_up'), t('perf_tier_' .. target)))
-        end
-    end
-end
-local function set_perf_pref(pref)
-    perf_pref = pref
-    save_state()
-    if pref == 'auto' then
-        perf_bad_streak, perf_good_streak = 0, 0
-        osd(string.format(t('perf_manual_auto'), t('perf_tier_' .. perf_tier_active)))
-    else
-        apply_tier(pref)
-        osd(string.format(t('perf_manual_forced'), t('perf_tier_' .. pref)))
-    end
-    refresh_menu()
-end
-mp.add_periodic_timer(PERF_POLL_INTERVAL, perf_poll)
-
--- ---------- resume-position prompt ----------
--- mpv's own save-position-on-quit/resume-playback resumes silently (turned off in mpv.conf) -
--- position is tracked here instead, in a small side file (kept separate from
--- echoplay-state.json so it can grow/shrink independently). Playback always starts at 0:00;
--- if a saved spot exists, an on-screen prompt asks whether to jump there.
-local RESUME_PATH = mp.command_native({ 'expand-path', '~~/echoplay-resume.json' })
-local RESUME_MAX_ENTRIES = 300
-local resume_map = {}
-local function load_resume_map()
-    local m = read_json(RESUME_PATH)
-    if type(m) == 'table' then resume_map = m end
-end
-load_resume_map()
-local function save_resume_map()
-    local count, entries = 0, {}
-    for path, e in pairs(resume_map) do count = count + 1; entries[#entries + 1] = { path = path, at = e.at or 0 } end
-    if count > RESUME_MAX_ENTRIES then
-        table.sort(entries, function(a, b) return a.at < b.at end)
-        for i = 1, count - RESUME_MAX_ENTRIES do resume_map[entries[i].path] = nil end
-    end
-    local f = io.open(RESUME_PATH, 'w')
-    if f then f:write(to_json(resume_map)); f:close() end
-end
--- Skips near-start (nothing to resume) and near-end (finished - don't offer to "resume" 10s from the end).
-local function update_resume_position()
-    local path = mp.get_property('path')
-    local pos = mp.get_property_number('time-pos')
-    local dur = mp.get_property_number('duration')
-    if not path or not pos or not dur or dur <= 0 then return end
-    if pos < 15 or pos > dur - 20 then resume_map[path] = nil
-    else resume_map[path] = { pos = pos, dur = dur, at = os.time() } end
-end
-mp.add_periodic_timer(5, update_resume_position)
-mp.register_event('shutdown', function() update_resume_position(); save_resume_map() end)
-
-local function format_hms(sec)
-    sec = math.floor(sec + 0.5)
-    local h, m, s = math.floor(sec / 3600), math.floor((sec % 3600) / 60), sec % 60
-    if h > 0 then return string.format('%d:%02d:%02d', h, m, s) end
-    return string.format('%d:%02d', m, s)
-end
-local resume_overlay, resume_dismiss_timer = nil, nil
-local function dismiss_resume_prompt()
-    if resume_overlay then resume_overlay:remove(); resume_overlay = nil end
-    if resume_dismiss_timer then resume_dismiss_timer:kill(); resume_dismiss_timer = nil end
-    mp.remove_key_binding('resume-yes')
-    mp.remove_key_binding('resume-no')
-end
--- {\an5} centers in the middle of the frame (standard ASS alignment behavior without \pos).
-local function show_resume_prompt(pos)
-    resume_overlay = mp.create_osd_overlay('ass-events')
-    resume_overlay.data = string.format('{\\an5\\fs36}%s\\N{\\fs22}%s',
-        string.format(t('resume_prompt'), format_hms(pos)), t('resume_keys'))
-    resume_overlay:update()
-    mp.add_forced_key_binding('Enter', 'resume-yes', function()
-        dismiss_resume_prompt()
-        mp.set_property_number('time-pos', pos)
-    end)
-    mp.add_forced_key_binding('Esc', 'resume-no', function() dismiss_resume_prompt() end)
-    resume_dismiss_timer = mp.add_timeout(8, dismiss_resume_prompt)
-end
+quality.init({ t = t, osd = osd, refresh_menu = refresh_menu, save_state = save_state })
+resume.init({ t = t })
 
 local function handle(value, action)
     if value == 'open-mixer' then open_mixer()
@@ -960,7 +746,7 @@ local function handle(value, action)
     elseif type(value) == 'string' and value:sub(1, 7) == 'accent:' then set_accent(value:sub(8))
     elseif type(value) == 'string' and value:sub(1, 6) == 'theme:' then apply_theme_pack(value:sub(7))
     elseif type(value) == 'string' and value:sub(1, 5) == 'lang:' then set_language(value:sub(6))
-    elseif type(value) == 'string' and value:sub(1, 5) == 'perf:' then set_perf_pref(value:sub(6))
+    elseif type(value) == 'string' and value:sub(1, 5) == 'perf:' then quality.set(value:sub(6))
     elseif type(value) == 'string' and value:sub(1, 11) == 'screenshot:' then set_screenshot_preset(value:sub(12))
     elseif value == 'screenshot-pick' then pick_custom_screenshot_dir()
     elseif type(value) == 'string' and value:sub(1, 7) == 'rebind:' then
@@ -1196,24 +982,18 @@ mp.register_script_message('echoplay-speed-up', function() speed_nudge(speed_ste
 
 mp.register_event('start-file', function() mp.set_property('lavfi-complex', '') end)
 mp.register_event('file-loaded', function()
-    dismiss_resume_prompt()
-    local path = mp.get_property('path')
-    local saved = path and resume_map[path]
-    if saved then mp.add_timeout(0.5, function() show_resume_prompt(saved.pos) end) end
+    resume.dismiss()
+    local saved = resume.check(mp.get_property('path'))
+    if saved then mp.add_timeout(0.5, function() resume.show(saved.pos) end) end
     if not appearance_applied then appearance_applied = true; apply_appearance() end
-    if not perf_pref_applied then
-        perf_pref_applied = true
-        if perf_pref ~= 'auto' then apply_tier(perf_pref) end
-    end
+    quality.apply_initial()
     apply_screenshot_preset() -- static presets are idempotent; 'video_folder' needs this per file
     if not menu_hint_shown then
         menu_hint_shown = true
         save_state()
         mp.add_timeout(1.5, function() osd(t('menu_hint')) end)
     end
-    perf_last_count = nil
-    perf_bad_streak, perf_good_streak = 0, 0
-    perf_blocked = {} -- new file = new decode/render cost; let auto re-probe every tier
+    quality.reset_for_new_file()
     scan()
     enabled, gain, mono = {}, {}, {}
     if o.default_on == 'all' then

@@ -1,7 +1,8 @@
 name: Lint & smoke test
 
 # Runs on every push/PR (unlike release.yml, which only fires on version tags) so mistakes
-# in echoplay-audio.lua are caught within minutes of a commit, not just at release time.
+# in mpv/scripts/echoplay-audio/*.lua are caught within minutes of a commit, not just at
+# release time.
 on:
   push:
     branches: [main]
@@ -20,7 +21,7 @@ jobs:
           sudo luarocks install luacheck
 
       - name: Run luacheck
-        run: luacheck mpv/scripts/echoplay-audio.lua
+        run: luacheck mpv/scripts/echoplay-audio/
 
   smoke-test:
     runs-on: ubuntu-latest

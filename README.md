@@ -212,7 +212,7 @@ manually muxed files — is handled the same way.
 ## For the curious: how it works
 
 EchoPlay is deliberately thin. The only original code is one Lua script
-([`mpv/scripts/echoplay-audio.lua`](mpv/scripts/echoplay-audio.lua)); everything else is upstream
+([`mpv/scripts/echoplay-audio/`](mpv/scripts/echoplay-audio/)); everything else is upstream
 mpv, uosc, thumbfast and memo, wired together by config files. That makes it easy to extend — and
 easy to keep close to upstream.
 
@@ -266,7 +266,7 @@ volume goes up to 300%. The settings menu, mixer, theming and persistence (a sma
 
 | Path | Purpose |
 |------|---------|
-| [`mpv/scripts/echoplay-audio.lua`](mpv/scripts/echoplay-audio.lua) | EchoPlay's only original code — mixer, menus, theming |
+| [`mpv/scripts/echoplay-audio/`](mpv/scripts/echoplay-audio/) | EchoPlay's only original code — `main.lua` (mixer, menus, theming, shortcuts) + `i18n.lua`/`quality.lua`/`resume.lua` |
 | [`mpv/script-opts/echoplay-*.json`](mpv/script-opts) | Language packs |
 | [`mpv/themes/*.conf`](mpv/themes) | Community theme packs |
 | [`mpv/mpv.conf`](mpv/mpv.conf), [`mpv/input.conf`](mpv/input.conf) | Player settings & shortcuts (shared across all 3 platforms) |
@@ -274,13 +274,14 @@ volume goes up to 300%. The settings menu, mixer, theming and persistence (a sma
 | [`installer/macos/Info.plist.template`](installer/macos/Info.plist.template), [`entitlements.plist`](installer/macos/entitlements.plist) | macOS `.app` bundle identity (file associations, icon) + ad-hoc signing entitlements |
 | [`installer/linux/echoplay.desktop`](installer/linux/echoplay.desktop), [`AppRun`](installer/linux/AppRun) | Linux AppImage desktop entry (name/icon/mime types) + launcher |
 | [`.github/workflows/release.yml`](.github/workflows/release.yml) | CI: builds and publishes `EchoPlay-Setup.exe`, macOS `.dmg` (arm64 + x86_64), and the Linux `.AppImage` in one release |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: lint (luacheck) + headless smoke test on every push/PR |
 | [`install.ps1`](install.ps1) | Windows advanced/portable installer (no GUI wizard) |
 | [`install.sh`](install.sh) | Linux/macOS advanced/portable installer |
 | [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/`](licenses/) | Bundled upstream license notices (uosc, memo, thumbfast, mpv) |
 
 ## Credits & license
 
-EchoPlay's own code (`echoplay-audio.lua` + config/JSON/theme files) is **MIT** — see
+EchoPlay's own code (`mpv/scripts/echoplay-audio/` + config/JSON/theme files) is **MIT** — see
 [LICENSE](LICENSE). It downloads and bundles, under their own licenses:
 [uosc](https://github.com/tomasklaen/uosc) (LGPL-2.1) ·
 [memo](https://github.com/po5/memo) (GPL-3.0) ·

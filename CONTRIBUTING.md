@@ -27,7 +27,7 @@ fuller custom look — it can override any uosc option, not just the accent.
 
 | Path | Contents |
 |------|----------|
-| `mpv/scripts/echoplay-audio.lua` | EchoPlay's only original code (mixer + menus + theming) |
+| `mpv/scripts/echoplay-audio/` | EchoPlay's only original code — `main.lua` (mixer + menus + theming + shortcuts) + `i18n.lua`/`quality.lua`/`resume.lua` |
 | `mpv/script-opts/echoplay-*.json` | Language packs |
 | `mpv/themes/*.conf` | Theme packs |
 | `mpv/mpv.conf`, `mpv/input.conf` | Player + shortcut settings |
@@ -35,3 +35,10 @@ fuller custom look — it can override any uosc option, not just the accent.
 
 uosc / thumbfast / memo are downloaded from upstream — don't modify them here; contribute to their
 own repositories instead. EchoPlay stays as close to upstream mpv as possible.
+
+## Testing
+
+Every push and pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+automatically: `luacheck` against `mpv/scripts/echoplay-audio/`, then a headless mpv smoke test
+that loads a synthetic clip and fails the build if any Lua error shows up in the log. Changes to
+the Lua script should keep both green.

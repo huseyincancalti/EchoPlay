@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-EchoPlay's own code — `mpv/scripts/echoplay-audio.lua`, `mpv/mpv.conf`,
+EchoPlay's own code — `mpv/scripts/echoplay-audio/`, `mpv/mpv.conf`,
 `mpv/input.conf`, the language packs under `mpv/script-opts/`, and the theme
 packs under `mpv/themes/` — is **MIT-licensed**. See [`LICENSE`](LICENSE) in
 this repository.

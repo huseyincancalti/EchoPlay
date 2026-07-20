@@ -1,4 +1,4 @@
--- EchoPlay: one searchable, fully localized Settings menu (right-click / `a` / button).
+-- EchoPlay: one searchable, fully localized Settings menu (right-click, or the settings button).
 --   * Audio mixer lives in its own collapsed submenu (toggle + gain + per-track Mono),
 --     so a 9-track file doesn't dump everything on screen. Mixing is live (lavfi-complex).
 --   * Sectioned settings (Audio Sources / Video / Picture Quality / Appearance / File /
@@ -12,6 +12,12 @@
 local mp = require 'mp'
 local utils = require 'mp.utils'
 require 'mp.options'
+
+-- utils.format_json can return nil (caught live in CI, twice, on an older mpv build than the
+-- one this project targets: once in save_state's disk write, once in update_button's
+-- mp.commandv call - "argument N is not a string"). Centralized so every JSON-producing call
+-- site degrades to an empty object instead of crashing the whole script.
+local function to_json(tbl) return utils.format_json(tbl) or '{}' end
 
 local o = {
     language = 'tr',
@@ -367,15 +373,11 @@ local function save_state()
     for aid, v in pairs(mono) do if v then monos[tostring(aid)] = true end end
     local f = io.open(STATE_PATH, 'w')
     if f then
-        -- utils.format_json can return nil (caught live in CI: an unexpected nil field
-        -- made it choke on an older mpv build) - write nothing rather than crash the whole
-        -- script on `f:write(nil)`; the next successful save still catches up the state.
-        local json = utils.format_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
+        f:write(to_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
             perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
             screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
-            volume = saved_volume })
-        if json then f:write(json) end
+            volume = saved_volume }))
         f:close()
     end
 end
@@ -607,15 +609,15 @@ local function mixer_data()
         item_actions_place = 'outside', callback = { SCRIPT, 'menu-event' }, items = items }
 end
 
-local function open_menu() mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(menu_data())) end
-local function refresh_menu() mp.commandv('script-message-to', 'uosc', 'update-menu', utils.format_json(menu_data())) end
+local function open_menu() mp.commandv('script-message-to', 'uosc', 'open-menu', to_json(menu_data())) end
+local function refresh_menu() mp.commandv('script-message-to', 'uosc', 'update-menu', to_json(menu_data())) end
 local function close_menu() mp.commandv('script-message-to', 'uosc', 'close-menu', MENU_TYPE) end
-local function open_mixer() mp.commandv('script-message-to', 'uosc', 'open-menu', utils.format_json(mixer_data())) end
-local function refresh_mixer() mp.commandv('script-message-to', 'uosc', 'update-menu', utils.format_json(mixer_data())) end
+local function open_mixer() mp.commandv('script-message-to', 'uosc', 'open-menu', to_json(mixer_data())) end
+local function refresh_mixer() mp.commandv('script-message-to', 'uosc', 'update-menu', to_json(mixer_data())) end
 
 local function update_button()
     local n = #on_list()
-    mp.commandv('script-message-to', 'uosc', 'set-button', 'echoplay', utils.format_json({
+    mp.commandv('script-message-to', 'uosc', 'set-button', 'echoplay', to_json({
         icon = 'settings', badge = #tracks > 1 and tostring(n) or nil,
         tooltip = t('settings'), active = n > 1, command = 'script-message echoplay-menu',
     }))
@@ -896,7 +898,7 @@ local function save_resume_map()
         for i = 1, count - RESUME_MAX_ENTRIES do resume_map[entries[i].path] = nil end
     end
     local f = io.open(RESUME_PATH, 'w')
-    if f then f:write(utils.format_json(resume_map)); f:close() end
+    if f then f:write(to_json(resume_map)); f:close() end
 end
 -- Skips near-start (nothing to resume) and near-end (finished - don't offer to "resume" 10s from the end).
 local function update_resume_position()

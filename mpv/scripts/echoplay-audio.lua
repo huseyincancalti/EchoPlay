@@ -78,6 +78,10 @@ local screenshot_preset = 'desktop'  -- 'desktop' | 'videos' | 'pictures' | 'vid
 local screenshot_custom_path = ''
 local menu_hint_shown = false
 local speed_step = 0.1               -- s/d fine speed-adjust step, user-configurable
+-- Overall output volume (mpv's `volume` property, distinct from per-track `gain` in the
+-- mixer). Each file opened via "Open with" is a brand new process, so without this it
+-- resets to mpv.conf's volume=100 every time - nil means "no saved preference yet".
+local saved_volume = nil
 
 -- Every keyboard shortcut EchoPlay ships is in this list and rebindable from
 -- Settings -> Yardım -> Klavye Kısayolları. The corresponding keys carry `ignore` stubs
@@ -146,6 +150,7 @@ local function load_state()
     if type(s.screenshot_custom_path) == 'string' then screenshot_custom_path = s.screenshot_custom_path end
     if s.menu_hint_shown then menu_hint_shown = true end
     if tonumber(s.speed_step) then speed_step = tonumber(s.speed_step) end
+    if tonumber(s.volume) then saved_volume = tonumber(s.volume) end
     -- Copy entries instead of adopting the parsed table: utils.parse_json tags tables that
     -- came from a JSON array (and an EMPTY table always round-trips as []), and format_json
     -- then ignores string keys added to such a table forever - saves would silently lose
@@ -157,6 +162,9 @@ local function load_state()
     end
 end
 load_state()
+-- Applied here (top-level, before any file loads) rather than per-file: volume is one
+-- mpv session's global property, not something to re-snap on every playlist entry.
+if saved_volume then mp.set_property_number('volume', saved_volume) end
 
 -- ---------- i18n ----------
 local FALLBACK = {
@@ -283,9 +291,15 @@ local function on_list()
     return r
 end
 local function osd(text) if o.osd then mp.osd_message(text, o.osd_duration) end end
+-- `keep-open=yes` only stops mpv from exiting once there's truly nothing left to play - it
+-- does NOT stop mid-playlist auto-advance (proven live: with autocreate-playlist=same,
+-- "Sonda dur" still jumped to the next file in the folder; a pause-on-eof-reached hook
+-- didn't help either - by the time the Lua callback ran, mpv had already committed to the
+-- next file). `keep-open=always` is the real fix - also verified live: it blocks the
+-- advance entirely and pauses on the current file's last frame.
 local function cur_end()
     if mp.get_property('loop-file') == 'inf' then return 'loop' end
-    if mp.get_property('keep-open') == 'yes' then return 'stop' end
+    if mp.get_property('keep-open') == 'always' then return 'stop' end
     return 'next'
 end
 local function speed_on() return (mp.get_property_number('speed') or 1) > 1.01 end
@@ -339,10 +353,20 @@ local function save_state()
         f:write(utils.format_json({ default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
             perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
-            screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys }))
+            screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
+            volume = saved_volume }))
         f:close()
     end
 end
+-- Debounced so dragging uosc's volume slider (many rapid property changes) doesn't hammer
+-- the disk with a synchronous write on every pixel of movement.
+local volume_save_timer = nil
+mp.observe_property('volume', 'number', function(_, v)
+    if type(v) ~= 'number' then return end
+    saved_volume = v
+    if volume_save_timer then volume_save_timer:kill() end
+    volume_save_timer = mp.add_timeout(0.5, save_state)
+end)
 
 -- ---------- menus ----------
 -- Section header row: bold + an anchoring icon (uosc renders item icons on the right edge).
@@ -652,7 +676,7 @@ local function set_speed_step(step)
 end
 local function set_end(mode_)
     if mode_ == 'loop' then mp.set_property('loop-file', 'inf'); mp.set_property('keep-open', 'no')
-    elseif mode_ == 'stop' then mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'yes')
+    elseif mode_ == 'stop' then mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'always')
     else mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'no') end
     osd(string.format(t('end_osd'), t('end_' .. mode_))); close_menu()
 end

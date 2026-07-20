@@ -80,8 +80,11 @@ local menu_hint_shown = false
 local speed_step = 0.1               -- s/d fine speed-adjust step, user-configurable
 -- Overall output volume (mpv's `volume` property, distinct from per-track `gain` in the
 -- mixer). Each file opened via "Open with" is a brand new process, so without this it
--- resets to mpv.conf's volume=100 every time - nil means "no saved preference yet".
-local saved_volume = nil
+-- resets to mpv.conf's volume=100 every time. Mirrors mpv.conf's own default rather than
+-- starting nil: the volume-change observer's first callback isn't guaranteed to land before
+-- file-loaded fires (caught live in CI - a nil here made save_state() crash on first file
+-- load, since utils.format_json choked on it).
+local saved_volume = 100
 
 -- Every keyboard shortcut EchoPlay ships is in this list and rebindable from
 -- Settings -> Yardım -> Klavye Kısayolları. The corresponding keys carry `ignore` stubs
@@ -125,6 +128,10 @@ local function accent_name(hex)
 end
 
 -- ---------- state persistence ----------
+-- Bumped whenever a saved field's meaning/format changes in a way old saves won't match
+-- (e.g. perf_pref's value set changing). load_state()'s migration block below is the only
+-- place that needs to know about a previous schema's format - saves always write CURRENT.
+local CURRENT_SCHEMA = 2
 local saved_gains, saved_mono = {}, {}
 local function read_json(path)
     local f = io.open(path, 'r'); if not f then return nil end
@@ -133,19 +140,14 @@ local function read_json(path)
 end
 local function load_state()
     local s = read_json(STATE_PATH); if not s then return end
+    local schema = tonumber(s._schema) or 1 -- saves before this field existed are schema 1
+
     if s.default_on then o.default_on = s.default_on end
     if s.language then o.language = s.language end
-    if s.mode == 'light' or s.mode == 'dark' then mode = s.mode
-    elseif s.theme == 'light' or s.theme == 'dark' then mode = s.theme end   -- pre-1.0 field
     if type(s.accent) == 'string' and s.accent ~= '' then accent = ACCENT_MIGRATE[s.accent] or s.accent end
     if tonumber(s.speed_factor) then o.speed_factor = tonumber(s.speed_factor) end
     if type(s.gains) == 'table' then saved_gains = s.gains end
     if type(s.mono) == 'table' then saved_mono = s.mono end
-    -- Older saves used on/off (binary toggle) then a 5-tier set (high/lowest) - map them all
-    -- onto the current 4-way system (auto / ultra / normal / low).
-    if s.perf_pref == 'on' or s.perf_pref == 'lowest' or s.perf_pref == 'low' then perf_pref = 'low'
-    elseif s.perf_pref == 'off' or s.perf_pref == 'high' or s.perf_pref == 'normal' then perf_pref = 'normal'
-    elseif s.perf_pref == 'auto' or s.perf_pref == 'ultra' then perf_pref = s.perf_pref end
     if type(s.screenshot_preset) == 'string' and s.screenshot_preset ~= '' then screenshot_preset = s.screenshot_preset end
     if type(s.screenshot_custom_path) == 'string' then screenshot_custom_path = s.screenshot_custom_path end
     if s.menu_hint_shown then menu_hint_shown = true end
@@ -155,16 +157,33 @@ local function load_state()
     -- came from a JSON array (and an EMPTY table always round-trips as []), and format_json
     -- then ignores string keys added to such a table forever - saves would silently lose
     -- every rebind (found via live IPC test: binding worked in-memory, file always had []).
+    -- Not schema-gated: this JSON array/object quirk can recur regardless of version.
     if type(s.custom_keys) == 'table' then
         for k, v in pairs(s.custom_keys) do
             if type(k) == 'string' and type(v) == 'string' then custom_keys[k] = v end
+        end
+    end
+
+    -- Current-format reads (apply regardless of schema - a field already in its current
+    -- shape doesn't need migrating just because other fields in the same save are old).
+    local mode_matched = s.mode == 'light' or s.mode == 'dark'
+    if mode_matched then mode = s.mode end
+    local perf_matched = s.perf_pref == 'auto' or s.perf_pref == 'ultra' or s.perf_pref == 'normal' or s.perf_pref == 'low'
+    if perf_matched then perf_pref = s.perf_pref end
+    -- Schema 1 -> 2: `theme` was renamed `mode`; perf_pref went through a binary on/off
+    -- toggle, then a 5-tier set (high/lowest), before landing on the current 4-way scheme.
+    if schema < 2 then
+        if not mode_matched and (s.theme == 'light' or s.theme == 'dark') then mode = s.theme end
+        if not perf_matched then
+            if s.perf_pref == 'on' or s.perf_pref == 'lowest' then perf_pref = 'low'
+            elseif s.perf_pref == 'off' or s.perf_pref == 'high' then perf_pref = 'normal' end
         end
     end
 end
 load_state()
 -- Applied here (top-level, before any file loads) rather than per-file: volume is one
 -- mpv session's global property, not something to re-snap on every playlist entry.
-if saved_volume then mp.set_property_number('volume', saved_volume) end
+mp.set_property_number('volume', saved_volume)
 
 -- ---------- i18n ----------
 local FALLBACK = {
@@ -328,12 +347,10 @@ end
 local function theme_display(name)
     local f = io.open(THEMES_DIR .. '/' .. name .. '.conf', 'r')
     if f then
-        for line in f:lines() do
-            local h = line:match('^#%s*(.+)$')
-            f:close()
-            return h or (name:gsub('^%l', string.upper))
-        end
+        local first_line = f:read('*l')
         f:close()
+        local h = first_line and first_line:match('^#%s*(.+)$')
+        if h then return h end
     end
     return (name:gsub('^%l', string.upper))
 end
@@ -350,11 +367,15 @@ local function save_state()
     for aid, v in pairs(mono) do if v then monos[tostring(aid)] = true end end
     local f = io.open(STATE_PATH, 'w')
     if f then
-        f:write(utils.format_json({ default_on = don, gains = gains, mono = monos,
+        -- utils.format_json can return nil (caught live in CI: an unexpected nil field
+        -- made it choke on an older mpv build) - write nothing rather than crash the whole
+        -- script on `f:write(nil)`; the next successful save still catches up the state.
+        local json = utils.format_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
             perf_pref = perf_pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
             screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
-            volume = saved_volume }))
+            volume = saved_volume })
+        if json then f:write(json) end
         f:close()
     end
 end
@@ -777,7 +798,7 @@ local function pick_custom_screenshot_dir()
     mp.command_native_async({ name = 'subprocess', playback_only = false, capture_stdout = true, args = {
         'powershell', '-NoProfile', '-Command',
         'Add-Type -AssemblyName System.Windows.Forms; $f=New-Object System.Windows.Forms.FolderBrowserDialog; if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){$f.SelectedPath}'
-    } }, function(success, res)
+    } }, function(_, res)
         local out = res and res.stdout and res.stdout:gsub('%s+$', '')
         if out and out ~= '' then
             screenshot_custom_path = out
@@ -943,7 +964,7 @@ local function handle(value, action)
     elseif type(value) == 'string' and value:sub(1, 7) == 'rebind:' then
         close_menu() -- the open menu's key grab would eat the key we're about to capture
         local id = value:sub(8)
-        for _, action in ipairs(KEY_ACTIONS) do if action.id == id then rebind_capture(action) end end
+        for _, key_action in ipairs(KEY_ACTIONS) do if key_action.id == id then rebind_capture(key_action) end end
     elseif value == 'lang-folder' then close_menu(); open_folder(OPTS_DIR)
     elseif value == 'theme-folder' then close_menu(); open_folder(THEMES_DIR)
     elseif PLAYER[value] then close_menu(); mp.commandv('script-binding', 'uosc/' .. PLAYER[value])

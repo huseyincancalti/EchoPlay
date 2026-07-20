@@ -1,0 +1,68 @@
+name: Lint & smoke test
+
+# Runs on every push/PR (unlike release.yml, which only fires on version tags) so mistakes
+# in echoplay-audio.lua are caught within minutes of a commit, not just at release time.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 luarocks
+          sudo luarocks install luacheck
+
+      - name: Run luacheck
+        run: luacheck mpv/scripts/echoplay-audio.lua
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mpv
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mpv curl unzip
+
+      - name: Assemble a throwaway config dir
+        run: |
+          set -euo pipefail
+          CONF="$RUNNER_TEMP/mpv-smoke-config"
+          mkdir -p "$CONF/scripts" "$CONF/fonts"
+          cp -R mpv/. "$CONF/"
+          curl -sfL -o uosc.zip "https://github.com/tomasklaen/uosc/releases/download/5.12.0/uosc.zip"
+          unzip -q uosc.zip -d uosc_extracted
+          cp -R uosc_extracted/scripts/. "$CONF/scripts/"
+          cp -R uosc_extracted/fonts/. "$CONF/fonts/"
+          curl -sfL -o "$CONF/scripts/thumbfast.lua" "https://raw.githubusercontent.com/po5/thumbfast/master/thumbfast.lua"
+          curl -sfL -o "$CONF/scripts/memo.lua" "https://raw.githubusercontent.com/po5/memo/master/memo.lua"
+          curl -sfL -o "$CONF/script-opts/memo.conf" "https://raw.githubusercontent.com/po5/memo/master/memo.conf"
+          echo "CONF=$CONF" >> "$GITHUB_ENV"
+
+      - name: Boot mpv headlessly on a synthetic clip and check for Lua errors
+        run: |
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/smoke.log"
+          # No display/audio device needed (--vo=null --ao=null); no repo test asset needed
+          # (mpv's own lavfi virtual source generates a synthetic clip on the fly). This
+          # exercises the full file-loaded path once (mixer scan, i18n, quality tiers,
+          # screenshot presets, resume-prompt lookup) without needing a GUI or a real file.
+          # keep-open=always (mpv.conf) means the process won't exit on its own at EOF, so
+          # `timeout` bounds it - a clean kill after N seconds is the expected outcome here.
+          timeout 12 mpv --config-dir="$CONF" --vo=null --ao=null -v \
+            --log-file="$LOG" "av://lavfi:testsrc=duration=3" || true
+          echo "----- mpv log -----"
+          cat "$LOG"
+          echo "--------------------"
+          if grep -qi "lua error\|stack traceback" "$LOG"; then
+            echo "Lua error found in log - see above"
+            exit 1
+          fi

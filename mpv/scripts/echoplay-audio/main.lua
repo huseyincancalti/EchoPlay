@@ -980,6 +980,34 @@ mp.register_script_message('echoplay-speed', speed_toggle)
 mp.register_script_message('echoplay-speed-down', function() speed_nudge(-speed_step) end)
 mp.register_script_message('echoplay-speed-up', function() speed_nudge(speed_step) end)
 
+-- file-loaded can fire before mpv has finished registering every track (observed live: on a
+-- freshly opened file, track-list sometimes only contains the video track for the first tick
+-- or two, especially while hwdec negotiation is still running - the audio track appears a
+-- moment later). Scanning synchronously in file-loaded then found 0 audio tracks and
+-- apply_audio() committed to aid=no permanently, since nothing re-ran afterward - the file
+-- played back silent until the user manually opened the mixer. Guarded by
+-- audio_defaults_applied (reset per file) so this only actually applies once real tracks
+-- exist, and observe_property's own immediate first call covers the common case where
+-- track-list is already complete by the time file-loaded runs.
+local audio_defaults_applied = false
+local function apply_audio_defaults()
+    if audio_defaults_applied then return end
+    scan()
+    if #tracks == 0 then return end -- not ready yet; the track-list observer below will retry
+    audio_defaults_applied = true
+    enabled, gain, mono = {}, {}, {}
+    if o.default_on == 'all' then
+        for _, aid in ipairs(tracks) do enabled[aid] = true end
+    elseif o.default_on ~= 'none' then
+        for s in tostring(o.default_on):gmatch('%d+') do enabled[tonumber(s)] = true end
+    end
+    for k, v in pairs(saved_gains) do local a = tonumber(k); if a then gain[a] = v end end
+    for k, v in pairs(saved_mono) do local a = tonumber(k); if a then mono[a] = v end end
+    if o.default_on ~= 'none' and #on_list() == 0 and #tracks > 0 then enabled[tracks[1]] = true end
+    apply_audio(); update_button()
+end
+mp.observe_property('track-list', 'native', apply_audio_defaults)
+
 mp.register_event('start-file', function() mp.set_property('lavfi-complex', '') end)
 mp.register_event('file-loaded', function()
     resume.dismiss()
@@ -994,15 +1022,6 @@ mp.register_event('file-loaded', function()
         mp.add_timeout(1.5, function() osd(t('menu_hint')) end)
     end
     quality.reset_for_new_file()
-    scan()
-    enabled, gain, mono = {}, {}, {}
-    if o.default_on == 'all' then
-        for _, aid in ipairs(tracks) do enabled[aid] = true end
-    elseif o.default_on ~= 'none' then
-        for s in tostring(o.default_on):gmatch('%d+') do enabled[tonumber(s)] = true end
-    end
-    for k, v in pairs(saved_gains) do local a = tonumber(k); if a then gain[a] = v end end
-    for k, v in pairs(saved_mono) do local a = tonumber(k); if a then mono[a] = v end end
-    if o.default_on ~= 'none' and #on_list() == 0 and #tracks > 0 then enabled[tracks[1]] = true end
-    apply_audio(); update_button()
+    audio_defaults_applied = false
+    apply_audio_defaults()
 end)

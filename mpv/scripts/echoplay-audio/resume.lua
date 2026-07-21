@@ -14,7 +14,15 @@ local resume_map = {}
 
 local function load_resume_map()
     local m = util.read_json(RESUME_PATH)
-    if type(m) == 'table' then resume_map = m end
+    if type(m) ~= 'table' then return end
+    -- Copy entries instead of adopting the parsed table: utils.parse_json tags a table that
+    -- came from JSON "[]" as array-origin, and utils.format_json then silently ignores any
+    -- string keys later added to that same table when serializing (same quirk fixed for
+    -- custom_keys in main.lua's load_state()) - every path here is written as [], the
+    -- resume file's default empty state, so adopting it directly poisoned every future save.
+    for path, e in pairs(m) do
+        if type(path) == 'string' and type(e) == 'table' then resume_map[path] = e end
+    end
 end
 load_resume_map()
 

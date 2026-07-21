@@ -222,8 +222,13 @@ end
 local function pct(aid) return math.floor((gain[aid] or 1) * 100 + 0.5) end
 -- Mono is already shown in the title's " · Mono" suffix - not repeated here, to leave the
 -- action-button cluster (down/up/mono, see mixer_data) enough room to render without clipping.
+-- Percentage is padded to a fixed width: uosc lays its action buttons out relative to the
+-- menu's overall content width, so an unpadded "9%" -> "10%" -> "100%" transition on every
+-- +/- click reflows that width and shifts the buttons out from under a stationary cursor
+-- (same class of bug menu_data() already avoids for the speed rows - see its comment on
+-- item_actions_place below).
 local function hint(aid)
-    local parts = { pct(aid) .. '%' }
+    local parts = { string.format('%3d%%', pct(aid)) }
     if (info[aid] or {}).codec then parts[#parts + 1] = info[aid].codec end
     return table.concat(parts, ' · ')
 end
@@ -518,8 +523,12 @@ local function mixer_data()
     items[#items + 1] = { title = t('mute'), icon = 'volume_off', value = 'none', keep_open = true }
     items[#items + 1] = separator()
     items[#items + 1] = { title = t('back'), icon = 'arrow_back', value = 'back' }
+    -- No item_actions_place='outside' here (same reasoning as menu_data()'s speed rows,
+    -- see its comment): 'outside' anchors the action buttons off the menu's overall content
+    -- width, so refresh_mixer()'s live text updates (gain %, above) shifted them out from
+    -- under the cursor on every click, forcing a re-hover before the next click registered.
     return { type = MENU_TYPE_MIX, title = t('mixer'), search_style = 'palette',
-        item_actions_place = 'outside', callback = { SCRIPT, 'menu-event' }, items = items }
+        callback = { SCRIPT, 'menu-event' }, items = items }
 end
 
 local function open_menu() mp.commandv('script-message-to', 'uosc', 'open-menu', to_json(menu_data())) end
@@ -876,12 +885,12 @@ end
 local function capture_set_text(error_line)
     if not capture_overlay then return end
     local parts = {
-        string.format('{\\an5\\fs28}%s', string.format(t('sc_capture_title'), t(capture_action.label_key))),
+        string.format(t('sc_capture_title'), t(capture_action.label_key)),
         string.format('{\\fs46\\b1}%s{\\b0}', capture_pending and pretty_key(capture_pending) or '...'),
         '{\\fs20}' .. (capture_stage == 'confirm' and t('sc_capture_confirm') or t('sc_capture_sub')),
     }
     if error_line then parts[#parts + 1] = '{\\fs20}' .. error_line end
-    capture_overlay.data = table.concat(parts, '\\N')
+    util.toast(capture_overlay, parts)
     capture_overlay:update()
 end
 
@@ -1012,7 +1021,7 @@ mp.register_event('start-file', function() mp.set_property('lavfi-complex', '') 
 mp.register_event('file-loaded', function()
     resume.dismiss()
     local saved = resume.check(mp.get_property('path'))
-    if saved then mp.add_timeout(0.5, function() resume.show(saved.pos) end) end
+    if saved then resume.maybe_show(saved) end
     if not appearance_applied then appearance_applied = true; apply_appearance() end
     quality.apply_initial()
     apply_screenshot_preset() -- static presets are idempotent; 'video_folder' needs this per file

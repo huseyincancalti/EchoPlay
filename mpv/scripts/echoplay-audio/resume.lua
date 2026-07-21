@@ -56,19 +56,21 @@ local function format_hms(sec)
     return string.format('%d:%02d', m, s)
 end
 
-local overlay, dismiss_timer = nil, nil
+local overlay, dismiss_timer, pending_timer = nil, nil, nil
 function M.dismiss()
+    if pending_timer then pending_timer:kill(); pending_timer = nil end
     if overlay then overlay:remove(); overlay = nil end
     if dismiss_timer then dismiss_timer:kill(); dismiss_timer = nil end
     mp.remove_key_binding('resume-yes')
     mp.remove_key_binding('resume-no')
 end
 
--- {\an5} centers in the middle of the frame (standard ASS alignment behavior without \pos).
 function M.show(pos)
     overlay = mp.create_osd_overlay('ass-events')
-    overlay.data = string.format('{\\an5\\fs36}%s\\N{\\fs22}%s',
-        string.format(t('resume_prompt'), format_hms(pos)), t('resume_keys'))
+    util.toast(overlay, {
+        string.format(t('resume_prompt'), format_hms(pos)),
+        '{\\fs22}' .. t('resume_keys'),
+    })
     overlay:update()
     mp.add_forced_key_binding('Enter', 'resume-yes', function()
         M.dismiss()
@@ -77,6 +79,22 @@ function M.show(pos)
     mp.add_forced_key_binding('Esc', 'resume-no', function() M.dismiss() end)
     dismiss_timer = mp.add_timeout(8, M.dismiss)
 end
+
+-- Schedules the prompt, but a manual seek before it fires (the user already moved on their
+-- own - scrubbing the timeline, jumping to a chapter) cancels it outright: asking "resume from
+-- X?" is pointless once they've already picked their own spot. The 'seek' listener below
+-- covers the same case if it happens while the prompt is already showing.
+function M.maybe_show(saved)
+    if pending_timer then pending_timer:kill() end
+    pending_timer = mp.add_timeout(0.5, function()
+        pending_timer = nil
+        M.show(saved.pos)
+    end)
+end
+mp.register_event('seek', function()
+    if pending_timer then pending_timer:kill(); pending_timer = nil end
+    if overlay then M.dismiss() end
+end)
 
 -- Returns the saved {pos, dur, at} entry for a path, or nil if there's nothing to resume.
 function M.check(path)

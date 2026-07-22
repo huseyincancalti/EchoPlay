@@ -23,6 +23,19 @@ jobs:
       - name: Run luacheck
         run: luacheck mpv/scripts/echoplay-audio/
 
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1
+
+      - name: Run pure-Lua unit tests
+        run: lua5.1 tests/run.lua
+
   smoke-test:
     runs-on: ubuntu-latest
     steps:

@@ -67,6 +67,7 @@ local FALLBACK = {
 
     -- Discoverability
     menu_hint = 'İpucu: Ayarlar için sağ tıklayın', sec_help = 'Yardım',
+    silent_warning = 'Ses kapalı - Ayarlar > Ses Kaynakları\'ndan açabilirsiniz',
 
     -- Resume prompt: position is remembered, but playback always starts from 0 and asks first.
     resume_prompt = "%s'ten devam edilsin mi?", resume_keys = 'Enter: Evet  ·  Esc: Baştan başla',

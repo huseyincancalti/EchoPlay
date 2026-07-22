@@ -537,11 +537,20 @@ local function close_menu() mp.commandv('script-message-to', 'uosc', 'close-menu
 local function open_mixer() mp.commandv('script-message-to', 'uosc', 'open-menu', to_json(mixer_data())) end
 local function refresh_mixer() mp.commandv('script-message-to', 'uosc', 'update-menu', to_json(mixer_data())) end
 
+-- With multiple tracks, "0 enabled" already shows via the numeric badge - it's a mixer state
+-- the user has to have deliberately reached (nothing is on by default in that case). A single
+-- track silently muted is different: default_on='none' plus a lone track means every file
+-- opens dead silent with zero indication why, which is exactly what confused a real user (the
+-- single-track case doesn't show a badge at all normally, since #tracks > 1 is false). Flip the
+-- gear to a mute icon with an explicit "0" badge whenever *any* file has zero audio enabled, so
+-- the silence is visible without having to open the menu to discover it.
 local function update_button()
     local n = #on_list()
+    local silent = #tracks > 0 and n == 0
     mp.commandv('script-message-to', 'uosc', 'set-button', 'echoplay', to_json({
-        icon = 'settings', badge = #tracks > 1 and tostring(n) or nil,
-        tooltip = t('settings'), active = n > 1, command = 'script-message echoplay-menu',
+        icon = silent and 'volume_off' or 'settings', badge = (silent or #tracks > 1) and tostring(n) or nil,
+        tooltip = silent and t('silent_warning') or t('settings'), active = silent or n > 1,
+        command = 'script-message echoplay-menu',
     }))
 end
 
@@ -1012,6 +1021,7 @@ local function apply_audio_defaults()
     for k, v in pairs(saved_mono) do local a = tonumber(k); if a then mono[a] = v end end
     if o.default_on ~= 'none' and #on_list() == 0 and #tracks > 0 then enabled[tracks[1]] = true end
     apply_audio(); update_button()
+    if #on_list() == 0 then osd(t('silent_warning')) end
 end
 mp.observe_property('track-list', 'native', apply_audio_defaults)
 

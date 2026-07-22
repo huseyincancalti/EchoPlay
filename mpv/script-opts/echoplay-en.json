@@ -105,6 +105,7 @@
 
   "menu_hint": "Tip: right-click for Settings",
   "sec_help": "Help",
+  "silent_warning": "Audio is off - enable it under Settings > Audio Sources",
 
   "resume_prompt": "Resume from %s?",
   "resume_keys": "Enter: Yes  ·  Esc: Start over"

@@ -39,6 +39,9 @@ own repositories instead. EchoPlay stays as close to upstream mpv as possible.
 ## Testing
 
 Every push and pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-automatically: `luacheck` against `mpv/scripts/echoplay-audio/`, then a headless mpv smoke test
-that loads a synthetic clip and fails the build if any Lua error shows up in the log. Changes to
-the Lua script should keep both green.
+automatically: `luacheck` against `mpv/scripts/echoplay-audio/`, a plain-Lua unit test suite
+([`tests/run.lua`](tests/run.lua) - no mpv process needed, run locally with `lua5.1 tests/run.lua`)
+covering the pure logic that's easy to get subtly wrong (e.g. quality.lua's auto-tier stepping
+thresholds), and a headless mpv smoke test that loads a synthetic clip and fails the build if
+any Lua error shows up in the log. Changes to the Lua script should keep all three green - if you
+add non-trivial pure logic, add a case to `tests/run.lua` too.

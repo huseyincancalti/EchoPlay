@@ -86,6 +86,16 @@ Name: "{group}\{cm:UninstallProgram,EchoPlay}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\EchoPlay"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\logo.ico"; Tasks: desktopicon
 
 [Registry]
+; Purge a stale "EchoPlay.Media" ProgID some machines picked up from an earlier prototype
+; (before this installer's Applications\EchoPlay.exe registration existed). Found live: on a
+; dev machine, "Open with -> EchoPlay" was silently bound to this leftover key, which pointed
+; at an unrelated, separately-installed mpv.exe instead of {app}\EchoPlay.exe - every fix ever
+; shipped was invisible through that entry point, for months, with zero indication anything was
+; wrong. This installer never creates this ProgID; deleting it here means a fresh install (or a
+; reinstall over a machine with the stale key) always converges on the one true registration
+; below, instead of leaving both an orphaned entry and the real one to fight over "Open with".
+Root: HKCU; Subkey: "Software\Classes\EchoPlay.Media"; Flags: deletekey
+
 ; Register EchoPlay.exe as an "Open with" application under its own (renamed)
 ; identity - this is what makes the dialog show "EchoPlay", not "mpv".
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey

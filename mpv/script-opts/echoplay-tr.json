@@ -105,6 +105,7 @@
 
   "menu_hint": "İpucu: Ayarlar için sağ tıklayın",
   "sec_help": "Yardım",
+  "silent_warning": "Ses kapalı - Ayarlar > Ses Kaynakları'ndan açabilirsiniz",
 
   "resume_prompt": "%s'ten devam edilsin mi?",
   "resume_keys": "Enter: Evet  ·  Esc: Baştan başla"

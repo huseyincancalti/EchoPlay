@@ -56,22 +56,20 @@ local function format_hms(sec)
     return string.format('%d:%02d', m, s)
 end
 
-local overlay, dismiss_timer, pending_timer = nil, nil, nil
+local dismiss_timer, pending_timer = nil, nil
 function M.dismiss()
     if pending_timer then pending_timer:kill(); pending_timer = nil end
-    if overlay then overlay:remove(); overlay = nil end
+    util.toast_hide('resume')
     if dismiss_timer then dismiss_timer:kill(); dismiss_timer = nil end
     mp.remove_key_binding('resume-yes')
     mp.remove_key_binding('resume-no')
 end
 
 function M.show(pos)
-    overlay = mp.create_osd_overlay('ass-events')
-    util.toast(overlay, {
+    util.toast_show('resume', {
         string.format(t('resume_prompt'), format_hms(pos)),
         '{\\fs22}' .. t('resume_keys'),
     })
-    overlay:update()
     mp.add_forced_key_binding('Enter', 'resume-yes', function()
         M.dismiss()
         mp.set_property_number('time-pos', pos)
@@ -93,7 +91,7 @@ function M.maybe_show(saved)
 end
 mp.register_event('seek', function()
     if pending_timer then pending_timer:kill(); pending_timer = nil end
-    if overlay then M.dismiss() end
+    M.dismiss()
 end)
 
 -- Returns the saved {pos, dur, at} entry for a path, or nil if there's nothing to resume.

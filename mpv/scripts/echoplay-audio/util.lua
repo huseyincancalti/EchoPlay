@@ -19,28 +19,72 @@ function M.to_json(tbl)
     return utils.format_json(tbl) or '{}'
 end
 
--- Renders `lines` (already-styled ASS text, one string per line) as a compact block near the
--- bottom-center of the frame, and sets it on `overlay`. Shared by resume.lua's "continue?"
--- prompt and main.lua's key-rebind capture prompt so both read as one visual language instead
--- of each drawing bare {\an5} text dead-center on screen (a full-screen-centered wall of text
--- draws far more attention than a two-line question warrants, and \an5 with no border at all
--- is unreadable over bright video). Readability comes from a heavy black outline + shadow on
--- the text itself (\bord/\shad/\3c), not a separately-drawn background box - an earlier
--- version drew one via {\p1} vector paths, but that meant two {\...} blocks in one ASS event
--- each carrying their own \pos, and ASS only honors the *first* \pos per event; the second
--- (the text's own) was silently dropped, which is why real users saw the dynamic part of the
--- message (e.g. the resume timestamp) rendered in the wrong place / not visibly at all. A
--- single \pos, single alignment, no draw-mode mixing avoids that whole class of bug.
-function M.toast(overlay, lines)
-    local fs = 30
-    -- Query the OSD's actual coordinate space rather than assuming 1280x720: mp.create_osd_overlay
-    -- defaults res_y to 720 and auto-computes res_x from the video's aspect ratio, so a hardcoded
-    -- cx would drift off-center for anything that isn't exactly 16:9.
-    local w, h = mp.get_osd_size()
-    w, h = (w and w > 0) and w or 1280, (h and h > 0) and h or 720
-    overlay.data = string.format(
-        '{\\an2\\pos(%d,%d)\\fs%d\\bord3\\shad1\\3c&H000000&\\4c&H000000&\\1c&HE9E4DC&}%s',
-        math.floor(w / 2), math.floor(h - 60), fs, table.concat(lines, '\\N'))
+-- Renders `lines` (already-styled ASS text, one string per line) as a compact card with a
+-- real dark background, centered near the bottom of the frame. Shared by resume.lua's
+-- "continue?" prompt and main.lua's key-rebind capture prompt so both read as one visual
+-- language instead of each drawing bare {\an5} text dead-center on screen with no background -
+-- unreadable over bright video, and dead-center draws far more attention than a two-line
+-- question warrants.
+--
+-- Two PREVIOUS attempts at this both shipped broken, each confirmed live via a real user's
+-- screenshots before being caught:
+--   1. Box (drawn via {\p1} vector paths) and text packed into ONE ass-events overlay as two
+--      "lines" (joined by a raw \n), each carrying its own \pos - ASS only honors the *first*
+--      \pos per event, so the text's \pos was silently dropped and its dynamic content (e.g.
+--      the resume timestamp) rendered blank.
+--   2. Dropped the box, kept text-only, computed \pos from mp.get_osd_size() - but that
+--      queries the *video's* OSD scale, which doesn't match the coordinate space
+--      mp.create_osd_overlay('ass-events') actually renders in by default; text landed around
+--      mid-screen instead of near the bottom.
+--
+-- Fix: two SEPARATE overlay objects (mpv gives each its own independent ASS event - no shared
+-- \pos to clobber), both with res_x/res_y explicitly pinned to the same fixed 1280x720 space
+-- *by this code*, so the box's drawn coordinates and the text's \pos are guaranteed to agree -
+-- nothing is queried or assumed. `toasts[key]` keeps one box+text pair per caller (resume.lua
+-- and main.lua's rebind capture each get their own, so one can't stomp the other).
+local toasts = {}
+
+function M.toast_show(key, lines)
+    local o = toasts[key]
+    if not o then
+        o = { box = mp.create_osd_overlay('ass-events'), text = mp.create_osd_overlay('ass-events') }
+        o.box.res_x, o.box.res_y = 1280, 720
+        o.text.res_x, o.text.res_y = 1280, 720
+        o.box.z, o.text.z = 0, 1 -- text above box
+        toasts[key] = o
+    end
+    local base_fs = 30
+    local pad_v, pad_h, min_w = 20, 36, 420
+    -- Width/height estimates scale per-line with that line's own \fsNN override (if any),
+    -- since a line rendered much larger than the base size (e.g. the big captured-key line
+    -- in main.lua's rebind prompt) needs proportionally more room, not the base size's estimate.
+    local widest_px, total_h = 0, 0
+    for _, l in ipairs(lines) do
+        local fs = tonumber(l:match('\\fs(%d+)')) or base_fs
+        local plain = l:gsub('{\\[^}]*}', '')
+        widest_px = math.max(widest_px, plain:len() * fs * 0.56)
+        total_h = total_h + fs * 1.3
+    end
+    local box_w = math.max(min_w, widest_px + pad_h * 2)
+    local box_h = total_h + pad_v * 2
+    local cx, cy = 640, 640
+    local left, top = math.floor(cx - box_w / 2), math.floor(cy - box_h / 2)
+    local right, bottom = math.floor(cx + box_w / 2), math.floor(cy + box_h / 2)
+    o.box.data = string.format(
+        '{\\pos(0,0)\\bord0\\shad0\\1c&H121417&\\1a&H20&\\p1}m %d %d l %d %d l %d %d l %d %d{\\p0}',
+        left, top, right, top, right, bottom, left, bottom)
+    o.text.data = string.format('{\\an5\\pos(%d,%d)\\fs%d\\1c&HE9E4DC&}%s',
+        cx, cy, base_fs, table.concat(lines, '\\N'))
+    o.box:update()
+    o.text:update()
+end
+
+function M.toast_hide(key)
+    local o = toasts[key]
+    if not o then return end
+    o.box:remove()
+    o.text:remove()
+    toasts[key] = nil
 end
 
 return M

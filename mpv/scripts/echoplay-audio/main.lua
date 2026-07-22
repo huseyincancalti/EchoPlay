@@ -842,7 +842,7 @@ end
 local CAPTURE_SECTION = 'echoplay-capture'
 -- enter/esc are the capture UI's own confirm/cancel keys; esc cancels, enter confirms.
 local RESERVED_INFO = { enter = 'sc_reserved_player' }
-local capture_action, capture_overlay, capture_timeout = nil, nil, nil
+local capture_action, capture_timeout = nil, nil
 local capture_stage, capture_pending = 'wait', nil -- 'wait' -> 'held' -> 'confirm'
 
 local function capture_candidates()
@@ -883,15 +883,14 @@ local function combo_size(key)
 end
 
 local function capture_set_text(error_line)
-    if not capture_overlay then return end
+    if not capture_action then return end
     local parts = {
         string.format(t('sc_capture_title'), t(capture_action.label_key)),
         string.format('{\\fs46\\b1}%s{\\b0}', capture_pending and pretty_key(capture_pending) or '...'),
         '{\\fs20}' .. (capture_stage == 'confirm' and t('sc_capture_confirm') or t('sc_capture_sub')),
     }
     if error_line then parts[#parts + 1] = '{\\fs20}' .. error_line end
-    util.toast(capture_overlay, parts)
-    capture_overlay:update()
+    util.toast_show('rebind', parts)
 end
 
 local function capture_stop()
@@ -899,7 +898,7 @@ local function capture_stop()
     capture_action = nil
     capture_stage, capture_pending = 'wait', nil
     mp.commandv('disable-section', CAPTURE_SECTION)
-    if capture_overlay then capture_overlay:remove(); capture_overlay = nil end
+    util.toast_hide('rebind')
     if capture_timeout then capture_timeout:kill(); capture_timeout = nil end
 end
 
@@ -964,7 +963,6 @@ rebind_capture = function(action)
     end
     mp.commandv('define-section', CAPTURE_SECTION, table.concat(lines, '\n'), 'force')
     mp.commandv('enable-section', CAPTURE_SECTION)
-    capture_overlay = mp.create_osd_overlay('ass-events')
     capture_set_text(nil)
     capture_timeout = mp.add_timeout(20, capture_stop)
 end

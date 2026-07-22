@@ -85,6 +85,15 @@ local accent = 'ff7d26'
 local screenshot_preset = 'desktop'  -- 'desktop' | 'videos' | 'pictures' | 'video_folder' | 'custom'
 local screenshot_custom_path = ''
 local menu_hint_shown = false
+-- 'next' | 'loop' | 'stop' - matches mpv.conf's own keep-open=always default (cur_end()
+-- reads 'stop' from that at startup if this is never applied). Was never persisted: closing
+-- and reopening always silently reverted to that default regardless of what was last chosen.
+local end_mode = 'stop'
+local function apply_end(mode_)
+    if mode_ == 'loop' then mp.set_property('loop-file', 'inf'); mp.set_property('keep-open', 'no')
+    elseif mode_ == 'stop' then mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'always')
+    else mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'no') end
+end
 local speed_step = 0.1               -- s/d fine speed-adjust step, user-configurable
 -- Overall output volume (mpv's `volume` property, distinct from per-track `gain` in the
 -- mixer). Each file opened via "Open with" is a brand new process, so without this it
@@ -156,6 +165,7 @@ local function load_state()
     if s.menu_hint_shown then menu_hint_shown = true end
     if tonumber(s.speed_step) then speed_step = tonumber(s.speed_step) end
     if tonumber(s.volume) then saved_volume = tonumber(s.volume) end
+    if s.end_mode == 'next' or s.end_mode == 'loop' or s.end_mode == 'stop' then end_mode = s.end_mode end
     -- Copy entries instead of adopting the parsed table: utils.parse_json tags tables that
     -- came from a JSON array (and an EMPTY table always round-trips as []), and format_json
     -- then ignores string keys added to such a table forever - saves would silently lose
@@ -185,8 +195,10 @@ local function load_state()
 end
 load_state()
 -- Applied here (top-level, before any file loads) rather than per-file: volume is one
--- mpv session's global property, not something to re-snap on every playlist entry.
+-- mpv session's global property, not something to re-snap on every playlist entry. Same for
+-- end_mode - keep-open/loop-file are core mpv properties, not something to reset per file.
 mp.set_property_number('volume', saved_volume)
+apply_end(end_mode)
 
 local custom = {}
 for pair in o.labels:gmatch('[^,]+') do
@@ -220,8 +232,9 @@ local function mixer_title()
     return t('mixer')
 end
 local function pct(aid) return math.floor((gain[aid] or 1) * 100 + 0.5) end
--- Mono is already shown in the title's " · Mono" suffix - not repeated here, to leave the
--- action-button cluster (down/up/mono, see mixer_data) enough room to render without clipping.
+-- Channel mode (Mono/Stereo) is already shown in the title's " · Mono"/" · Stereo" suffix -
+-- not repeated here, to leave the action-button cluster (down/up/mono, see mixer_data) enough
+-- room to render without clipping.
 -- Percentage is padded to a fixed width: uosc lays its action buttons out relative to the
 -- menu's overall content width, so an unpadded "9%" -> "10%" -> "100%" transition on every
 -- +/- click reflows that width and shifts the buttons out from under a stationary cursor
@@ -294,6 +307,7 @@ local function save_state()
         f:write(to_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
             perf_pref = quality.pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
+            end_mode = end_mode,
             screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
             volume = saved_volume }))
         f:close()
@@ -507,15 +521,20 @@ end
 
 -- Audio mixer (its own menu so live refresh keeps us in place).
 local function mixer_data()
-    local actions = {
-        { name = 'down', icon = 'remove', label = t('gain_down') },
-        { name = 'up', icon = 'add', label = t('gain_up') },
-        { name = 'mono', icon = 'surround_sound', label = t('mono') },
-    }
     local items = {}
     for _, aid in ipairs(tracks) do
-        items[#items + 1] = { title = label(aid) .. (mono[aid] and (' · ' .. t('mono_short')) or ''),
-            hint = hint(aid), icon = CHECK[enabled[aid] == true], value = aid, actions = actions, keep_open = true }
+        -- Channel mode is always spelled out (Mono or Stereo), never just omitted for the
+        -- default case - "Sistem Sesi" alone doesn't tell you whether it's currently mono or
+        -- stereo, only "Sistem Sesi · Mono"/"Sistem Sesi · Stereo" does. The toggle action's
+        -- own label also reflects the CURRENT state's opposite (what clicking it will do),
+        -- built per-row instead of shared, since each track can be in a different mode.
+        local row_actions = {
+            { name = 'down', icon = 'remove', label = t('gain_down') },
+            { name = 'up', icon = 'add', label = t('gain_up') },
+            { name = 'mono', icon = 'surround_sound', label = mono[aid] and t('mono_off') or t('mono') },
+        }
+        items[#items + 1] = { title = label(aid) .. ' · ' .. (mono[aid] and t('mono_short') or t('stereo_short')),
+            hint = hint(aid), icon = CHECK[enabled[aid] == true], value = aid, actions = row_actions, keep_open = true }
     end
     if #tracks == 0 then items[#items + 1] = { title = t('single_track'), selectable = false, muted = true } end
     items[#items + 1] = separator()
@@ -629,9 +648,9 @@ local function set_speed_step(step)
     refresh_menu()
 end
 local function set_end(mode_)
-    if mode_ == 'loop' then mp.set_property('loop-file', 'inf'); mp.set_property('keep-open', 'no')
-    elseif mode_ == 'stop' then mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'always')
-    else mp.set_property('loop-file', 'no'); mp.set_property('keep-open', 'no') end
+    apply_end(mode_)
+    end_mode = mode_
+    save_state()
     osd(string.format(t('end_osd'), t('end_' .. mode_))); close_menu()
 end
 

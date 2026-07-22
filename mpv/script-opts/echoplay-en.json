@@ -17,6 +17,8 @@
   "silent": "Silent",
   "mono": "Make mono (merge L+R)",
   "mono_short": "Mono",
+  "mono_off": "Switch back to stereo",
+  "stereo_short": "Stereo",
   "speed": "Fixed speed (g)",
   "speed_osd": "Speed: %sx",
   "faster": "Faster",

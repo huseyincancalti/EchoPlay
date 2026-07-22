@@ -17,6 +17,8 @@
   "silent": "Sessiz",
   "mono": "Mono yap (L+R birleştir)",
   "mono_short": "Mono",
+  "mono_off": "Stereo'ya döndür",
+  "stereo_short": "Stereo",
   "speed": "Sabit Hız (g)",
   "speed_osd": "Hız: %sx",
   "faster": "Hızlandır",

@@ -13,6 +13,7 @@ local FALLBACK = {
     all_on = 'Hepsini aç', mute = 'Sustur',
     gain_down = 'Sesi azalt', gain_up = 'Sesi artır', silent = 'Sessiz',
     mono = 'Mono yap (L+R birleştir)', mono_short = 'Mono',
+    mono_off = "Stereo'ya döndür", stereo_short = 'Stereo',
     speed = 'Sabit Hız (g)', speed_osd = 'Hız: %sx', faster = 'Hızlandır', slower = 'Yavaşlat',
     video_end = 'Video Bitince', end_next = 'Sıradakine geç', end_loop = 'Tekrarla', end_stop = 'Sonda dur',
     end_osd = 'Video bitince: %s',

@@ -90,10 +90,31 @@ function M.reset_for_new_file()
     perf_blocked = {}
 end
 
--- One-shot: applies a forced (non-auto) tier once, on the very first file of the session.
+-- Every tier switch after the very first one is instant - confirmed live via verbose mpv
+-- logs: the first-ever `apply-profile` to a given tier stalls the GPU thread for 1-2 seconds
+-- ((Re)creating a texture at that size/format for the first time in this process is
+-- expensive at the driver level), but re-applying that same tier moments or minutes later
+-- never repeats the (Re)creating step and never stalls again - the resources just get
+-- reused. So the fix isn't "switch tiers less" (auto mode already switches rarely), it's
+-- "pay that one-time cost during the boring first moment of a file loading, not mid-viewing
+-- when the user is actually watching and would feel every millisecond of it" - the same
+-- "shader warm-up" trick game engines use before a level starts, applied here before
+-- playback of the very first file starts.
+local function warm_up()
+    for _, tier in ipairs(M.TIERS) do
+        if TIER_PROFILE[tier] then
+            mp.commandv('apply-profile', TIER_PROFILE[tier])
+            mp.commandv('apply-profile', TIER_PROFILE[tier], 'restore')
+        end
+    end
+end
+
+-- One-shot: warms up every tier's GPU resources, then applies a forced (non-auto) tier if
+-- one is set - both only on the very first file of the session.
 function M.apply_initial()
     if applied_initial then return end
     applied_initial = true
+    warm_up()
     if M.pref ~= 'auto' then apply_tier(M.pref) end
 end
 

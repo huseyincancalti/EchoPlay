@@ -1,0 +1,7 @@
+# Created for winget-pkgs (https://github.com/microsoft/winget-pkgs). NOT submitted there yet -
+# see packaging/winget/README.md for why and what the submission step involves.
+PackageIdentifier: HuseyinCanCalti.EchoPlay
+PackageVersion: 1.4.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

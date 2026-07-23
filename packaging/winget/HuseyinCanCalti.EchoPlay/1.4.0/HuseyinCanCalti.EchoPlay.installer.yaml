@@ -1,0 +1,19 @@
+PackageIdentifier: HuseyinCanCalti.EchoPlay
+PackageVersion: 1.4.0
+InstallerType: inno
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+InstallerSwitches:
+  Silent: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+  SilentWithProgress: /SILENT /SUPPRESSMSGBOXES /NORESTART
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    InstallerType: inno
+    InstallerUrl: https://github.com/huseyincancalti/EchoPlay/releases/download/v1.4.0/EchoPlay-Setup.exe
+    InstallerSha256: 7F01ACAF1DF23160413849DE061E43BB512051C8244C440269FD660A0FC22BA4
+ManifestType: installer
+ManifestVersion: 1.6.0

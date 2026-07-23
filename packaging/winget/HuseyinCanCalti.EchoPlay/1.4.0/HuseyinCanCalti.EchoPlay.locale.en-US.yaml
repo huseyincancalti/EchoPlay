@@ -1,0 +1,26 @@
+PackageIdentifier: HuseyinCanCalti.EchoPlay
+PackageVersion: 1.4.0
+PackageLocale: en-US
+Publisher: Huseyin Can CALTI
+PublisherUrl: https://github.com/huseyincancalti
+PublisherSupportUrl: https://github.com/huseyincancalti/EchoPlay/issues
+PackageName: EchoPlay
+PackageUrl: https://github.com/huseyincancalti/EchoPlay
+License: MIT
+LicenseUrl: https://github.com/huseyincancalti/EchoPlay/blob/main/LICENSE
+Copyright: Copyright (c) Huseyin Can CALTI
+ShortDescription: Video player for NVIDIA ShadowPlay & OBS dual-audio-track recordings
+Description: >-
+  EchoPlay is a curated distribution of mpv for NVIDIA ShadowPlay, NVIDIA App, and OBS Studio
+  clips recorded with separate game/mic audio tracks. It mixes any combination of tracks live,
+  with no re-encode, and remembers your mix per file.
+Moniker: echoplay
+Tags:
+  - mpv
+  - video-player
+  - shadowplay
+  - obs-studio
+  - audio-mixer
+ReleaseNotesUrl: https://github.com/huseyincancalti/EchoPlay/releases/tag/v1.4.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

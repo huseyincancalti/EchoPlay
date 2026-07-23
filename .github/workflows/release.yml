@@ -20,6 +20,12 @@ jobs:
           $version = "${{ github.ref_name }}" -replace '^v', ''
           echo "VERSION=$version" >> $env:GITHUB_ENV
 
+      - name: Embed version into script
+        shell: pwsh
+        run: |
+          (Get-Content mpv\scripts\echoplay-audio\version.lua) -replace '0\.0\.0-dev', "${{ env.VERSION }}" |
+            Set-Content mpv\scripts\echoplay-audio\version.lua
+
       - name: Download portable mpv
         shell: pwsh
         env:
@@ -111,6 +117,9 @@ jobs:
 
       - name: Resolve version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Embed version into script
+        run: sed -i '' "s/0\.0\.0-dev/${VERSION}/" mpv/scripts/echoplay-audio/version.lua
 
       - name: Download upstream mpv.app bundle
         env:
@@ -245,6 +254,9 @@ jobs:
 
       - name: Resolve version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Embed version into script
+        run: sed -i "s/0\.0\.0-dev/${VERSION}/" mpv/scripts/echoplay-audio/version.lua
 
       - name: Install mpv + tooling
         run: |

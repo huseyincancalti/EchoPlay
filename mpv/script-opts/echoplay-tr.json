@@ -110,5 +110,8 @@
   "silent_warning": "Ses kapalı - Ayarlar > Ses Kaynakları'ndan açabilirsiniz",
 
   "resume_prompt": "%s'ten devam edilsin mi?",
-  "resume_keys": "Enter: Evet  ·  Esc: Baştan başla"
+  "resume_keys": "Enter: Evet  ·  Esc: Baştan başla",
+
+  "update_available": "Yeni EchoPlay sürümü çıktı: %s",
+  "update_available_menu": "Güncelleme mevcut: %s"
 }

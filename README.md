@@ -60,6 +60,9 @@ next time.
 - 💾 **Persistent, and it asks before resuming** — your mixer, mono, accent, language, speed, and
   shortcut choices survive restarts. Playback always starts at 0:00 and offers to jump back to
   where you left off — it never silently skips ahead.
+- 🔔 **Tells you when a new version is out** — checks GitHub in the background (at most once a
+  day) and adds a one-click download link under Settings → Help once a newer release exists.
+  No account, no background service — just a quiet check next time you open a video.
 
 ### EchoPlay vs. VLC, PotPlayer & vanilla mpv for dual-audio-track video
 

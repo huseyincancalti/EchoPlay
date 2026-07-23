@@ -72,6 +72,10 @@ local FALLBACK = {
 
     -- Resume prompt: position is remembered, but playback always starts from 0 and asks first.
     resume_prompt = "%s'ten devam edilsin mi?", resume_keys = 'Enter: Evet  ·  Esc: Baştan başla',
+
+    -- Update check
+    update_available = 'Yeni EchoPlay sürümü çıktı: %s',
+    update_available_menu = 'Güncelleme mevcut: %s',
 }
 
 local opts_dir, STR

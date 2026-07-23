@@ -27,7 +27,7 @@ fuller custom look — it can override any uosc option, not just the accent.
 
 | Path | Contents |
 |------|----------|
-| `mpv/scripts/echoplay-audio/` | EchoPlay's only original code — `main.lua` (mixer + menus + theming + shortcuts) + `i18n.lua`/`quality.lua`/`resume.lua` |
+| `mpv/scripts/echoplay-audio/` | EchoPlay's only original code — `main.lua` (mixer + menus + theming + shortcuts) + `i18n.lua`/`quality.lua`/`resume.lua`/`update_check.lua` (`version.lua` is a build-time placeholder, see release.yml) |
 | `mpv/script-opts/echoplay-*.json` | Language packs |
 | `mpv/themes/*.conf` | Theme packs |
 | `mpv/mpv.conf`, `mpv/input.conf` | Player + shortcut settings |

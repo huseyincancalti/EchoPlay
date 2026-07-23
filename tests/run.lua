@@ -103,6 +103,29 @@ do
     end)())
 end
 
+-- ---------- update_check.lua ----------
+do
+    print('update_check.lua')
+    local update_check = require 'update_check'
+
+    check('newer patch version is detected', update_check.is_newer('1.4.1', '1.4.0'))
+    check('newer minor version is detected', update_check.is_newer('1.5.0', '1.4.9'))
+    check('newer major version is detected', update_check.is_newer('2.0.0', '1.9.9'))
+    check('equal versions are not "newer"', not update_check.is_newer('1.4.0', '1.4.0'))
+    check('older version is not "newer"', not update_check.is_newer('1.3.0', '1.4.0'))
+    check('unparsable version never counts as newer', not update_check.is_newer('nightly', '1.4.0'))
+
+    -- version.lua's checked-in placeholder (a raw dev checkout) must never fire a real
+    -- network check - init() should return immediately instead of calling M.check().
+    local checked = false
+    local orig_check = update_check.check
+    update_check.check = function() checked = true end
+    update_check.init({ t = function(k) return k end, osd = function() end,
+        refresh_menu = function() end, save_state = function() end })
+    check('a raw dev checkout (0.0.0-dev) never triggers a network check', not checked)
+    update_check.check = orig_check
+end
+
 print('')
 if failures == 0 then
     print('All checks passed.')

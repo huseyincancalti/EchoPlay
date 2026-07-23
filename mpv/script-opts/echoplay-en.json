@@ -110,5 +110,8 @@
   "silent_warning": "Audio is off - enable it under Settings > Audio Sources",
 
   "resume_prompt": "Resume from %s?",
-  "resume_keys": "Enter: Yes  ·  Esc: Start over"
+  "resume_keys": "Enter: Yes  ·  Esc: Start over",
+
+  "update_available": "New EchoPlay version is out: %s",
+  "update_available_menu": "Update available: %s"
 }

@@ -25,6 +25,7 @@ local util = require 'util'
 local i18n = require 'i18n'
 local quality = require 'quality'
 local resume = require 'resume'
+local update_check = require 'update_check'
 local to_json = util.to_json
 
 local o = {
@@ -46,11 +47,13 @@ local MENU_TYPE_MIX = 'echoplay-mixer'
 local OPTS_DIR = mp.command_native({ 'expand-path', '~~/script-opts' })
 local THEMES_DIR = mp.command_native({ 'expand-path', '~~/themes' })
 local STATE_PATH = mp.command_native({ 'expand-path', '~~/echoplay-state.json' })
+local RELEASES_URL = 'https://github.com/huseyincancalti/EchoPlay/releases/latest'
 
 i18n.init(OPTS_DIR, o.language)
 local t = i18n.t
 
--- Open a folder in the OS file manager (Explorer/Finder/whatever handles xdg-open).
+-- Open a folder (or URL) with whatever the OS associates it with - Explorer/Finder/xdg-open
+-- all happily take a URL too, so this doubles as "open a web page" for the update-check link.
 local function open_folder(path)
     local platform = mp.get_property_native('platform')
     if platform == 'windows' then
@@ -166,6 +169,8 @@ local function load_state()
     if tonumber(s.speed_step) then speed_step = tonumber(s.speed_step) end
     if tonumber(s.volume) then saved_volume = tonumber(s.volume) end
     if s.end_mode == 'next' or s.end_mode == 'loop' or s.end_mode == 'stop' then end_mode = s.end_mode end
+    if tonumber(s.update_last_checked) then update_check.last_checked = tonumber(s.update_last_checked) end
+    if type(s.update_seen_version) == 'string' then update_check.seen_version = s.update_seen_version end
     -- Copy entries instead of adopting the parsed table: utils.parse_json tags tables that
     -- came from a JSON array (and an EMPTY table always round-trips as []), and format_json
     -- then ignores string keys added to such a table forever - saves would silently lose
@@ -309,7 +314,8 @@ local function save_state()
             perf_pref = quality.pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
             end_mode = end_mode,
             screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
-            volume = saved_volume }))
+            volume = saved_volume, update_last_checked = update_check.last_checked,
+            update_seen_version = update_check.seen_version }))
         f:close()
     end
 end
@@ -513,6 +519,12 @@ local function menu_data()
     items[#items + 1] = separator()
     items[#items + 1] = section_heading(t('sec_help'), 'help_outline')
     items[#items + 1] = { title = t('shortcuts'), icon = 'chevron_right', items = shortcuts_items() }
+    -- Only shown once a genuinely newer release has been detected (update_check.seen_version) -
+    -- silent otherwise, so up-to-date users never see a dead "check for updates" row.
+    if update_check.seen_version ~= '' then
+        items[#items + 1] = { title = string.format(t('update_available_menu'), update_check.seen_version),
+            icon = 'download', value = 'update-page' }
+    end
     -- Actions stay inside the row ('outside' floats them detached from the menu, which both
     -- looks odd and breaks rapid repeat-clicking of +/- on the speed rows).
     return { type = MENU_TYPE, title = t('settings'), search_style = 'palette',
@@ -761,6 +773,7 @@ end
 
 quality.init({ t = t, osd = osd, refresh_menu = refresh_menu, save_state = save_state })
 resume.init({ t = t })
+update_check.init({ t = t, osd = osd, refresh_menu = refresh_menu, save_state = save_state })
 
 local function handle(value, action)
     if value == 'open-mixer' then open_mixer()
@@ -792,6 +805,7 @@ local function handle(value, action)
         for _, key_action in ipairs(KEY_ACTIONS) do if key_action.id == id then rebind_capture(key_action) end end
     elseif value == 'lang-folder' then close_menu(); open_folder(OPTS_DIR)
     elseif value == 'theme-folder' then close_menu(); open_folder(THEMES_DIR)
+    elseif value == 'update-page' then close_menu(); open_folder(RELEASES_URL)
     elseif PLAYER[value] then close_menu(); mp.commandv('script-binding', 'uosc/' .. PLAYER[value])
     else
         local aid = tonumber(value)

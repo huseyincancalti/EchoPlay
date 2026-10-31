@@ -1,7 +1,9 @@
 # Qt Test unit tests for the app's C++ classes that need no libmpv and no window. One executable per class.
 # echoplay_test(<name> <app sources...>): builds tst_<name>.cpp with those sources and registers it in ctest.
 function(echoplay_test name)
-    # Console executable (not qt_add_executable, which makes a Windows GUI app): ctest shows why a test failed.
+    # Plain console executable: qt_add_executable would make a Windows GUI app and run a QML import scan.
+    # Qt Test prints nothing to a redirected stdout here (Qt 6.10 MinGW); to read a failure, run the test
+    # with "-o result.txt,txt".
     add_executable(tst_${name} tst_${name}.cpp ${ARGN})
     target_include_directories(tst_${name} PRIVATE ../src)
     target_link_libraries(tst_${name} PRIVATE Qt6::Test Qt6::Qml)

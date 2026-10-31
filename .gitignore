@@ -1,6 +1,15 @@
 # User's previous local setup (not part of the project)
 _old/
 
+# Local working files: session plan/handoff, engine briefs, check logs, engine config with a
+# private API endpoint. Never committed (see CLAUDE.md).
+NOW.md
+HANDOFF.md
+.motor/
+.out/
+opencode.json
+aqtinstall.log
+
 # Third-party components are fetched by install.ps1 (or the release CI) into
 # the mpv config dir, not committed here. uosc.conf IS committed (mpv/script-opts/uosc.conf)
 # since it carries EchoPlay's own control-bar/theme overrides, not upstream defaults.

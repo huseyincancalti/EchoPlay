@@ -4,7 +4,7 @@ project(EchoPlay VERSION 2.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS Quick Gui GuiPrivate)
+find_package(Qt6 6.7 REQUIRED COMPONENTS Quick Gui GuiPrivate Test)
 qt_standard_project_setup(REQUIRES 6.7)
 
 # libmpv dev package: include/mpv/*.h, libmpv.dll.a, libmpv-2.dll (tools/setup-dev.sh fetches it).
@@ -38,3 +38,4 @@ add_custom_command(TARGET echoplay POST_BUILD
 
 enable_testing()
 add_test(NAME libmpv-smoke COMMAND echoplay --smoke)
+add_subdirectory(tests)

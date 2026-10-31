@@ -25,8 +25,9 @@ static int smoke()
 int main(int argc, char *argv[])
 {
     const qint64 tMain = MpvItem::processAgeMsNow();
-    // The libmpv render API draws with OpenGL; Qt on Windows would pick Direct3D 11 otherwise.
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+    // MpvItem renders through libmpv's D3D11 render API on Qt's device. OpenGL was ~750 ms slower to start:
+    // the NVIDIA OpenGL driver init alone took that long before the first frame (measured 2026-10-31).
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
     QGuiApplication app(argc, argv);
     const qint64 tApp = MpvItem::processAgeMsNow();
     std::setlocale(LC_NUMERIC, "C"); // libmpv requires it
@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
     if (cli.isSet(smokeOpt)) return smoke();
 
     QQmlApplicationEngine engine;
+    const qint64 tEngine = MpvItem::processAgeMsNow();
     engine.setInitialProperties({
         {"file", cli.positionalArguments().value(0)},
         {"benchSeconds", cli.value(bench).toInt()},
@@ -56,7 +58,7 @@ int main(int argc, char *argv[])
         {"mixToggle", cli.isSet(mixToggle)},
         {"shotAt", cli.value(shotAt).toDouble()},
         {"shotOut", cli.value(shotOut)},
-        {"startup", QVariantMap{{"main_ms", tMain}, {"app_ms", tApp}}},
+        {"startup", QVariantMap{{"main_ms", tMain}, {"app_ms", tApp}, {"engine_ms", tEngine}}},
     });
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
                      Qt::QueuedConnection);

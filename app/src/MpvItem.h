@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QQuickFramebufferObject>
+#include <QQuickRhiItem>
 #include <QVariant>
 #include <QtQml/qqmlregistration.h>
 
@@ -8,8 +8,8 @@ struct mpv_handle;
 struct mpv_render_context;
 
 // A QML item that shows libmpv's video through the render API, inside the Qt Quick scene,
-// so other items (glass panels) can sample and blur it.
-class MpvItem : public QQuickFramebufferObject
+// so other items (glass panels) can sample and blur it. Windows: Direct3D 11 on Qt's own device.
+class MpvItem : public QQuickRhiItem
 {
     Q_OBJECT
     QML_ELEMENT
@@ -18,8 +18,6 @@ public:
     explicit MpvItem(QQuickItem *parent = nullptr);
     ~MpvItem() override;
 
-    Renderer *createRenderer() const override;
-
     Q_INVOKABLE void command(const QVariantList &args);
     Q_INVOKABLE void setOption(const QString &name, const QString &value); // before start() only
     Q_INVOKABLE void start();                                              // mpv_initialize
@@ -27,6 +25,7 @@ public:
     Q_INVOKABLE void setProperty(const QString &name, const QVariant &value);
     Q_INVOKABLE qint64 processAgeMs() const { return processAgeMsNow(); }
     static qint64 processAgeMsNow(); // ms since the OS created this process; -1 if unknown
+    Q_INVOKABLE QVariantMap startupMarks() const { return m_marks; } // item_ms, mpv_created_ms
 
     mpv_handle *handle() const { return m_mpv; }
     mpv_render_context *renderContext = nullptr;
@@ -36,9 +35,13 @@ signals:
     void playbackRestarted();
     void fileEnded();
 
+protected:
+    QQuickRhiItemRenderer *createRenderer() override;
+
 private slots:
     void drainEvents();
 
 private:
     mpv_handle *m_mpv = nullptr;
+    QVariantMap m_marks;
 };

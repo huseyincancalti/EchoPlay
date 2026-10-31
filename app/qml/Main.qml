@@ -22,6 +22,11 @@ Window {
     required property var startup // main_ms, app_ms from C++; qml_ms, render_ms, process_ms added here
 
     readonly property string mixGraph: "[aid1][aid2]amix=inputs=2:normalize=0[ao]"
+    property bool unpauseOnSwap: false
+    onFrameSwapped: {
+        if (startup.paint_ms === undefined) startup.paint_ms = mpv.processAgeMs() // window first on screen
+        if (unpauseOnSwap) { unpauseOnSwap = false; mpv.setProperty("pause", false) }
+    }
     property bool restarted: false
     property bool mixOn: mix
 
@@ -37,6 +42,7 @@ Window {
         anchors.fill: parent
         Component.onCompleted: {
             root.startup.qml_ms = processAgeMs()
+            Object.assign(root.startup, startupMarks())
             setOption("hwdec", "auto-safe")
             setOption("scale", "lanczos")
             setOption("cscale", "lanczos")
@@ -53,8 +59,10 @@ Window {
         onRenderReady: {
             root.startup.render_ms = processAgeMs()
             if (!root.file) return
-            if (root.shotAt >= 0) command(["loadfile", root.file, "replace", -1, "start=" + root.shotAt + ",pause=yes"])
-            else command(["loadfile", root.file])
+            // Opened paused: mpv dropped the first ~8 frames when the clock ran while Qt was still building
+            // its first frames. Playback starts once the first video frame is on screen (onFrameSwapped).
+            const start = root.shotAt >= 0 ? "start=" + root.shotAt + "," : ""
+            command(["loadfile", root.file, "replace", -1, start + "pause=yes"])
         }
         onPlaybackRestarted: {
             if (root.restarted) return
@@ -62,6 +70,20 @@ Window {
             root.startup.process_ms = processAgeMs()
             command(["print-text", "STARTUP " + JSON.stringify(root.startup)])
             if (root.shotAt >= 0) shotTimer.start()
+            else root.unpauseOnSwap = true
+        }
+    }
+
+    // Bench only: log when dropped frames happen (the mpv log has no per-drop line at -v).
+    property int lastDrops: 0
+    Timer {
+        running: root.benchSeconds > 0
+        interval: 250
+        repeat: true
+        onTriggered: {
+            const n = mpv.getProperty("frame-drop-count") || 0
+            if (n !== root.lastDrops) mpv.command(["print-text", "DROPS " + n + " at " + mpv.getProperty("playback-time")])
+            root.lastDrops = n
         }
     }
 

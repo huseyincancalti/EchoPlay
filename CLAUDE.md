@@ -28,6 +28,9 @@ Two tracks live in this repo:
 the evidence. Any check or measurement that will likely be run again (benchmarks, platform tests,
 screenshots) is written as a script in `tools/` from the start (maintainer, 2026-10-29), not first done by
 hand. One-off investigations stay manual.
+`tools/bench.sh` and `tools/shot-compare.sh` open real player windows on the maintainer's screen (frame
+timing needs a real, undisturbed window). Run them only when the maintainer says they are away or asks
+for a measurement (maintainer, 2026-10-31). `tools/check.sh` is headless and fine any time.
 
 ## Work split (save Claude credits)
 - The main session writes small changes itself (about 20 lines or one file). Bigger pieces go to one
@@ -59,6 +62,9 @@ hand. One-off investigations stay manual.
 - Qt 6 Quick/QML + C++ backend, CMake. Video goes through the libmpv render API inside the QML scene so
   glass panels can blur the live video (a webview or a native child window cannot). References:
   mpv-examples `libmpv/qml`, Haruna, mpc-qt.
+- Windows renders through libmpv's D3D11 render API on Qt's own D3D11 device (`MpvItem`, a
+  `QQuickRhiItem`). Not OpenGL: the NVIDIA OpenGL driver init alone cost ~750 ms of startup. Linux/macOS
+  will need the OpenGL path in the same item when their builds start.
 - Mixer: v1's proven `lavfi-complex` technique, ported to C++.
 - UI/UX is designed first in v0 from `docs/design/v0-brief.md`; the maintainer picks; then QML.
 

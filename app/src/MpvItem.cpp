@@ -1,10 +1,10 @@
 #include "MpvItem.h"
 
-#include <QOpenGLContext>
-#include <QOpenGLFramebufferObject>
 #include <QQuickWindow>
 #include <mpv/client.h>
-#include <mpv/render_gl.h>
+#include <mpv/render.h>
+#include <mpv/render_d3d11.h>
+#include <rhi/qrhi.h>
 #include <deque>
 #include <stdexcept>
 #include <vector>
@@ -15,12 +15,6 @@
 #endif
 
 namespace {
-
-void *getProcAddress(void *, const char *name)
-{
-    QOpenGLContext *ctx = QOpenGLContext::currentContext();
-    return ctx ? reinterpret_cast<void *>(ctx->getProcAddress(QByteArray(name))) : nullptr;
-}
 
 // QVariant -> mpv_node (strings, numbers, bools, lists). Owns the memory the node points into;
 // std::deque never moves existing elements, so pointers stay valid while it grows.
@@ -74,42 +68,42 @@ QVariant fromNode(const mpv_node &n)
     }
 }
 
-class MpvRenderer : public QQuickFramebufferObject::Renderer
+// Renders mpv into the item's color texture on Qt's own D3D11 device (no OpenGL driver to load,
+// d3d11va decodes on the same device). Runs on Qt's render thread.
+class MpvRenderer : public QQuickRhiItemRenderer
 {
 public:
     explicit MpvRenderer(MpvItem *item) : m_item(item) {}
 
-    QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override
+    void initialize(QRhiCommandBuffer *) override
     {
-        if (!m_item->renderContext) {
-            mpv_opengl_init_params gl{getProcAddress, nullptr};
-            mpv_render_param params[] = {
-                {MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_OPENGL)},
-                {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl},
-                {MPV_RENDER_PARAM_INVALID, nullptr}};
-            if (mpv_render_context_create(&m_item->renderContext, m_item->handle(), params) < 0)
-                throw std::runtime_error("mpv_render_context_create failed");
-            mpv_render_context_set_update_callback(
-                m_item->renderContext,
-                [](void *ctx) { QMetaObject::invokeMethod(static_cast<MpvItem *>(ctx), "update", Qt::QueuedConnection); },
-                m_item);
-            QMetaObject::invokeMethod(m_item, "renderReady", Qt::QueuedConnection);
-        }
-        return QQuickFramebufferObject::Renderer::createFramebufferObject(size);
+        if (m_item->renderContext) return;
+        if (rhi()->backend() != QRhi::D3D11) throw std::runtime_error("MpvItem needs Qt's Direct3D 11 backend");
+        auto *native = static_cast<const QRhiD3D11NativeHandles *>(rhi()->nativeHandles());
+        mpv_d3d11_init_params init{native->dev};
+        mpv_render_param params[] = {
+            {MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_D3D11)},
+            {MPV_RENDER_PARAM_D3D11_INIT_PARAMS, &init},
+            {MPV_RENDER_PARAM_INVALID, nullptr}};
+        if (mpv_render_context_create(&m_item->renderContext, m_item->handle(), params) < 0)
+            throw std::runtime_error("mpv_render_context_create failed");
+        mpv_render_context_set_update_callback(
+            m_item->renderContext,
+            [](void *ctx) { QMetaObject::invokeMethod(static_cast<MpvItem *>(ctx), "update", Qt::QueuedConnection); },
+            m_item);
+        QMetaObject::invokeMethod(m_item, "renderReady", Qt::QueuedConnection);
     }
 
-    void render() override
+    void synchronize(QQuickRhiItem *) override {}
+
+    void render(QRhiCommandBuffer *cb) override
     {
-        QOpenGLFramebufferObject *fbo = framebufferObject();
-        mpv_opengl_fbo target{int(fbo->handle()), fbo->width(), fbo->height(), 0};
-        int flipY = 0;
-        mpv_render_param params[] = {
-            {MPV_RENDER_PARAM_OPENGL_FBO, &target},
-            {MPV_RENDER_PARAM_FLIP_Y, &flipY},
-            {MPV_RENDER_PARAM_INVALID, nullptr}};
-        m_item->window()->beginExternalCommands();
+        mpv_d3d11_fbo target{reinterpret_cast<void *>(colorTexture()->nativeTexture().object)};
+        mpv_render_param params[] = {{MPV_RENDER_PARAM_D3D11_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
+        // mpv draws on the immediate context and leaves its state changed; Qt flushes before and resets after.
+        cb->beginExternal();
         mpv_render_context_render(m_item->renderContext, params);
-        m_item->window()->endExternalCommands();
+        cb->endExternal();
     }
 
 private:
@@ -118,9 +112,12 @@ private:
 
 } // namespace
 
-MpvItem::MpvItem(QQuickItem *parent) : QQuickFramebufferObject(parent), m_mpv(mpv_create())
+MpvItem::MpvItem(QQuickItem *parent) : QQuickRhiItem(parent)
 {
+    m_marks.insert("item_ms", processAgeMsNow());
+    m_mpv = mpv_create();
     if (!m_mpv) throw std::runtime_error("mpv_create failed");
+    m_marks.insert("mpv_created_ms", processAgeMsNow());
     mpv_set_option_string(m_mpv, "vo", "libmpv");
     // mpv's built-in Lua scripts (console, stats, ytdl, ...) are uosc-era tooling the Qt UI replaces;
     // skipping them saves startup time. Older/newer option names are both set; unknown ones are ignored.
@@ -139,11 +136,11 @@ MpvItem::~MpvItem()
     mpv_terminate_destroy(m_mpv);
 }
 
-QQuickFramebufferObject::Renderer *MpvItem::createRenderer() const
+QQuickRhiItemRenderer *MpvItem::createRenderer()
 {
     window()->setPersistentGraphics(true);
     window()->setPersistentSceneGraph(true);
-    return new MpvRenderer(const_cast<MpvItem *>(this));
+    return new MpvRenderer(this);
 }
 
 void MpvItem::setOption(const QString &name, const QString &value)

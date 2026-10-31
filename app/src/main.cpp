@@ -3,10 +3,12 @@
 #include <QQmlApplicationEngine>
 #include <QDateTime>
 #include <QQuickWindow>
+#include <QStandardPaths>
 #include <clocale>
 #include <cstdio>
 #include <memory>
 #include <mpv/client.h>
+#include "AppState.h"
 #include "I18n.h"
 #include "MpvItem.h"
 #include "SingleInstance.h"
@@ -35,6 +37,7 @@ int main(int argc, char *argv[])
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
     QGuiApplication app(argc, argv);
     const qint64 tApp = MpvItem::processAgeMsNow();
+    QCoreApplication::setApplicationName("EchoPlay"); // config folder: %LOCALAPPDATA%/EchoPlay on Windows
     std::setlocale(LC_NUMERIC, "C"); // libmpv requires it
 
     QCommandLineParser cli;
@@ -64,9 +67,12 @@ int main(int argc, char *argv[])
     }
 
     // Declared before the engine so they outlive it. QML reaches them through the singletons' create().
+    AppState state(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/state.json");
+    AppState::setInstance(&state);
     I18n i18n(QCoreApplication::applicationDirPath() + "/lang");
-    i18n.setLanguage({});
+    i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
     I18n::setInstance(&i18n);
+    QObject::connect(&i18n, &I18n::languageChanged, &state, [&] { state.setLanguage(i18n.language()); });
     Theme theme(":/theme/theme.json", QCoreApplication::applicationDirPath() + "/theme.json");
     Theme::setInstance(&theme);
 

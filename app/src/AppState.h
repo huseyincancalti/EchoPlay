@@ -27,6 +27,11 @@ public:
     void setLanguage(const QString &code);
     MixerPrefs mixer() const { return m_mixer; }
     void setMixer(const MixerPrefs &prefs);
+    // The daily update check: when it last ran, and the newest version already shown to the user (shown once).
+    qint64 updateLastChecked() const { return m_updateLastChecked; } // seconds since the epoch; 0 = never
+    void setUpdateLastChecked(qint64 epochSeconds);
+    QString updateSeenVersion() const { return m_updateSeenVersion; }
+    void setUpdateSeenVersion(const QString &version);
 
     // Writes now. A change schedules this a moment later instead: a dragged slider changes a value
     // many times per second, and one write is enough.
@@ -51,4 +56,6 @@ private:
     QTimer m_saveTimer;
     QString m_language;
     MixerPrefs m_mixer;
+    qint64 m_updateLastChecked = 0;
+    QString m_updateSeenVersion;
 };

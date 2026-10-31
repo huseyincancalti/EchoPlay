@@ -38,6 +38,20 @@ void AppState::setMixer(const MixerPrefs &prefs)
     changed();
 }
 
+void AppState::setUpdateLastChecked(qint64 epochSeconds)
+{
+    if (epochSeconds == m_updateLastChecked) return;
+    m_updateLastChecked = epochSeconds;
+    changed();
+}
+
+void AppState::setUpdateSeenVersion(const QString &version)
+{
+    if (version == m_updateSeenVersion) return;
+    m_updateSeenVersion = version;
+    changed();
+}
+
 void AppState::changed()
 {
     m_saveTimer.start();
@@ -74,6 +88,10 @@ void AppState::load()
     }
     for (const QJsonValue &id : mixer.value("mono").toArray())
         if (id.isDouble()) m_mixer.mono.insert(id.toInt());
+
+    const QJsonObject update = s.value("update").toObject();
+    if (update.value("last_checked").isDouble()) m_updateLastChecked = update.value("last_checked").toInteger();
+    if (update.value("seen_version").isString()) m_updateSeenVersion = update.value("seen_version").toString();
 }
 
 void AppState::save()
@@ -91,6 +109,7 @@ void AppState::save()
         {"schema", Schema},
         {"language", m_language},
         {"mixer", QJsonObject{{"default_on", m_mixer.defaultOn}, {"gains", gains}, {"mono", monoIds}}},
+        {"update", QJsonObject{{"last_checked", m_updateLastChecked}, {"seen_version", m_updateSeenVersion}}},
     };
 
     QDir().mkpath(QFileInfo(m_path).absolutePath());

@@ -57,6 +57,10 @@ int main(int argc, char *argv[])
     cli.addHelpOption();
     cli.process(app);
     if (cli.isSet(smokeOpt)) return smoke();
+    // Absolute: a running instance resolves paths against its own working folder, and resume positions are
+    // keyed by path. URLs pass unchanged.
+    const QString arg = cli.positionalArguments().value(0);
+    const QString file = QFileInfo::exists(arg) ? QFileInfo(arg).absoluteFilePath() : arg;
 
     // One window per user: a second launch hands its file to the running one and exits. Bench and shot runs
     // stay independent (tools/bench.sh starts many in a row).
@@ -65,10 +69,7 @@ int main(int argc, char *argv[])
         instance = std::make_unique<SingleInstance>(SingleInstance::defaultName());
         const qint64 age = MpvItem::processAgeMsNow(); // the hand-over time counts from this process's creation
         const qint64 created = QDateTime::currentMSecsSinceEpoch() - (age < 0 ? 0 : age);
-        // Absolute: the running instance resolves paths against its own working folder. URLs pass unchanged.
-        const QString file = cli.positionalArguments().value(0);
-        const QString sent = QFileInfo::exists(file) ? QFileInfo(file).absoluteFilePath() : file;
-        if (instance->sendToRunning(sent, created)) return 0;
+        if (instance->sendToRunning(file, created)) return 0;
         instance->listen();
     }
 
@@ -83,7 +84,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();
     engine.setInitialProperties({
-        {"file", cli.positionalArguments().value(0)},
+        {"file", file},
         {"benchSeconds", cli.value(bench).toInt()},
         {"glass", !cli.isSet(noGlass)},
         {"mix", cli.isSet(mix)},

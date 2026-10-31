@@ -98,6 +98,9 @@ Window {
                 observeProperty("media-title")
                 observeProperty("speed")
                 observeProperty("frame-drop-count")
+                observeProperty("path")
+                observeProperty("time-pos")
+                observeProperty("duration")
             }
         }
         onRenderReady: {
@@ -129,6 +132,7 @@ Window {
         function onFileStarted() {
             MixerController.fileStarted()
             PictureQuality.fileStarted()
+            ResumeStore.save() // the previous file's spot, in case EchoPlay does not close cleanly later
         }
         function onPropertyChanged(name, value) {
             if (name === "track-list") MixerController.setTrackList(value || [])
@@ -144,6 +148,19 @@ Window {
             if (aid) mpv.setProperty("aid", aid)
         }
     }
+
+    // Where the user is in the file, for "Resume from 1:24?" next time (v1: every 5 s and on close).
+    function rememberPosition() {
+        if (root.measuring || !root.restarted) return
+        ResumeStore.update(mpv.observed("path") || "", mpv.observed("time-pos") || 0, mpv.observed("duration") || 0)
+    }
+    Timer {
+        running: !root.measuring && root.restarted
+        interval: 5000
+        repeat: true
+        onTriggered: root.rememberPosition()
+    }
+    onClosing: rememberPosition()
 
     // Picture quality: Auto steps tiers on sustained frame drops (PictureQuality).
     Timer {

@@ -32,7 +32,8 @@ struct Launch
         if (window) mpv = window->findChild<MpvItem *>();
         // Read like the UI does: observed values, never a synchronous get that could stall the render loop.
         if (mpv) {
-            for (const char *name : {"aid", "lavfi-complex", "pause", "volume", "speed", "time-pos", "scale", "dither"})
+            for (const char *name : {"aid", "lavfi-complex", "pause", "volume", "speed", "time-pos", "scale", "dither",
+                                     "duration"})
                 mpv->observeProperty(name);
         }
     }
@@ -155,6 +156,11 @@ private slots:
             app.services.quality.setPref("low");
             QTRY_COMPARE(app.prop("scale"), QString("bilinear"));
             QCOMPARE(app.prop("dither"), QString("no"));
+
+            // Resume position: closing the window at 0:25 of the 60 s clip remembers it.
+            app.mpv->command({"seek", 25, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") >= 25);
+            app.window->close();
         } // closed: pending state is written now
 
         QCOMPARE(voInits(log), 1); // every mixer switch kept the video running (no VO re-init)
@@ -164,6 +170,11 @@ private slots:
         QCOMPARE(state.value("mixer").toObject().value("default_on").toString(), QString("2"));
         QCOMPARE(state.value("volume").toDouble(), 85.0);
         QCOMPARE(state.value("quality").toString(), QString("low"));
+        QFile resume(QDir(m_path).filePath("resume.json"));
+        QVERIFY(resume.open(QIODevice::ReadOnly));
+        const QJsonObject entry =
+            QJsonDocument::fromJson(resume.readAll()).object().value("entries").toObject().value(QDir::cleanPath(QDir::fromNativeSeparators(m_clip))).toObject();
+        QVERIFY2(entry.value("pos").toDouble() >= 25 && entry.value("pos").toDouble() < 30, "resume.json lacks 0:25");
     }
 
     void secondRunRestoresMixerAndVolume()
@@ -175,6 +186,7 @@ private slots:
         QCOMPARE(app.prop("lavfi-complex"), QString());
         QCOMPARE(app.number("volume"), 85.0);
         QCOMPARE(app.prop("scale"), QString("bilinear")); // the forced tier from the first run
+        QVERIFY(app.services.resume.position(m_clip) >= 25); // ready for the "Resume from 0:25?" prompt
     }
 
 private:

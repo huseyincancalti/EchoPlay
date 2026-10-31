@@ -151,6 +151,14 @@ private slots:
         QCOMPARE(s.position("notobject.mp4"), -1.0);
     }
 
+    void slashesDoNotSplitAFile()
+    {
+        ResumeStore store(m_dir.filePath("slashes.json"));
+        store.update("C:\\Videos\\clip.mp4", 84, 276);
+        QCOMPARE(store.position("C:/Videos/clip.mp4"), 84.0);
+        QCOMPARE(store.position("https://example.com/a.mp4"), -1.0);
+    }
+
 private:
     QTemporaryDir m_dir;
     QString m_path;

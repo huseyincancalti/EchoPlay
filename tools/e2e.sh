@@ -11,10 +11,10 @@ cd "$(dirname "$0")/.." || exit 3
 . .out/devenv.sh || exit 3
 [ -x .out/build-v2/tst_e2e.exe ] || { echo "tst_e2e not built: run bash tools/check.sh v2"; exit 3; }
 mkdir -p .out/e2e
-clip=.out/e2e/two-tracks.mp4
+clip=.out/e2e/two-tracks-60s.mp4 # 60 s: resume keeps 15 s .. duration-20 s
 if [ ! -f "$clip" ]; then
   ffmpeg -v error -f lavfi -i testsrc2=size=1280x720:rate=60 -f lavfi -i sine=frequency=440 \
-    -f lavfi -i sine=frequency=880 -t 30 -map 0:v -map 1:a -map 2:a -c:v libx264 -preset ultrafast \
+    -f lavfi -i sine=frequency=880 -t 60 -map 0:v -map 1:a -map 2:a -c:v libx264 -preset ultrafast \
     -pix_fmt yuv420p -c:a aac -metadata:s:a:0 title="System sounds" -metadata:s:a:1 title="Microphone" "$clip" \
     || { echo "ffmpeg could not make the test clip"; exit 3; }
 fi

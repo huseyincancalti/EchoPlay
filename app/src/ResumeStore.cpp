@@ -15,6 +15,12 @@ namespace {
 constexpr double MinResumePos = 15;  // seconds; before this there is nothing worth resuming
 constexpr double FinishedMargin = 20; // seconds from the end; after this the file counts as watched
 
+// One key per file: Explorer hands over C:\Videos\a.mp4, a second launch C:/Videos/a.mp4. URLs stay as they are.
+QString key(const QString &path)
+{
+    return path.contains("://") ? path : QDir::cleanPath(QDir::fromNativeSeparators(path));
+}
+
 } // namespace
 
 ResumeStore::ResumeStore(const QString &path, QObject *parent) : QObject(parent), m_path(path)
@@ -31,16 +37,16 @@ void ResumeStore::update(const QString &path, double pos, double duration)
 {
     if (duration <= 0) return;
     if (pos < MinResumePos || pos > duration - FinishedMargin) {
-        if (m_entries.remove(path)) m_dirty = true;
+        if (m_entries.remove(key(path))) m_dirty = true;
         return;
     }
-    m_entries.insert(path, {pos, duration, QDateTime::currentSecsSinceEpoch()});
+    m_entries.insert(key(path), {pos, duration, QDateTime::currentSecsSinceEpoch()});
     m_dirty = true;
 }
 
 double ResumeStore::position(const QString &path) const
 {
-    const auto it = m_entries.constFind(path);
+    const auto it = m_entries.constFind(key(path));
     return it == m_entries.constEnd() ? -1 : it->pos;
 }
 
@@ -61,7 +67,7 @@ void ResumeStore::load()
         const QJsonObject e = it.value().toObject();
         if (!e.value("pos").isDouble() || !e.value("dur").isDouble() || !e.value("at").isDouble()) continue;
         const Entry entry{e.value("pos").toDouble(), e.value("dur").toDouble(), e.value("at").toInteger()};
-        if (entry.pos >= 0 && entry.dur > 0) m_entries.insert(it.key(), entry);
+        if (entry.pos >= 0 && entry.dur > 0) m_entries.insert(key(it.key()), entry);
     }
 }
 

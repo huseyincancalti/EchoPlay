@@ -19,7 +19,7 @@ qt_add_qml_module(echoplay
     VERSION 1.0
     QML_FILES qml/Main.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
-            src/I18n.h src/I18n.cpp
+            src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp
 )
 
 # libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship
@@ -36,6 +36,12 @@ target_link_libraries(echoplay PRIVATE Qt6::Quick Qt6::GuiPrivate Qt6::Network "
 
 add_custom_command(TARGET echoplay POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MPV_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:echoplay>")
+
+# The shipped theme: embedded as :/theme/theme.json (the defaults), and copied next to the exe, where the
+# same-named file overrides single tokens without a rebuild.
+qt_add_resources(echoplay theme PREFIX "/theme" BASE "${CMAKE_CURRENT_SOURCE_DIR}/theme" FILES theme/theme.json)
+add_custom_command(TARGET echoplay POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "$<TARGET_FILE_DIR:echoplay>")
 
 # Language files are loaded from a folder next to the exe (new languages are dropped in there, no rebuild).
 add_custom_command(TARGET echoplay POST_BUILD

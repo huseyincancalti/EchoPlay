@@ -1,0 +1,12 @@
+{
+  "bg": "#0E0D0C", "text": "#F5F2EE", "textMuted": "#B3ACA4",
+  "accent": "#FF7D26", "onAccent": "#1A0F06",
+  "success": "#3FB950", "warning": "#D29922", "danger": "#F85149",
+  "glass": { "fill": "#141210", "opacity": 0.35 }, "glassBorder": "#29FFFFFF",
+  "blur": { "panel": 48 },
+  "radius": { "sm": 6, "md": 10, "lg": 16, "xl": 24 },
+  "spacing": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24 },
+  "font": { "family": "Segoe UI Variable", "caption": 12, "body": 14, "title": 18, "display": 28 },
+  "icon": { "sm": 16, "md": 20, "lg": 24 },
+  "motion": { "fast": 120, "base": 200 }
+}

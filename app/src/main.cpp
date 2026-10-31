@@ -10,6 +10,7 @@
 #include "I18n.h"
 #include "MpvItem.h"
 #include "SingleInstance.h"
+#include "Theme.h"
 
 // --smoke: libmpv loads and initializes, no window. Used by ctest.
 static int smoke()
@@ -62,10 +63,12 @@ int main(int argc, char *argv[])
         instance->listen();
     }
 
-    // Declared before the engine so it outlives it. QML reaches it through I18n::create (setInstance).
+    // Declared before the engine so they outlive it. QML reaches them through the singletons' create().
     I18n i18n(QCoreApplication::applicationDirPath() + "/lang");
     i18n.setLanguage({});
     I18n::setInstance(&i18n);
+    Theme theme(":/theme/theme.json", QCoreApplication::applicationDirPath() + "/theme.json");
+    Theme::setInstance(&theme);
 
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();

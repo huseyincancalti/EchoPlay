@@ -67,6 +67,19 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(secondShown(t.image()), 7, 10000);
     }
 
+    void reopensAfterIdle()
+    {
+        Thumbnailer t(nullptr);
+        t.setFile(ECHOPLAY_THUMB_CLIP);
+        t.request(9.5);
+        QTRY_COMPARE_WITH_TIMEOUT(secondShown(t.image()), 9, 10000);
+        QSignalSpy pictures(&t, &Thumbnailer::imageChanged);
+        QVERIFY(!pictures.wait(Thumbnailer::IdleMs + 500)); // closed the file: the picture stays
+        QCOMPARE(secondShown(t.image()), 9);
+        t.request(17.2);
+        QTRY_COMPARE_WITH_TIMEOUT(secondShown(t.image()), 17, 10000);
+    }
+
     void fileChangeClearsAndReopens()
     {
         Thumbnailer t(nullptr);

@@ -46,3 +46,8 @@ set_target_properties(tst_e2e PROPERTIES WIN32_EXECUTABLE OFF)
 target_link_libraries(tst_e2e PRIVATE echoplay_lib echoplay_libplugin Qt6::Test)
 add_test(NAME e2e COMMAND tst_e2e)
 set_tests_properties(e2e PROPERTIES LABELS e2e)
+
+# Thumbnailer latency bench: a console tool on a real video, run by tools/thumbs-bench.sh, not by ctest.
+add_executable(bench_thumbnailer bench_thumbnailer.cpp ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
+target_include_directories(bench_thumbnailer PRIVATE ../src "${MPV_INCLUDE}")
+target_link_libraries(bench_thumbnailer PRIVATE Qt6::Test Qt6::Qml Qt6::Quick "${MPV_DIR}/libmpv.dll.a" psapi)

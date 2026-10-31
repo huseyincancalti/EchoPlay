@@ -36,6 +36,9 @@ Thumbnailer::Thumbnailer(QObject *parent) : QObject(parent)
     connect(&m_settle, &QTimer::timeout, this, [this] {
         if (!m_busy && m_target == m_served && !m_servedExact) seek(true);
     });
+    m_idle.setSingleShot(true);
+    m_idle.setInterval(IdleMs);
+    connect(&m_idle, &QTimer::timeout, this, &Thumbnailer::unload);
 }
 
 Thumbnailer::~Thumbnailer()
@@ -56,20 +59,27 @@ void Thumbnailer::setFile(const QString &file)
 {
     if (file == m_file) return;
     m_file = file;
-    ++m_generation;
-    m_loaded = m_starting = m_busy = false;
-    m_target = m_served = -1;
-    m_settle.stop();
-    if (m_mpv) {
-        const char *stop[] = {"stop", nullptr}; // frees the old file's decoder until the next request
-        mpv_command_async(m_mpv, 0, stop);
-    }
+    unload();
     {
         QMutexLocker lock(&m_imageLock);
         m_image = QImage();
     }
     emit fileChanged();
     emit imageChanged();
+}
+
+// Closes the file in the hidden player, which frees its decoder (a 4K HEVC clip holds ~200 MB of frames);
+// the next request opens it again, which costs about one keyframe seek. Replies still on their way are dropped.
+void Thumbnailer::unload()
+{
+    ++m_generation;
+    m_loaded = m_starting = m_busy = false;
+    m_target = m_served = -1;
+    m_settle.stop();
+    m_idle.stop();
+    if (!m_mpv) return;
+    const char *stop[] = {"stop", nullptr};
+    mpv_command_async(m_mpv, 0, stop);
 }
 
 QUrl Thumbnailer::source() const
@@ -90,6 +100,7 @@ void Thumbnailer::request(double seconds)
     m_target = seconds;
     m_settle.stop();
     if (!ensurePlayer()) return;
+    m_idle.start();
     if (!m_loaded) {
         // The start position is the first keyframe seek (hr-seek=no).
         const QByteArray file = m_file.toUtf8(), start = "start=" + QByteArray::number(seconds, 'f', 3);

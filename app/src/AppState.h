@@ -29,6 +29,8 @@ public:
     void setLanguage(const QString &code);
     double volume() const { return m_volume; } // mpv's volume, 0..VolumeMax
     void setVolume(double volume);
+    QString quality() const { return m_quality; } // picture quality: "auto", "ultra", "normal", "low"
+    void setQuality(const QString &quality);
     MixerPrefs mixer() const { return m_mixer; }
     void setMixer(const MixerPrefs &prefs);
     // The daily update check: when it last ran, and the newest version already shown to the user (shown once).
@@ -61,6 +63,7 @@ private:
     QTimer m_saveTimer;
     QString m_language;
     double m_volume = 100;
+    QString m_quality = QStringLiteral("auto");
     MixerPrefs m_mixer;
     qint64 m_updateLastChecked = 0;
     QString m_updateSeenVersion;

@@ -88,12 +88,16 @@ Window {
                 setOption("screenshot-directory", "~~desktop/")
                 setOption("cache", "auto")
                 setOption("demuxer-max-bytes", "256MiB")
+                const tier = PictureQuality.activeOptions() // a forced tier from the last session
+                for (const name in tier) setOption(name, tier[name])
             }
             start()
             if (!root.measuring) {
                 observeProperty("track-list")
                 observeProperty("volume")
                 observeProperty("media-title")
+                observeProperty("speed")
+                observeProperty("frame-drop-count")
             }
         }
         onRenderReady: {
@@ -122,7 +126,10 @@ Window {
     Connections {
         target: mpv
         enabled: !root.measuring
-        function onFileStarted() { MixerController.fileStarted() }
+        function onFileStarted() {
+            MixerController.fileStarted()
+            PictureQuality.fileStarted()
+        }
         function onPropertyChanged(name, value) {
             if (name === "track-list") MixerController.setTrackList(value || [])
             else if (name === "volume" && typeof value === "number") AppState.volume = value
@@ -135,6 +142,21 @@ Window {
         function onOutputChanged(lavfi, aid) {
             mpv.setProperty("lavfi-complex", lavfi)
             if (aid) mpv.setProperty("aid", aid)
+        }
+    }
+
+    // Picture quality: Auto steps tiers on sustained frame drops (PictureQuality).
+    Timer {
+        running: !root.measuring && root.restarted
+        interval: PictureQuality.pollMs
+        repeat: true
+        onTriggered: PictureQuality.tick(mpv.observed("frame-drop-count") || 0)
+    }
+    Connections {
+        target: PictureQuality
+        enabled: !root.measuring
+        function onApplyRequested(options) {
+            for (const name in options) mpv.setProperty(name, options[name])
         }
     }
 
@@ -155,7 +177,7 @@ Window {
     Key { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
     Key { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
     Key { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }
-    Key { sequence: "G"; onActivated: mpv.setProperty("speed", (mpv.getProperty("speed") || 1) > 1.01 ? 1 : 2) }
+    Key { sequence: "G"; onActivated: mpv.setProperty("speed", (mpv.observed("speed") || 1) > 1.01 ? 1 : 2) }
     Key { sequence: "S"; onActivated: mpv.command(["add", "speed", -0.1]) }
     Key { sequence: "D"; onActivated: mpv.command(["add", "speed", 0.1]) }
     Key { sequence: "F1"; onActivated: mpv.command(["screenshot"]) }

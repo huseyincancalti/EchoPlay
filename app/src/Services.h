@@ -4,6 +4,7 @@
 #include "AppState.h"
 #include "I18n.h"
 #include "MixerController.h"
+#include "PictureQuality.h"
 #include "ResumeStore.h"
 #include "Theme.h"
 #include "UpdateCheck.h"
@@ -21,5 +22,6 @@ struct Services
     I18n i18n;
     Theme theme;
     MixerController mixer;
+    PictureQuality quality;
     UpdateCheck updates;
 };

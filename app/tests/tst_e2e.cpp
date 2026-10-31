@@ -30,6 +30,11 @@ struct Launch
         engine.loadFromModule("EchoPlay", "Main");
         window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
         if (window) mpv = window->findChild<MpvItem *>();
+        // Read like the UI does: observed values, never a synchronous get that could stall the render loop.
+        if (mpv) {
+            for (const char *name : {"aid", "lavfi-complex", "pause", "volume", "speed", "time-pos", "scale", "dither"})
+                mpv->observeProperty(name);
+        }
     }
 
     // Waits until the clip plays (Main.qml opens it paused and unpauses on the first frame on screen).
@@ -38,17 +43,16 @@ struct Launch
         QSignalSpy restarted(mpv, &MpvItem::playbackRestarted);
         if (!restarted.wait(20000)) return false;
         mpv->setProperty("mute", true);
-        return QTest::qWaitFor([this] { return !mpv->getProperty("pause").toBool(); }, 5000);
+        return QTest::qWaitFor([this] { return prop("pause") == "no"; }, 5000);
     }
 
-    QString prop(const char *name) const { return mpv->getProperty(name).toString(); }
-    // mpv reads aid back as a number, or as the flag false for "no".
-    QString aid() const
+    // mpv reads "no" back as the flag false (aid=no, dither=no): compare as the strings that were set.
+    QString prop(const char *name) const
     {
-        const QVariant v = mpv->getProperty("aid");
+        const QVariant v = mpv->observed(name);
         return v.typeId() == QMetaType::Bool ? (v.toBool() ? "yes" : "no") : v.toString();
     }
-    double number(const char *name) const { return mpv->getProperty(name).toDouble(); }
+    double number(const char *name) const { return mpv->observed(name).toDouble(); }
     void key(Qt::Key k, Qt::KeyboardModifiers mods = Qt::NoModifier) { QTest::keyClick(window, k, mods); }
 
     Services services; // destroyed after the engine: its destructors write pending state
@@ -97,17 +101,17 @@ private slots:
             QTRY_COMPARE(app.window->title(), QFileInfo(m_clip).fileName()); // media-title
 
             // Mixer: first run plays track 1 alone (v1's default).
-            QTRY_COMPARE(app.aid(), QString("1"));
+            QTRY_COMPARE(app.prop("aid"), QString("1"));
             QCOMPARE(app.prop("lavfi-complex"), QString());
             app.key(Qt::Key_2, Qt::ControlModifier); // mic on: both tracks mixed
             QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
-            QCOMPARE(app.aid(), QString("no"));
+            QCOMPARE(app.prop("aid"), QString("no"));
             app.key(Qt::Key_1, Qt::ControlModifier); // game off: the mic alone needs no graph
-            QTRY_COMPARE(app.aid(), QString("2"));
+            QTRY_COMPARE(app.prop("aid"), QString("2"));
             QCOMPARE(app.prop("lavfi-complex"), QString());
             app.key(Qt::Key_3, Qt::ControlModifier); // no third track: nothing changes
             QTest::qWait(300);
-            QCOMPARE(app.aid(), QString("2"));
+            QCOMPARE(app.prop("aid"), QString("2"));
 
             // Volume (Down x3) and its memory.
             for (int i = 0; i < 3; ++i) app.key(Qt::Key_Down);
@@ -116,9 +120,9 @@ private slots:
 
             // Pause, speed, seek.
             app.key(Qt::Key_Space);
-            QTRY_VERIFY(app.mpv->getProperty("pause").toBool());
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
             app.key(Qt::Key_Space);
-            QTRY_VERIFY(!app.mpv->getProperty("pause").toBool());
+            QTRY_COMPARE(app.prop("pause"), QString("no"));
             app.key(Qt::Key_G);
             QTRY_COMPARE(app.number("speed"), 2.0);
             app.key(Qt::Key_G);
@@ -143,6 +147,14 @@ private slots:
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             QTest::mouseDClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
+
+            // Picture quality: a forced tier reaches mpv at once (the settings UI will set pref).
+            QCOMPARE(app.prop("scale"), QString("lanczos")); // Auto starts at Normal
+            app.services.quality.setPref("ultra");
+            QTRY_COMPARE(app.prop("scale"), QString("ewa_lanczossharp"));
+            app.services.quality.setPref("low");
+            QTRY_COMPARE(app.prop("scale"), QString("bilinear"));
+            QCOMPARE(app.prop("dither"), QString("no"));
         } // closed: pending state is written now
 
         QCOMPARE(voInits(log), 1); // every mixer switch kept the video running (no VO re-init)
@@ -151,6 +163,7 @@ private slots:
         const QJsonObject state = QJsonDocument::fromJson(f.readAll()).object();
         QCOMPARE(state.value("mixer").toObject().value("default_on").toString(), QString("2"));
         QCOMPARE(state.value("volume").toDouble(), 85.0);
+        QCOMPARE(state.value("quality").toString(), QString("low"));
     }
 
     void secondRunRestoresMixerAndVolume()
@@ -158,9 +171,10 @@ private slots:
         Launch app(m_path, m_clip, QDir(m_path).filePath("run2.log"));
         QVERIFY(app.mpv);
         QVERIFY2(app.playing(), "the clip did not start playing");
-        QTRY_COMPARE(app.aid(), QString("2"));
+        QTRY_COMPARE(app.prop("aid"), QString("2"));
         QCOMPARE(app.prop("lavfi-complex"), QString());
         QCOMPARE(app.number("volume"), 85.0);
+        QCOMPARE(app.prop("scale"), QString("bilinear")); // the forced tier from the first run
     }
 
 private:

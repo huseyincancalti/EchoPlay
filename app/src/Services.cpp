@@ -6,6 +6,7 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
       i18n(appDir + "/lang"),
       theme(":/theme/theme.json", appDir + "/theme.json"),
       mixer(&state),
+      quality(&state),
       updates(&state, version)
 {
     i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
@@ -16,5 +17,6 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
     I18n::setInstance(&i18n);
     Theme::setInstance(&theme);
     MixerController::setInstance(&mixer);
+    PictureQuality::setInstance(&quality);
     UpdateCheck::setInstance(&updates);
 }

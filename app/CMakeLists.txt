@@ -28,7 +28,7 @@ qt_add_qml_module(echoplay_lib
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/ResumeStore.h src/ResumeStore.cpp
             src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp
-            src/Services.h src/Services.cpp
+            src/PictureQuality.h src/PictureQuality.cpp src/Services.h src/Services.cpp
 )
 qt_add_executable(echoplay src/main.cpp)
 

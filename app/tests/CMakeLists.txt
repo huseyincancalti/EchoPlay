@@ -13,6 +13,8 @@ echoplay_test(mixer ../src/Mixer.h ../src/Mixer.cpp)
 echoplay_test(appstate ../src/AppState.h ../src/AppState.cpp ../src/Mixer.h ../src/Mixer.cpp)
 echoplay_test(mixercontroller ../src/MixerController.h ../src/MixerController.cpp ../src/Mixer.h ../src/Mixer.cpp
               ../src/AppState.h ../src/AppState.cpp)
+echoplay_test(picturequality ../src/PictureQuality.h ../src/PictureQuality.cpp ../src/AppState.h
+              ../src/AppState.cpp ../src/Mixer.h ../src/Mixer.cpp)
 echoplay_test(singleinstance ../src/SingleInstance.h ../src/SingleInstance.cpp)
 target_link_libraries(tst_singleinstance PRIVATE Qt6::Network)
 echoplay_test(i18n ../src/I18n.h ../src/I18n.cpp)

@@ -207,7 +207,9 @@ void MpvItem::drainEvents()
         if (e->event_id == MPV_EVENT_PROPERTY_CHANGE) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
             const QVariant value = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)) : QVariant();
-            emit propertyChanged(QString::fromUtf8(p->name), value);
+            const QString name = QString::fromUtf8(p->name);
+            m_observed.insert(name, value);
+            emit propertyChanged(name, value);
         }
     }
 }

@@ -21,9 +21,14 @@ public:
     Q_INVOKABLE void command(const QVariantList &args);
     Q_INVOKABLE void setOption(const QString &name, const QString &value); // before start() only
     Q_INVOKABLE void start();                                              // mpv_initialize
+    // Synchronous: waits for mpv's core. Avoid it while playing. A GUI thread blocked on the core stalls Qt's
+    // render loop, and mpv's VO waits for that render: seen 2026-10-31 as d3d11va failing with E_PENDING and
+    // falling back to software decoding. UI code reads observed() values instead.
     Q_INVOKABLE QVariant getProperty(const QString &name) const;
     Q_INVOKABLE void setProperty(const QString &name, const QVariant &value);
     Q_INVOKABLE void observeProperty(const QString &name); // propertyChanged now and on every change
+    // The last value of an observed property; never blocks.
+    Q_INVOKABLE QVariant observed(const QString &name) const { return m_observed.value(name); }
     Q_INVOKABLE qint64 processAgeMs() const { return processAgeMsNow(); }
     static qint64 processAgeMsNow(); // ms since the OS created this process; -1 if unknown
     Q_INVOKABLE QVariantMap startupMarks() const { return m_marks; } // item_ms, mpv_created_ms
@@ -46,5 +51,6 @@ private slots:
 
 private:
     mpv_handle *m_mpv = nullptr;
+    QVariantMap m_observed;
     QVariantMap m_marks;
 };

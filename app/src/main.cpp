@@ -54,7 +54,8 @@ int main(int argc, char *argv[])
     QCommandLineOption shotAt("shot-at", "Pause at <seconds>, save a window screenshot to --shot-out, quit.", "seconds", "-1");
     QCommandLineOption shotOut("shot-out", "Screenshot path for --shot-at.", "path");
     QCommandLineOption thumbScrub("thumb-scrub", "Request a seek-bar preview every 50 ms while playing, like a pointer on the seek bar.");
-    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub});
+    QCommandLineOption tierCycle("tier-cycle", "Switch the picture tier every 2 s while playing (Ultra, Low, Normal, ...).");
+    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub, tierCycle});
     cli.addHelpOption();
     cli.process(app);
     if (cli.isSet(smokeOpt)) return smoke();
@@ -92,6 +93,7 @@ int main(int argc, char *argv[])
         {"logFile", cli.value(logFile)},
         {"mixToggle", cli.isSet(mixToggle)},
         {"thumbScrub", cli.isSet(thumbScrub)},
+        {"tierCycle", cli.isSet(tierCycle)},
         {"shotAt", cli.value(shotAt).toDouble()},
         {"shotOut", cli.value(shotOut)},
         {"startup", QVariantMap{{"main_ms", tMain}, {"app_ms", tApp}, {"engine_ms", tEngine}}},

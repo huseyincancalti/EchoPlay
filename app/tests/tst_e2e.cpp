@@ -26,7 +26,7 @@ struct Launch
         : services(configDir, QCoreApplication::applicationDirPath(), "0.0.0-dev")
     {
         engine.setInitialProperties({{"file", clip}, {"benchSeconds", 0}, {"glass", true}, {"mix", false},
-                                     {"logFile", log}, {"mixToggle", false}, {"thumbScrub", false}, {"shotAt", -1.0},
+                                     {"logFile", log}, {"mixToggle", false}, {"thumbScrub", false}, {"tierCycle", false}, {"shotAt", -1.0},
                                      {"shotOut", QString()}, {"startup", QVariantMap{}},
                                      {"instance", QVariant::fromValue<QObject *>(nullptr)}});
         engine.loadFromModule("EchoPlay", "Main");

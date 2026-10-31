@@ -1,6 +1,8 @@
 #include "MpvItem.h"
 
+#include <QDir>
 #include <QQuickWindow>
+#include <QStandardPaths>
 #include <mpv/client.h>
 #include <mpv/render.h>
 #include <mpv/render_d3d11.h>
@@ -119,6 +121,11 @@ MpvItem::MpvItem(QQuickItem *parent) : QQuickRhiItem(parent)
     if (!m_mpv) throw std::runtime_error("mpv_create failed");
     m_marks.insert("mpv_created_ms", processAgeMsNow());
     mpv_set_option_string(m_mpv, "vo", "libmpv");
+    // libmpv has no cache folder of its own, so it compiled every video shader again on each start (~150 ms
+    // before the first frame, 2026-10-31). v1's mpv keeps them in its cache folder; so does EchoPlay now.
+    const QString shaders = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/mpv-shaders";
+    QDir().mkpath(shaders);
+    mpv_set_option_string(m_mpv, "gpu-shader-cache-dir", shaders.toUtf8().constData());
     // mpv's built-in Lua scripts (console, stats, ytdl, ...) are uosc-era tooling the Qt UI replaces;
     // skipping them saves startup time. Older/newer option names are both set; unknown ones are ignored.
     for (const char *opt : {"ytdl", "load-stats-overlay", "load-console", "load-osd-console", "load-auto-profiles",

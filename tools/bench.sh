@@ -4,11 +4,13 @@
 # Each run: 1280x720 window (logical; DPI-scaled the same way in both), tracks 1+2 mixed, muted, N seconds.
 # Usage: [RUNS=3] [VARIANTS="v1 v2-glass"] [TOGGLE=1] bash tools/bench.sh <seconds> <video> [video...]
 #   RUNS    runs per variant (default 3); the table shows the median first frame and every run's drops
-#   VARIANTS  space-separated subset of: v1 v2 v2-glass v2-second v2-scrub (default: v1 v2 v2-glass)
+#   VARIANTS  space-separated subset of: v1 v2 v2-glass v2-second v2-scrub v2-tiers (default: v1 v2 v2-glass)
 #             v2-second = opening a second video while v2 already runs: the first instance plays, a second
 #             launch hands the file over and exits; "startup" is then the hand-over -> playback restart time
 #             v2-scrub = v2-glass while seek-bar previews are requested every 50 ms (compare with v2-glass);
 #             the BENCH line's "thumbnails" counts the pictures delivered
+#             v2-tiers = v2-glass switching the picture tier every 2 s (Ultra, Low, Normal, twice); the log's
+#             TIER and DROPS lines show whether a first switch to a tier costs frames (v1 needed a warm-up)
 #   TOGGLE  also run v1-toggle / v2-toggle: mix <-> track 1 alone every 2 s while playing
 # Columns: vo drops = running total over the whole run (frame-drop-count resets on every mixer switch);
 #          first frame = mpv log clock (starts at mpv init; v2's starts after Qt init);
@@ -61,6 +63,7 @@ for video in "$@"; do
         v2-glass)  v2 "$log" "$video" ;;
         v2-toggle) v2 "$log" --mix-toggle "$video" ;;
         v2-scrub)  v2 "$log" --thumb-scrub "$video" ;;
+        v2-tiers)  v2 "$log" --tier-cycle "$video" ;;
         v2-second) v2second "$log" "$video" ;;
       esac
     done

@@ -18,6 +18,7 @@ Window {
     required property string logFile
     required property bool mixToggle
     required property bool thumbScrub
+    required property bool tierCycle
     required property real shotAt
     required property string shotOut
     required property var startup // main_ms, app_ms from C++; qml_ms, render_ms, process_ms added here
@@ -35,7 +36,7 @@ Window {
     property string mediaTitle: ""
     // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
     // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
-    readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle || thumbScrub
+    readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle || thumbScrub || tierCycle
 
     // A second launch hands its file here (SingleInstance). An empty file only brings the window forward.
     Connections {
@@ -247,6 +248,22 @@ Window {
         interval: 100
         repeat: true
         onTriggered: root.countDrops()
+    }
+
+    // Bench only (--tier-cycle): a picture tier every 2 s, Ultra, Low, Normal, and again. v1 stalled 1-2 s on
+    // the first switch to a tier in a fresh process (quality.lua warms them up); the second round shows the
+    // cost of a repeat switch. Logs a TIER line per switch, next to the DROPS lines.
+    property int tierStep: 0
+    Timer {
+        running: root.tierCycle && root.restarted
+        interval: 2000
+        repeat: true
+        onTriggered: {
+            const tier = ["ultra", "low", "normal"][root.tierStep++ % 3]
+            const options = PictureQuality.tierOptions(tier)
+            for (const name in options) mpv.setProperty(name, options[name])
+            mpv.command(["print-text", "TIER " + tier + " at " + mpv.observed("playback-time")])
+        }
     }
 
     // Bench only (--thumb-scrub): a pointer moving over the seek bar for 1 s (a preview request every 50 ms,

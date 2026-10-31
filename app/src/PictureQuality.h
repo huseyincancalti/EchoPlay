@@ -32,6 +32,7 @@ public:
     // The mpv properties of a tier. Every tier sets the same keys, so switching never needs a restore step.
     static QVariantMap options(const QString &tier);
     Q_INVOKABLE QVariantMap activeOptions() const { return options(m_active); } // set before the first file
+    Q_INVOKABLE QVariantMap tierOptions(const QString &tier) const { return options(tier); } // nothing saved (bench)
 
     Q_INVOKABLE void fileStarted(); // a new file costs differently: Auto may try every tier again
     Q_INVOKABLE void tick(double frameDropCount);

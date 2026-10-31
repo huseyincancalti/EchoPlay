@@ -9,7 +9,7 @@ Two tracks live in this repo:
 - **v2 (in development)**: our own player app, Qt 6 Quick/QML UI + C++ backend on libmpv (`app/`; the
   spike lives on branch `spike/qt-libmpv` until the MVP starts). Replaces v1 when ready: same repo, same
   GitHub releases, same update check. Windows first;
-  Linux and macOS build in CI from the start and get real testing later.
+  Linux and macOS (their OpenGL render path, CI builds) are the very last work item (maintainer, 2026-10-31).
 
 ## Start of every session
 1. Read `NOW.md`: the only plan file (goal, decisions, phases, next steps). If `HANDOFF.md` exists, read it.

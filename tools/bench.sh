@@ -6,7 +6,8 @@
 #   RUNS    runs per variant (default 3); the table shows the median first frame and every run's drops
 #   VARIANTS  space-separated subset of: v1 v2 v2-glass (default all three)
 #   TOGGLE  also run v1-toggle / v2-toggle: mix <-> track 1 alone every 2 s while playing
-# Columns: first frame = mpv log clock (starts at mpv init; v2's starts after Qt init);
+# Columns: vo drops = running total over the whole run (frame-drop-count resets on every mixer switch);
+#          first frame = mpv log clock (starts at mpv init; v2's starts after Qt init);
 #          startup = v2 only, OS process creation -> first playback restart (the honest end-to-end number);
 #          vo inits = "VO:" lines (1 = video never re-initialized, e.g. by an audio switch).
 # Needs: tools/setup-dev.sh done, v2 built (bash tools/check.sh v2). Logs: .out/bench/
@@ -72,7 +73,7 @@ for i, video in enumerate(videos, 1):
             if not m:
                 drops.append('x'); dec.append('x'); dly.append('x'); continue
             b = json.loads(m.group(1))
-            drops.append(b.get('frame-drop-count') or 0); dec.append(b.get('decoder-frame-drop-count') or 0)
+            drops.append(b.get('frame-drop-total', b.get('frame-drop-count')) or 0); dec.append(b.get('decoder-frame-drop-count') or 0)
             dly.append(b.get('vo-delayed-frame-count') or 0); hw = f"{b.get('hwdec-current')} / {b.get('current-vo')}"
         med = lambda xs: f"{statistics.median(xs):.2f} s" if xs else '-'
         j = lambda xs: '/'.join(map(str, xs))

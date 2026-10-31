@@ -74,17 +74,23 @@ Window {
         }
     }
 
-    // Bench only: log when dropped frames happen (the mpv log has no per-drop line at -v).
+    // Bench only: log when dropped frames happen (the mpv log has no per-drop line at -v), and keep a
+    // running total, since mpv resets frame-drop-count whenever the audio chain is rebuilt (mixer switch).
     property int lastDrops: 0
+    property int totalDrops: 0
+    function countDrops() {
+        const n = mpv.getProperty("frame-drop-count") || 0
+        if (n !== lastDrops) {
+            totalDrops += n > lastDrops ? n - lastDrops : n
+            mpv.command(["print-text", "DROPS " + totalDrops + " at " + mpv.getProperty("playback-time")])
+        }
+        lastDrops = n
+    }
     Timer {
         running: root.benchSeconds > 0
-        interval: 250
+        interval: 100
         repeat: true
-        onTriggered: {
-            const n = mpv.getProperty("frame-drop-count") || 0
-            if (n !== root.lastDrops) mpv.command(["print-text", "DROPS " + n + " at " + mpv.getProperty("playback-time")])
-            root.lastDrops = n
-        }
+        onTriggered: root.countDrops()
     }
 
     Timer {
@@ -103,6 +109,7 @@ Window {
 
     component Glass: Item {
         id: glass
+        property int blurMax: 64
         visible: root.glass
         ShaderEffectSource {
             id: behind
@@ -117,7 +124,7 @@ Window {
             source: behind
             blurEnabled: true
             blur: 1.0
-            blurMax: 64
+            blurMax: glass.blurMax
         }
         Rectangle {
             anchors.fill: parent
@@ -131,6 +138,9 @@ Window {
     Glass {
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 24 }
         height: 76
+        // MultiEffect left this 76 px strip completely unblurred at blurMax 64 (checked in a screenshot).
+        // MVP: blur the whole frame once and let each panel crop its region, instead of per-panel blurs.
+        blurMax: 24
     }
     Glass {
         width: 420
@@ -145,7 +155,8 @@ Window {
             const keys = ["mpv-version", "current-vo", "hwdec-current", "width", "height", "display-fps",
                           "estimated-vf-fps", "playback-time", "frame-drop-count", "decoder-frame-drop-count",
                           "vo-delayed-frame-count"]
-            const r = { glass: root.glass, mix: root.mix }
+            root.countDrops()
+            const r = { glass: root.glass, mix: root.mix, "frame-drop-total": root.totalDrops }
             for (const k of keys) r[k] = mpv.getProperty(k)
             const line = "BENCH " + JSON.stringify(r)
             mpv.command(["print-text", line])

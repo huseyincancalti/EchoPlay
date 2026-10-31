@@ -12,6 +12,14 @@ local keys = { 'mpv-version', 'current-vo', 'hwdec-current', 'width', 'height', 
     'estimated-vf-fps', 'playback-time', 'frame-drop-count', 'decoder-frame-drop-count',
     'vo-delayed-frame-count' }
 
+-- Running total: mpv resets frame-drop-count whenever the audio chain is rebuilt (mixer switch).
+local last_drops, total_drops = 0, 0
+mp.observe_property('frame-drop-count', 'number', function(_, n)
+    n = n or 0
+    total_drops = total_drops + (n >= last_drops and n - last_drops or n)
+    last_drops = n
+end)
+
 local restarted = false
 mp.register_event('playback-restart', function()
     if restarted then return end
@@ -34,7 +42,7 @@ end)
 
 if seconds then
     mp.add_timeout(seconds, function()
-        local r = { glass = false, mix = mp.get_property('lavfi-complex', '') ~= '' }
+        local r = { glass = false, mix = mp.get_property('lavfi-complex', '') ~= '', ['frame-drop-total'] = total_drops }
         for _, k in ipairs(keys) do r[k] = mp.get_property_native(k) end
         mp.msg.info('BENCH ' .. utils.format_json(r))
         mp.command('quit')

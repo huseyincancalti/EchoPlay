@@ -1,11 +1,14 @@
 #include <QCommandLineParser>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QDateTime>
 #include <QQuickWindow>
 #include <clocale>
 #include <cstdio>
+#include <memory>
 #include <mpv/client.h>
 #include "MpvItem.h"
+#include "SingleInstance.h"
 
 // --smoke: libmpv loads and initializes, no window. Used by ctest.
 static int smoke()
@@ -47,6 +50,17 @@ int main(int argc, char *argv[])
     cli.process(app);
     if (cli.isSet(smokeOpt)) return smoke();
 
+    // One window per user: a second launch hands its file to the running one and exits. Bench and shot runs
+    // stay independent (tools/bench.sh starts many in a row).
+    std::unique_ptr<SingleInstance> instance;
+    if (!cli.isSet(bench) && cli.value(shotAt).toDouble() < 0) {
+        instance = std::make_unique<SingleInstance>(SingleInstance::defaultName());
+        const qint64 age = MpvItem::processAgeMsNow(); // the hand-over time counts from this process's creation
+        const qint64 created = QDateTime::currentMSecsSinceEpoch() - (age < 0 ? 0 : age);
+        if (instance->sendToRunning(cli.positionalArguments().value(0), created)) return 0;
+        instance->listen();
+    }
+
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();
     engine.setInitialProperties({
@@ -59,6 +73,7 @@ int main(int argc, char *argv[])
         {"shotAt", cli.value(shotAt).toDouble()},
         {"shotOut", cli.value(shotOut)},
         {"startup", QVariantMap{{"main_ms", tMain}, {"app_ms", tApp}, {"engine_ms", tEngine}}},
+        {"instance", QVariant::fromValue<QObject *>(instance.get())},
     });
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
                      Qt::QueuedConnection);

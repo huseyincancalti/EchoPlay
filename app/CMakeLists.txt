@@ -4,7 +4,7 @@ project(EchoPlay VERSION 2.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS Quick Gui GuiPrivate Test)
+find_package(Qt6 6.7 REQUIRED COMPONENTS Quick Gui GuiPrivate Network Test)
 qt_standard_project_setup(REQUIRES 6.7)
 
 # libmpv dev package: include/mpv/*.h, libmpv.dll.a, libmpv-2.dll (tools/setup-dev.sh fetches it).
@@ -18,7 +18,7 @@ qt_add_qml_module(echoplay
     URI EchoPlay
     VERSION 1.0
     QML_FILES qml/Main.qml
-    SOURCES src/MpvItem.h src/MpvItem.cpp
+    SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
 )
 
 # libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship
@@ -31,7 +31,7 @@ endif()
 # src/ for the generated QML type registration, which includes MpvItem.h by bare name.
 target_include_directories(echoplay PRIVATE src "${MPV_INCLUDE}")
 # Qt6::GuiPrivate: QRhi native handles (rhi/qrhi.h), to hand Qt's D3D11 device to libmpv.
-target_link_libraries(echoplay PRIVATE Qt6::Quick Qt6::GuiPrivate "${MPV_DIR}/libmpv.dll.a")
+target_link_libraries(echoplay PRIVATE Qt6::Quick Qt6::GuiPrivate Qt6::Network "${MPV_DIR}/libmpv.dll.a")
 
 add_custom_command(TARGET echoplay POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MPV_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:echoplay>")

@@ -4,7 +4,9 @@
 # Each run: 1280x720 window (logical; DPI-scaled the same way in both), tracks 1+2 mixed, muted, N seconds.
 # Usage: [RUNS=3] [VARIANTS="v1 v2-glass"] [TOGGLE=1] bash tools/bench.sh <seconds> <video> [video...]
 #   RUNS    runs per variant (default 3); the table shows the median first frame and every run's drops
-#   VARIANTS  space-separated subset of: v1 v2 v2-glass (default all three)
+#   VARIANTS  space-separated subset of: v1 v2 v2-glass v2-second (default: v1 v2 v2-glass)
+#             v2-second = opening a second video while v2 already runs: the first instance plays, a second
+#             launch hands the file over and exits; "startup" is then the hand-over -> playback restart time
 #   TOGGLE  also run v1-toggle / v2-toggle: mix <-> track 1 alone every 2 s while playing
 # Columns: vo drops = running total over the whole run (frame-drop-count resets on every mixer switch);
 #          first frame = mpv log clock (starts at mpv init; v2's starts after Qt init);
@@ -33,6 +35,16 @@ v2() { # $1 = log, rest = extra spike args
   "$SPIKE" --bench "$seconds" --mix --log-file "$log" "$@" >/dev/null 2>&1 || true
 }
 
+v2second() { # $1 = log, $2 = video: a running instance, then a second launch that must exit by itself
+  local log="$1" video="$2"
+  "$SPIKE" --log-file "$log" "$video" >/dev/null 2>&1 &
+  sleep 4
+  timeout 15 "$SPIKE" "$video" >/dev/null 2>&1 || true
+  sleep 3
+  taskkill //F //IM echoplay.exe >/dev/null 2>&1 || true
+  wait || true
+}
+
 variants="${VARIANTS:-v1 v2 v2-glass}"; [ "$TOGGLE" = 1 ] && variants="$variants v1-toggle v2-toggle"
 i=0
 for video in "$@"; do
@@ -46,6 +58,7 @@ for video in "$@"; do
         v2)        v2 "$log" --no-glass "$video" ;;
         v2-glass)  v2 "$log" "$video" ;;
         v2-toggle) v2 "$log" --mix-toggle "$video" ;;
+        v2-second) v2second "$log" "$video" ;;
       esac
     done
   done
@@ -66,8 +79,12 @@ for i, video in enumerate(videos, 1):
                 continue
             m = re.search(r'^\[\s*([\d.]+)\].*first video frame after restart shown', log, re.M)
             if m: ff.append(float(m.group(1)))
-            m = re.search(r'STARTUP (\{.*\})', log)
-            if m: st.append(json.loads(m.group(1))['process_ms'] / 1000)
+            if v == 'v2-second':
+                m = re.search(r'SECOND_OPEN (\{.*\})', log)
+                if m: st.append(json.loads(m.group(1))['ms'] / 1000)
+            else:
+                m = re.search(r'STARTUP (\{.*\})', log)
+                if m: st.append(json.loads(m.group(1))['process_ms'] / 1000)
             inits.append(len(re.findall(r'\]\[i\]\[cplayer\] VO: \[', log)))
             m = re.search(r'BENCH (\{.*\})', log)
             if not m:

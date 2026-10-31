@@ -20,6 +20,7 @@ Window {
     required property real shotAt
     required property string shotOut
     required property var startup // main_ms, app_ms from C++; qml_ms, render_ms, process_ms added here
+    required property QtObject instance // SingleInstance; null in bench and shot runs
 
     readonly property string mixGraph: "[aid1][aid2]amix=inputs=2:normalize=0[ao]"
     property bool unpauseOnSwap: false
@@ -29,6 +30,23 @@ Window {
     }
     property bool restarted: false
     property bool mixOn: mix
+    property real handOverSentMs: 0 // epoch ms of a second launch whose file has not started playing yet
+
+    // A second launch hands its file here (SingleInstance). An empty file only brings the window forward.
+    Connections {
+        target: root.instance
+        function onFileRequested(file, sentMs) {
+            if (file) {
+                root.handOverSentMs = sentMs
+                // Before the render context exists a file cannot be loaded: onRenderReady loads root.file.
+                if (root.startup.render_ms === undefined) root.file = file
+                else mpv.command(["loadfile", file, "replace"])
+            }
+            root.show()
+            root.raise()
+            root.requestActivate()
+        }
+    }
 
     // Same switching order as v1's apply_audio(): lavfi-complex first, then aid.
     function setMix(on) {
@@ -65,6 +83,10 @@ Window {
             command(["loadfile", root.file, "replace", -1, start + "pause=yes"])
         }
         onPlaybackRestarted: {
+            if (root.handOverSentMs) {
+                command(["print-text", "SECOND_OPEN " + JSON.stringify({ms: Date.now() - root.handOverSentMs})])
+                root.handOverSentMs = 0
+            }
             if (root.restarted) return
             root.restarted = true
             root.startup.process_ms = processAgeMs()

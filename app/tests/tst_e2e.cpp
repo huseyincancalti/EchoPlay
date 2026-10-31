@@ -231,6 +231,18 @@ private slots:
         QCOMPARE(app.prop("loop-file"), QString("inf"));   // end of video: loop, set before the file opened
         QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QFileInfo(m_clip).absolutePath());
         QCOMPARE(app.services.player.speedFactor(), 1.5);
+
+        // A file that is not a video: the end-file reason and mpv's words for it (the error state's detail).
+        const QString broken = QDir(m_path).filePath("not-a-video.mp4");
+        QFile junk(broken);
+        QVERIFY(junk.open(QIODevice::WriteOnly));
+        junk.write(QByteArray(4096, 'x'));
+        junk.close();
+        QSignalSpy ended(app.mpv, &MpvItem::fileEnded);
+        app.mpv->command({"loadfile", broken, "replace"});
+        QTRY_VERIFY(std::any_of(ended.cbegin(), ended.cend(), [](const QList<QVariant> &args) {
+            return args.value(0).toString() == "error" && !args.value(1).toString().isEmpty();
+        }));
         QVERIFY(app.services.resume.position(m_clip) >= 25); // ready for the "Resume from 0:25?" prompt
     }
 

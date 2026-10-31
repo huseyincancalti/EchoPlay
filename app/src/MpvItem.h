@@ -40,7 +40,9 @@ signals:
     void renderReady(); // render context exists: only now can a file with video be loaded
     void playbackRestarted();
     void fileStarted();
-    void fileEnded(const QString &reason); // mpv's end-file reason: eof, stop, quit, error, redirect
+    // mpv's end-file reason: eof, stop, quit, error, redirect. With "error", why (mpv_error_string, English:
+    // "unrecognized file format", "loading failed", ...) for the "This file can't be opened" state.
+    void fileEnded(const QString &reason, const QString &error);
     void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
 
 protected:

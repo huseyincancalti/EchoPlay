@@ -37,6 +37,14 @@ target_link_libraries(echoplay PRIVATE Qt6::Quick Qt6::GuiPrivate Qt6::Network "
 add_custom_command(TARGET echoplay POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MPV_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:echoplay>")
 
+# Qt and MinGW runtime DLLs + QML modules next to the exe, so the dev build starts from Explorer
+# (double-click, or drop a video on it) without the dev PATH from .out/devenv.sh.
+if(WIN32)
+    add_custom_command(TARGET echoplay POST_BUILD
+        COMMAND Qt6::windeployqt --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml" --no-translations --verbose 0
+                "$<TARGET_FILE:echoplay>")
+endif()
+
 # The shipped theme: embedded as :/theme/theme.json (the defaults), and copied next to the exe, where the
 # same-named file overrides single tokens without a rebuild.
 qt_add_resources(echoplay theme PREFIX "/theme" BASE "${CMAKE_CURRENT_SOURCE_DIR}/theme" FILES theme/theme.json)

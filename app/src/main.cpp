@@ -2,6 +2,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QDateTime>
+#include <QFileInfo>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <clocale>
@@ -62,7 +63,10 @@ int main(int argc, char *argv[])
         instance = std::make_unique<SingleInstance>(SingleInstance::defaultName());
         const qint64 age = MpvItem::processAgeMsNow(); // the hand-over time counts from this process's creation
         const qint64 created = QDateTime::currentMSecsSinceEpoch() - (age < 0 ? 0 : age);
-        if (instance->sendToRunning(cli.positionalArguments().value(0), created)) return 0;
+        // Absolute: the running instance resolves paths against its own working folder. URLs pass unchanged.
+        const QString file = cli.positionalArguments().value(0);
+        const QString sent = QFileInfo::exists(file) ? QFileInfo(file).absoluteFilePath() : file;
+        if (instance->sendToRunning(sent, created)) return 0;
         instance->listen();
     }
 

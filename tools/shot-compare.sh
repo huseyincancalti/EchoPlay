@@ -15,7 +15,7 @@ a="$out/$name-v1.png"; b="$out/$name-v2.png"; rm -f "$a" "$b"
   --scale=lanczos --cscale=lanczos --dscale=mitchell --geometry="$V1_GEOMETRY" --mute=yes \
   --start="$at" --pause=yes --screenshot-format=png --script=tools/bench/v1-probe.lua \
   --script-opts=shot-out="$(cygpath -m "$PWD/$a")" "$video" >/dev/null 2>&1 || true
-.out/build-v2/echoplay.exe --no-glass --shot-at "$at" --shot-out "$(cygpath -m "$PWD/$b")" "$video" >/dev/null 2>&1 || true
+.out/build-v2/EchoPlay.exe --no-glass --shot-at "$at" --shot-out "$(cygpath -m "$PWD/$b")" "$video" >/dev/null 2>&1 || true
 
 for f in "$a" "$b"; do
   [ -f "$f" ] || { echo "missing $f"; exit 1; }

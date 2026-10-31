@@ -31,6 +31,15 @@ qt_add_qml_module(echoplay_lib
             src/PictureQuality.h src/PictureQuality.cpp src/Services.h src/Services.cpp
 )
 qt_add_executable(echoplay src/main.cpp)
+# EchoPlay.exe, as v1's: "Open with", Task Manager and the installer's registry entries use this name.
+set_target_properties(echoplay PROPERTIES OUTPUT_NAME EchoPlay)
+if(WIN32)
+    string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)" _ "${ECHOPLAY_VERSION}")
+    set(ECHOPLAY_VERSION_RC "${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0")
+    set(ECHOPLAY_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../assets/logo.ico")
+    configure_file(echoplay.rc.in echoplay.rc @ONLY)
+    target_sources(echoplay PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/echoplay.rc")
+endif()
 
 # libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship
 # yet (third_party/mpv/README.md). render_d3d11.h includes "render.h" from its own folder.
@@ -66,6 +75,18 @@ add_custom_command(TARGET echoplay POST_BUILD
 # Language files are loaded from a folder next to the exe (new languages are dropped in there, no rebuild).
 add_custom_command(TARGET echoplay POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CMAKE_CURRENT_SOURCE_DIR}/lang" "$<TARGET_FILE_DIR:echoplay>/lang")
+
+# Packaging: `cmake --install <build> --prefix <stage>` lays out a self-contained app (exe, Qt and MinGW
+# runtime, QML modules, libmpv, lang/, theme.json) for the installer (tools/package-v2.sh). Flat, like v1:
+# EchoPlay.exe at the root, where the "Open with" registration points, and Qt's runtime next to it.
+install(TARGETS echoplay RUNTIME DESTINATION .)
+install(CODE "set(QT_DEPLOY_BIN_DIR .)") # read by the deploy script below; its default is bin/
+install(FILES "${MPV_DIR}/libmpv-2.dll" theme/theme.json DESTINATION .)
+install(DIRECTORY lang DESTINATION .)
+# --no-opengl-sw: Qt's 20 MB software OpenGL; EchoPlay renders through Direct3D 11 only.
+qt_generate_deploy_qml_app_script(TARGET echoplay OUTPUT_SCRIPT deploy_script NO_TRANSLATIONS
+                                  NO_UNSUPPORTED_PLATFORM_ERROR DEPLOY_TOOL_OPTIONS --no-opengl-sw)
+install(SCRIPT "${deploy_script}")
 
 enable_testing()
 add_test(NAME libmpv-smoke COMMAND echoplay --smoke)

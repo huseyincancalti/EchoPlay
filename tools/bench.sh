@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 seconds="${1:?usage: bash tools/bench.sh <seconds> <video> [video...]}"; shift
 [ $# -gt 0 ] || { echo "usage: bash tools/bench.sh <seconds> <video> [video...]"; exit 3; }
 RUNS="${RUNS:-3}"; TOGGLE="${TOGGLE:-0}"
-SPIKE=.out/build-v2/echoplay.exe
+SPIKE=.out/build-v2/EchoPlay.exe
 [ -x "$SPIKE" ] || { echo "v2 not built: run bash tools/check.sh v2"; exit 3; }
 rm -rf .out/bench && mkdir -p .out/bench
 MIX='[aid1][aid2]amix=inputs=2:normalize=0[ao]'
@@ -41,7 +41,7 @@ v2second() { # $1 = log, $2 = video: a running instance, then a second launch th
   sleep 4
   timeout 15 "$SPIKE" "$video" >/dev/null 2>&1 || true
   sleep 3
-  taskkill //F //IM echoplay.exe >/dev/null 2>&1 || true
+  taskkill //F //IM EchoPlay.exe >/dev/null 2>&1 || true
   wait || true
 }
 

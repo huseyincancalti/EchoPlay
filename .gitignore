@@ -22,6 +22,8 @@ mpv/fonts/
 
 # Local build artifacts from compiling/staging each platform's installer.
 installer/windows/dist/
+installer/windows/v2/stage/
+installer/windows/v2/Output/
 installer/windows/Output/
 installer/macos/build/
 installer/linux/AppDir/

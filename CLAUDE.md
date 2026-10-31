@@ -74,6 +74,7 @@ no quiet screen (its input goes to the test window only): run it after every v2 
 bash tools/setup-dev.sh                 # one-time: Qt (MinGW kit), MinGW, CMake, Ninja, libmpv into ~/.echoplay-dev
 bash tools/check.sh v2                  # configure + build + ctest (sources .out/devenv.sh)
 bash tools/e2e.sh                       # the real player window, driven by synthetic keys: mixer, volume, keys, memory
+[VERSION=2.0.0] bash tools/package-v2.sh   # Windows installer: stage (checked without dev PATH) + Inno Setup
 bash tools/make-clips.sh <recording> [start] [len]   # test clips in .out/clips: 1080p cut + 4K60 upscale, all tracks
 RUNS=3 TOGGLE=1 bash tools/bench.sh <seconds> <videos>  # v1 engine vs v2: startup, dropped frames, live mixer
 bash tools/shot-compare.sh <video> <seconds>         # same paused frame from v1 and v2, SSIM/PSNR

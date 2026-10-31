@@ -57,7 +57,10 @@ void SilenceCheck::setFile(const QString &file)
     if (file == m_file) return;
     m_file = file;
     ++m_generation;
-    m_starting = m_done = false;
+    // Events still queued about the previous file (FILE_LOADED, END_FILE) are skipped until the next load's
+    // START_FILE; taken for this file, they could finish it before it is checked.
+    m_starting = m_mpv != nullptr;
+    m_done = false;
     m_tracks.clear();
     m_current = -1;
     m_silent.clear();

@@ -34,6 +34,7 @@ Window {
     property bool videoOn: false      // the render context exists, so video can play
     property bool earlyRestart: false // the file restarted before video was on: audio only so far
     property bool endedEarly: false   // the file ended before video was on: with vid=no a file without audio
+    property bool videoRetried: false // vid=auto came after mpv had picked tracks for this file: asked once more
     property bool mixOn: mix
     property real handOverSentMs: 0 // epoch ms of a second launch whose file has not started playing yet
     property string mediaTitle: ""
@@ -48,7 +49,7 @@ Window {
             if (file) {
                 root.handOverSentMs = sentMs
                 if (root.videoOn) mpv.command(["loadfile", file, "replace"])
-                else { root.file = file; root.openFile(file) }
+                else { root.file = file; root.earlyRestart = root.endedEarly = false; root.openFile(file) }
             }
             root.show()
             root.raise()
@@ -152,11 +153,27 @@ Window {
                 command(["print-text", "SECOND_OPEN " + JSON.stringify({ms: Date.now() - root.handOverSentMs})])
                 root.handOverSentMs = 0
             }
-            if (root.videoOn) root.firstRestart()
-            else root.earlyRestart = true // audio only so far: onRenderReady turns video on
+            if (!root.videoOn) { root.earlyRestart = true; return } // audio only so far: onRenderReady turns video on
+            // On a slow open, vid=auto can land after mpv picked tracks for the file (vid=no) and only sets the
+            // option: the file has video, none plays. Ask once more for this file.
+            const tracks = observed("track-list") || []
+            if (!root.restarted && !root.videoRetried && tracks.some(t => t.type === "video")
+                    && !tracks.some(t => t.type === "video" && t.selected)) {
+                root.videoRetried = true
+                setProperty("vid", "auto")
+                command(["seek", 0, "relative+exact"])
+                return
+            }
+            root.firstRestart()
         }
         // An error, not the folder playlist's redirect: a file without audio has nothing to play while vid=no.
-        onFileEnded: reason => { if (!root.videoOn && reason === "error") root.endedEarly = true }
+        // Once video is on, the same can still happen on a slow open (tracks picked before vid=auto): open it once
+        // more.
+        onFileEnded: reason => {
+            if (reason !== "error" || root.restarted) return
+            if (!root.videoOn) root.endedEarly = true
+            else if (!root.videoRetried) { root.videoRetried = true; root.openFile(root.file) }
+        }
     }
 
     // The mixer (MixerController) gets mpv's tracks and hands back what to set, lavfi-complex first.

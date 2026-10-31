@@ -7,7 +7,7 @@ Window {
     id: root
     width: 1280
     height: 720
-    visible: true
+    visible: false // shown once mpv opens the file (MpvItem's onCompleted)
     color: "black"
     title: mediaTitle || "EchoPlay"
 
@@ -31,6 +31,9 @@ Window {
         if (unpauseOnSwap) { unpauseOnSwap = false; mpv.setProperty("pause", false) }
     }
     property bool restarted: false
+    property bool videoOn: false      // the render context exists, so video can play
+    property bool earlyRestart: false // the file restarted before video was on: audio only so far
+    property bool endedEarly: false   // the file ended before video was on: with vid=no a file without audio
     property bool mixOn: mix
     property real handOverSentMs: 0 // epoch ms of a second launch whose file has not started playing yet
     property string mediaTitle: ""
@@ -44,14 +47,28 @@ Window {
         function onFileRequested(file, sentMs) {
             if (file) {
                 root.handOverSentMs = sentMs
-                // Before the render context exists a file cannot be loaded: onRenderReady loads root.file.
-                if (root.startup.render_ms === undefined) root.file = file
-                else mpv.command(["loadfile", file, "replace"])
+                if (root.videoOn) mpv.command(["loadfile", file, "replace"])
+                else { root.file = file; root.openFile(file) }
             }
             root.show()
             root.raise()
             root.requestActivate()
         }
+    }
+
+    // Opened paused: mpv dropped the first ~8 frames when the clock ran while Qt was still building its first
+    // frames. Playback starts once the first video frame is on screen (onFrameSwapped).
+    function openFile(file) {
+        const start = root.shotAt >= 0 ? "start=" + root.shotAt + "," : ""
+        mpv.command(["loadfile", file, "replace", -1, start + "pause=yes"])
+    }
+    function firstRestart() {
+        if (root.restarted) return
+        root.restarted = true
+        root.startup.process_ms = mpv.processAgeMs()
+        mpv.command(["print-text", "STARTUP " + JSON.stringify(root.startup)])
+        if (root.shotAt >= 0) shotTimer.start()
+        else root.unpauseOnSwap = true
     }
 
     // Same switching order as v1's apply_audio(): lavfi-complex first, then aid.
@@ -93,9 +110,17 @@ Window {
                 const tier = PictureQuality.activeOptions() // a forced tier from the last session
                 for (const name in tier) setOption(name, tier[name])
             }
+            // Video cannot play before the render context exists: a VO that fails to start stays off for the
+            // file. So mpv starts with vid=no and onRenderReady turns video on. Not a loadfile option: the folder
+            // playlist replaces the opened entry, and loadfile options do not carry over to it.
+            setOption("vid", "no")
             start()
+            observeProperty("track-list")
+            // The file opens (demuxer, audio device: WASAPI alone took ~190 ms) while Qt creates the window, the
+            // D3D11 device and the first frame (~600 ms before; measured 2026-10-31), instead of after them.
+            if (root.file) root.openFile(root.file)
+            root.visible = true
             if (!root.measuring) {
-                observeProperty("track-list")
                 observeProperty("volume")
                 observeProperty("media-title")
                 observeProperty("speed")
@@ -112,24 +137,26 @@ Window {
         }
         onRenderReady: {
             root.startup.render_ms = processAgeMs()
+            root.videoOn = true
+            setProperty("vid", "auto")
             if (!root.file) return
-            // Opened paused: mpv dropped the first ~8 frames when the clock ran while Qt was still building
-            // its first frames. Playback starts once the first video frame is on screen (onFrameSwapped).
-            const start = root.shotAt >= 0 ? "start=" + root.shotAt + "," : ""
-            command(["loadfile", root.file, "replace", -1, start + "pause=yes"])
+            if (root.endedEarly) { root.openFile(root.file); return } // nothing to play without video: again, with it
+            // Turning video on shows its frame but sends no playback restart; a seek in place does. (While the
+            // file still opens, the seek fails and the first restart comes with video anyway.)
+            command(["seek", 0, "relative+exact"])
+            // A file without video restarted already (audio only) and gets no second restart.
+            if (root.earlyRestart && !(observed("track-list") || []).some(t => t.type === "video")) root.firstRestart()
         }
         onPlaybackRestarted: {
             if (root.handOverSentMs) {
                 command(["print-text", "SECOND_OPEN " + JSON.stringify({ms: Date.now() - root.handOverSentMs})])
                 root.handOverSentMs = 0
             }
-            if (root.restarted) return
-            root.restarted = true
-            root.startup.process_ms = processAgeMs()
-            command(["print-text", "STARTUP " + JSON.stringify(root.startup)])
-            if (root.shotAt >= 0) shotTimer.start()
-            else root.unpauseOnSwap = true
+            if (root.videoOn) root.firstRestart()
+            else root.earlyRestart = true // audio only so far: onRenderReady turns video on
         }
+        // An error, not the folder playlist's redirect: a file without audio has nothing to play while vid=no.
+        onFileEnded: reason => { if (!root.videoOn && reason === "error") root.endedEarly = true }
     }
 
     // The mixer (MixerController) gets mpv's tracks and hands back what to set, lavfi-complex first.

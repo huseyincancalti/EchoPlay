@@ -40,7 +40,7 @@ signals:
     void renderReady(); // render context exists: only now can a file with video be loaded
     void playbackRestarted();
     void fileStarted();
-    void fileEnded();
+    void fileEnded(const QString &reason); // mpv's end-file reason: eof, stop, quit, error, redirect
     void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
 
 protected:

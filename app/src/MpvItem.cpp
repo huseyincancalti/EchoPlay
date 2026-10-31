@@ -210,7 +210,15 @@ void MpvItem::drainEvents()
         if (e->event_id == MPV_EVENT_NONE) break;
         if (e->event_id == MPV_EVENT_PLAYBACK_RESTART) emit playbackRestarted();
         if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
-        if (e->event_id == MPV_EVENT_END_FILE) emit fileEnded();
+        if (e->event_id == MPV_EVENT_END_FILE) {
+            switch (static_cast<mpv_event_end_file *>(e->data)->reason) {
+            case MPV_END_FILE_REASON_EOF: emit fileEnded("eof"); break;
+            case MPV_END_FILE_REASON_STOP: emit fileEnded("stop"); break;
+            case MPV_END_FILE_REASON_QUIT: emit fileEnded("quit"); break;
+            case MPV_END_FILE_REASON_ERROR: emit fileEnded("error"); break;
+            case MPV_END_FILE_REASON_REDIRECT: emit fileEnded("redirect"); break;
+            }
+        }
         if (e->event_id == MPV_EVENT_PROPERTY_CHANGE) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
             const QVariant value = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)) : QVariant();

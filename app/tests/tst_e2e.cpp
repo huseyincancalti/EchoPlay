@@ -35,18 +35,20 @@ struct Launch
         // Read like the UI does: observed values, never a synchronous get that could stall the render loop.
         if (mpv) {
             for (const char *name : {"aid", "lavfi-complex", "pause", "volume", "speed", "time-pos", "scale", "dither",
-                                     "duration", "keep-open", "loop-file", "screenshot-dir"})
+                                     "duration", "keep-open", "loop-file", "screenshot-dir", "vo-configured"})
                 mpv->observeProperty(name);
         }
     }
 
-    // Waits until the clip plays (Main.qml opens it paused and unpauses on the first frame on screen).
+    // Waits until the clip plays with video (Main.qml opens it paused, audio first, turns video on once the
+    // render context exists, and unpauses on the first frame on screen). "pause" alone is not enough: before
+    // the file loads it reads the global "no".
     bool playing()
     {
         QSignalSpy restarted(mpv, &MpvItem::playbackRestarted);
         if (!restarted.wait(20000)) return false;
         mpv->setProperty("mute", true);
-        return QTest::qWaitFor([this] { return prop("pause") == "no"; }, 5000);
+        return QTest::qWaitFor([this] { return prop("vo-configured") == "yes" && prop("pause") == "no" && number("time-pos") > 0.3; }, 10000);
     }
 
     // mpv reads "no" back as the flag false (aid=no, dither=no): compare as the strings that were set.

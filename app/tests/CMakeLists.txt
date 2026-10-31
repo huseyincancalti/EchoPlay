@@ -22,3 +22,11 @@ target_compile_definitions(tst_theme PRIVATE ECHOPLAY_THEME_JSON="${CMAKE_SOURCE
 echoplay_test(updatecheck ../src/UpdateCheck.h ../src/UpdateCheck.cpp ../src/AppState.h ../src/AppState.cpp ../src/Mixer.h ../src/Mixer.cpp)
 target_link_libraries(tst_updatecheck PRIVATE Qt6::Network)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
+
+# End-to-end: the real player window on a two-track clip, driven by synthetic keys and clicks. It opens a
+# window, so it is labeled e2e: tools/e2e.sh runs it, tools/check.sh (headless) leaves it out.
+qt_add_executable(tst_e2e tst_e2e.cpp)
+set_target_properties(tst_e2e PROPERTIES WIN32_EXECUTABLE OFF)
+target_link_libraries(tst_e2e PRIVATE echoplay_lib echoplay_libplugin Qt6::Test)
+add_test(NAME e2e COMMAND tst_e2e)
+set_tests_properties(e2e PROPERTIES LABELS e2e)

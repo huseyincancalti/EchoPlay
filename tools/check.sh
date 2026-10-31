@@ -43,7 +43,8 @@ check_v2() {
   echo "v2"
   step "cmake configure" cmake -S app -B .out/build-v2 -DCMAKE_BUILD_TYPE=Release
   step "cmake build" cmake --build .out/build-v2 --config Release
-  step "ctest" ctest --test-dir .out/build-v2 -C Release --output-on-failure
+  # -LE e2e: the end-to-end test opens a window (tools/e2e.sh runs it).
+  step "ctest" ctest --test-dir .out/build-v2 -C Release --output-on-failure -LE e2e
 }
 
 case "$mode" in

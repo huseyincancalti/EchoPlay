@@ -30,7 +30,8 @@ screenshots) is written as a script in `tools/` from the start (maintainer, 2026
 hand. One-off investigations stay manual.
 `tools/bench.sh` and `tools/shot-compare.sh` open real player windows on the maintainer's screen (frame
 timing needs a real, undisturbed window). Run them only when the maintainer says they are away or asks
-for a measurement (maintainer, 2026-10-31). `tools/check.sh` is headless and fine any time.
+for a measurement (maintainer, 2026-10-31). `tools/check.sh` is headless and fine any time. `tools/e2e.sh` opens a player window for a few seconds but needs
+no quiet screen (its input goes to the test window only): run it after every v2 change, before saying "done".
 
 ## Work split (save Claude credits)
 - The main session writes small changes itself (about 20 lines or one file). Bigger pieces go to one
@@ -72,6 +73,7 @@ for a measurement (maintainer, 2026-10-31). `tools/check.sh` is headless and fin
 ```bash
 bash tools/setup-dev.sh                 # one-time: Qt (MinGW kit), MinGW, CMake, Ninja, libmpv into ~/.echoplay-dev
 bash tools/check.sh v2                  # configure + build + ctest (sources .out/devenv.sh)
+bash tools/e2e.sh                       # the real player window, driven by synthetic keys: mixer, volume, keys, memory
 bash tools/make-clips.sh <recording> [start] [len]   # test clips in .out/clips: 1080p cut + 4K60 upscale, all tracks
 RUNS=3 TOGGLE=1 bash tools/bench.sh <seconds> <videos>  # v1 engine vs v2: startup, dropped frames, live mixer
 bash tools/shot-compare.sh <video> <seconds>         # same paused frame from v1 and v2, SSIM/PSNR

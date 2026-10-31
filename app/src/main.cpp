@@ -10,14 +10,12 @@
 #include <cstdio>
 #include <memory>
 #include <mpv/client.h>
-#include "AppState.h"
-#include "I18n.h"
-#include "MixerController.h"
+#include <QtQml/qqmlextensionplugin.h>
 #include "MpvItem.h"
-#include "ResumeStore.h"
+#include "Services.h"
 #include "SingleInstance.h"
-#include "Theme.h"
-#include "UpdateCheck.h"
+
+Q_IMPORT_QML_PLUGIN(EchoPlayPlugin) // the player's QML module is a static library (app/CMakeLists.txt)
 
 // --smoke: libmpv loads and initializes, no window. Used by ctest.
 static int smoke()
@@ -74,26 +72,13 @@ int main(int argc, char *argv[])
         instance->listen();
     }
 
-    // Declared before the engine so they outlive it. QML reaches them through the singletons' create().
-    AppState state(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/state.json");
-    AppState::setInstance(&state);
-    // Where the user stopped in each file, next to state.json (it grows with every file watched).
-    ResumeStore resume(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/resume.json");
-    ResumeStore::setInstance(&resume);
-    I18n i18n(QCoreApplication::applicationDirPath() + "/lang");
-    i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
-    I18n::setInstance(&i18n);
-    QObject::connect(&i18n, &I18n::languageChanged, &state, [&] { state.setLanguage(i18n.language()); });
-    Theme theme(":/theme/theme.json", QCoreApplication::applicationDirPath() + "/theme.json");
-    Theme::setInstance(&theme);
-    MixerController mixer(&state);
-    MixerController::setInstance(&mixer);
-    UpdateCheck updates(&state, ECHOPLAY_VERSION);
-    UpdateCheck::setInstance(&updates);
+    // Declared before the engine so it outlives it. QML reaches it through the singletons' create().
+    Services services(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation),
+                      QCoreApplication::applicationDirPath(), ECHOPLAY_VERSION);
     // 5 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay
     // offline (comparable measurements).
     if (!cli.isSet(bench) && cli.value(shotAt).toDouble() < 0)
-        QTimer::singleShot(5000, &updates, &UpdateCheck::start);
+        QTimer::singleShot(5000, &services.updates, &UpdateCheck::start);
 
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();

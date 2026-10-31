@@ -1,0 +1,25 @@
+#pragma once
+
+#include <QString>
+#include "AppState.h"
+#include "I18n.h"
+#include "MixerController.h"
+#include "ResumeStore.h"
+#include "Theme.h"
+#include "UpdateCheck.h"
+
+// Everything QML reaches as a singleton, created and wired in one place, so the app (main.cpp) and the
+// end-to-end test (tests/tst_e2e.cpp) start the same player. Create it before the QML engine and destroy it
+// after: the destructors write pending state.
+struct Services
+{
+    // configDir holds state.json and resume.json; appDir holds lang/ and theme.json (next to the exe).
+    Services(const QString &configDir, const QString &appDir, const QString &version);
+
+    AppState state;
+    ResumeStore resume;
+    I18n i18n;
+    Theme theme;
+    MixerController mixer;
+    UpdateCheck updates;
+};

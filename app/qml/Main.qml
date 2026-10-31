@@ -140,28 +140,31 @@ Window {
 
     // v1's default keys (main.lua KEY_ACTIONS) and the mpv defaults v1 users rely on. Rebinding comes with
     // the settings UI.
+    // Application-wide (EchoPlay has one window): a key works whichever item has focus, and the end-to-end
+    // test's synthetic keys arrive even while another app holds the OS focus.
+    component Key: Shortcut { context: Qt.ApplicationShortcut }
     function toggleFullScreen() {
         root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
     }
-    Shortcut { sequence: "Space"; onActivated: mpv.command(["cycle", "pause"]) }
-    Shortcut { sequence: "M"; onActivated: mpv.command(["cycle", "mute"]) }
-    Shortcut { sequence: "Up"; onActivated: mpv.command(["add", "volume", 5]) }
-    Shortcut { sequence: "Down"; onActivated: mpv.command(["add", "volume", -5]) }
-    Shortcut { sequence: "Right"; onActivated: mpv.command(["seek", 10]) }
-    Shortcut { sequence: "Left"; onActivated: mpv.command(["seek", -10]) }
-    Shortcut { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
-    Shortcut { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
-    Shortcut { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }
-    Shortcut { sequence: "G"; onActivated: mpv.setProperty("speed", (mpv.getProperty("speed") || 1) > 1.01 ? 1 : 2) }
-    Shortcut { sequence: "S"; onActivated: mpv.command(["add", "speed", -0.1]) }
-    Shortcut { sequence: "D"; onActivated: mpv.command(["add", "speed", 0.1]) }
-    Shortcut { sequence: "F1"; onActivated: mpv.command(["screenshot"]) }
-    Shortcut { sequence: "Shift+S"; onActivated: mpv.command(["screenshot", "video"]) }
-    Shortcut { sequence: "Ctrl+S"; onActivated: mpv.command(["screenshot", "window"]) }
-    Shortcut { sequence: ">"; onActivated: mpv.command(["playlist-next"]) }
-    Shortcut { sequence: "<"; onActivated: mpv.command(["playlist-prev"]) }
-    Shortcut { sequence: "F"; onActivated: root.toggleFullScreen() }
-    Shortcut { sequence: "Esc"; onActivated: if (root.visibility === Window.FullScreen) root.visibility = Window.Windowed }
+    Key { sequence: "Space"; onActivated: mpv.command(["cycle", "pause"]) }
+    Key { sequence: "M"; onActivated: mpv.command(["cycle", "mute"]) }
+    Key { sequence: "Up"; onActivated: mpv.command(["add", "volume", 5]) }
+    Key { sequence: "Down"; onActivated: mpv.command(["add", "volume", -5]) }
+    Key { sequence: "Right"; onActivated: mpv.command(["seek", 10]) }
+    Key { sequence: "Left"; onActivated: mpv.command(["seek", -10]) }
+    Key { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
+    Key { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
+    Key { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }
+    Key { sequence: "G"; onActivated: mpv.setProperty("speed", (mpv.getProperty("speed") || 1) > 1.01 ? 1 : 2) }
+    Key { sequence: "S"; onActivated: mpv.command(["add", "speed", -0.1]) }
+    Key { sequence: "D"; onActivated: mpv.command(["add", "speed", 0.1]) }
+    Key { sequence: "F1"; onActivated: mpv.command(["screenshot"]) }
+    Key { sequence: "Shift+S"; onActivated: mpv.command(["screenshot", "video"]) }
+    Key { sequence: "Ctrl+S"; onActivated: mpv.command(["screenshot", "window"]) }
+    Key { sequence: ">"; onActivated: mpv.command(["playlist-next"]) }
+    Key { sequence: "<"; onActivated: mpv.command(["playlist-prev"]) }
+    Key { sequence: "F"; onActivated: root.toggleFullScreen() }
+    Key { sequence: "Esc"; onActivated: if (root.visibility === Window.FullScreen) root.visibility = Window.Windowed }
     MouseArea {
         anchors.fill: parent
         onDoubleClicked: root.toggleFullScreen()

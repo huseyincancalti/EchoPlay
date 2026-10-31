@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QTimer>
 #include <clocale>
 #include <cstdio>
 #include <memory>
@@ -14,6 +15,7 @@
 #include "MpvItem.h"
 #include "SingleInstance.h"
 #include "Theme.h"
+#include "UpdateCheck.h"
 
 // --smoke: libmpv loads and initializes, no window. Used by ctest.
 static int smoke()
@@ -79,6 +81,12 @@ int main(int argc, char *argv[])
     QObject::connect(&i18n, &I18n::languageChanged, &state, [&] { state.setLanguage(i18n.language()); });
     Theme theme(":/theme/theme.json", QCoreApplication::applicationDirPath() + "/theme.json");
     Theme::setInstance(&theme);
+    UpdateCheck updates(&state, ECHOPLAY_VERSION);
+    UpdateCheck::setInstance(&updates);
+    // 5 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay
+    // offline (comparable measurements).
+    if (!cli.isSet(bench) && cli.value(shotAt).toDouble() < 0)
+        QTimer::singleShot(5000, &updates, &UpdateCheck::start);
 
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();

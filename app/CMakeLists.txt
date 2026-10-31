@@ -4,6 +4,9 @@ project(EchoPlay VERSION 2.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 0.0.0-dev (a dev build) never runs the update check.
+set(ECHOPLAY_VERSION "0.0.0-dev" CACHE STRING "Release version without the v; the release build sets it")
+
 find_package(Qt6 6.7 REQUIRED COMPONENTS Quick Gui GuiPrivate Network Test)
 qt_standard_project_setup(REQUIRES 6.7)
 
@@ -20,6 +23,7 @@ qt_add_qml_module(echoplay
     QML_FILES qml/Main.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
+            src/UpdateCheck.h src/UpdateCheck.cpp
 )
 
 # libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship
@@ -31,6 +35,7 @@ if(NOT EXISTS "${MPV_INCLUDE}/mpv/render_d3d11.h")
 endif()
 # src/ for the generated QML type registration, which includes MpvItem.h by bare name.
 target_include_directories(echoplay PRIVATE src "${MPV_INCLUDE}")
+target_compile_definitions(echoplay PRIVATE ECHOPLAY_VERSION="${ECHOPLAY_VERSION}")
 # Qt6::GuiPrivate: QRhi native handles (rhi/qrhi.h), to hand Qt's D3D11 device to libmpv.
 target_link_libraries(echoplay PRIVATE Qt6::Quick Qt6::GuiPrivate Qt6::Network "${MPV_DIR}/libmpv.dll.a")
 

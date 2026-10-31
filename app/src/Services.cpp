@@ -7,6 +7,7 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
       theme(":/theme/theme.json", appDir + "/theme.json"),
       mixer(&state),
       quality(&state),
+      player(&state),
       updates(&state, version),
       thumbnails(nullptr),
       silence(nullptr)
@@ -20,6 +21,7 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
     Theme::setInstance(&theme);
     MixerController::setInstance(&mixer);
     PictureQuality::setInstance(&quality);
+    PlayerSettings::setInstance(&player);
     UpdateCheck::setInstance(&updates);
     Thumbnailer::setInstance(&thumbnails);
     SilenceCheck::setInstance(&silence);

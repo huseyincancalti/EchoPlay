@@ -81,12 +81,12 @@ Window {
                 // v1's mpv.conf, player side.
                 setOption("autocreate-playlist", "same") // the other videos in the folder are the playlist,
                 setOption("directory-mode", "ignore")    // a subfolder next to them is not
-                setOption("keep-open", "always")         // v1's default end mode: stop on the last frame
                 setOption("volume-max", "300")
                 setOption("volume", String(AppState.volume))
                 setOption("af", "dynaudnorm=p=0.9:m=25:g=15") // v1's loudness levelling
                 setOption("screenshot-format", "png")
-                setOption("screenshot-directory", "~~desktop/")
+                const player = PlayerSettings.mpvOptions(root.file) // end of video, screenshot folder
+                for (const name in player) setOption(name, player[name])
                 setOption("cache", "auto")
                 setOption("demuxer-max-bytes", "256MiB")
                 const tier = PictureQuality.activeOptions() // a forced tier from the last session
@@ -147,8 +147,18 @@ Window {
             else if (name === "path") { // seek-bar previews and the silent-track check follow the playing file
                 Thumbnailer.file = value || ""
                 SilenceCheck.file = value || ""
+                root.applyPlayerSettings() // the screenshot folder can be the video's own
             }
         }
+    }
+    function applyPlayerSettings() {
+        const options = PlayerSettings.mpvOptions(mpv.observed("path") || root.file)
+        for (const name in options) mpv.setProperty(name, options[name])
+    }
+    Connections {
+        target: PlayerSettings
+        enabled: !root.measuring
+        function onChanged() { root.applyPlayerSettings() }
     }
     Connections {
         target: MixerController
@@ -204,9 +214,9 @@ Window {
     Key { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
     Key { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
     Key { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }
-    Key { sequence: "G"; onActivated: mpv.setProperty("speed", (mpv.observed("speed") || 1) > 1.01 ? 1 : 2) }
-    Key { sequence: "S"; onActivated: mpv.command(["add", "speed", -0.1]) }
-    Key { sequence: "D"; onActivated: mpv.command(["add", "speed", 0.1]) }
+    Key { sequence: "G"; onActivated: mpv.setProperty("speed", PlayerSettings.toggledSpeed(mpv.observed("speed") || 1)) }
+    Key { sequence: "S"; onActivated: mpv.command(["add", "speed", -PlayerSettings.speedStep]) }
+    Key { sequence: "D"; onActivated: mpv.command(["add", "speed", PlayerSettings.speedStep]) }
     Key { sequence: "F1"; onActivated: mpv.command(["screenshot"]) }
     Key { sequence: "Shift+S"; onActivated: mpv.command(["screenshot", "video"]) }
     Key { sequence: "Ctrl+S"; onActivated: mpv.command(["screenshot", "window"]) }

@@ -1,0 +1,126 @@
+#include <QtTest>
+#include <QStandardPaths>
+#include "AppState.h"
+#include "PlayerSettings.h"
+
+class TestPlayerSettings : public QObject
+{
+    Q_OBJECT
+
+private slots:
+    void init()
+    {
+        QVERIFY(m_dir.isValid());
+        m_path = m_dir.filePath(QString("state-%1.json").arg(m_n++));
+        m_state = std::make_unique<AppState>(m_path);
+        m_settings = std::make_unique<PlayerSettings>(m_state.get());
+    }
+
+    void defaultsAreV1s()
+    {
+        QCOMPARE(m_settings->endMode(), QString("stop"));
+        QCOMPARE(m_settings->speedFactor(), 2.0);
+        QCOMPARE(m_settings->speedStep(), 0.1);
+        QCOMPARE(m_settings->screenshotFolder(), QString("desktop"));
+        const QVariantMap o = m_settings->mpvOptions("C:/Videos/a.mp4");
+        QCOMPARE(o.value("keep-open").toString(), QString("always")); // stays on the last frame, no next file
+        QCOMPARE(o.value("loop-file").toString(), QString("no"));
+        QCOMPARE(o.value("screenshot-dir").toString(),
+                 QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+    }
+
+    void endModes()
+    {
+        QSignalSpy changed(m_settings.get(), &PlayerSettings::changed);
+        m_settings->setEndMode("loop");
+        QVariantMap o = m_settings->mpvOptions({});
+        QCOMPARE(o.value("loop-file").toString(), QString("inf"));
+        QCOMPARE(o.value("keep-open").toString(), QString("no"));
+        m_settings->setEndMode("next");
+        o = m_settings->mpvOptions({});
+        QCOMPARE(o.value("loop-file").toString(), QString("no"));
+        QCOMPARE(o.value("keep-open").toString(), QString("no"));
+        m_settings->setEndMode("pause"); // not a mode: ignored
+        QCOMPARE(m_settings->endMode(), QString("next"));
+        QCOMPARE(changed.count(), 2);
+    }
+
+    void speedKeys()
+    {
+        QCOMPARE(m_settings->toggledSpeed(1.0), 2.0);
+        QCOMPARE(m_settings->toggledSpeed(2.0), 1.0);
+        QCOMPARE(m_settings->toggledSpeed(1.1), 1.0); // any faster speed goes back to normal
+        QCOMPARE(m_settings->toggledSpeed(0.5), 2.0);
+        m_settings->setSpeedFactor(9);
+        QCOMPARE(m_settings->speedFactor(), PlayerSettings::SpeedFactorMax);
+        m_settings->setSpeedFactor(1);
+        QCOMPARE(m_settings->speedFactor(), PlayerSettings::SpeedFactorMin);
+        m_settings->setSpeedStep(0.5);
+        QCOMPARE(m_settings->speedStep(), 0.5);
+        m_settings->setSpeedStep(0);
+        m_settings->setSpeedStep(2);
+        QCOMPARE(m_settings->speedStep(), 0.5);
+    }
+
+    void screenshotFolders()
+    {
+        m_settings->setScreenshotFolder("video_folder");
+        QCOMPARE(m_settings->mpvOptions("C:/Videos/Clips/a.mp4").value("screenshot-dir").toString(),
+                 QString("C:/Videos/Clips"));
+        const QString desktop = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+        QCOMPARE(m_settings->mpvOptions("https://example.com/a.mp4").value("screenshot-dir").toString(), desktop);
+        m_settings->setScreenshotFolder("custom"); // no folder picked yet
+        QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(), desktop);
+        m_settings->setScreenshotCustomPath("D:/Shots");
+        QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(), QString("D:/Shots"));
+        m_settings->setScreenshotFolder("pictures");
+        QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(),
+                 QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+        m_settings->setScreenshotFolder("cloud"); // not a place: ignored
+        QCOMPARE(m_settings->screenshotFolder(), QString("pictures"));
+    }
+
+    void savedAndLoaded()
+    {
+        m_settings->setEndMode("loop");
+        m_settings->setSpeedFactor(1.5);
+        m_settings->setSpeedStep(0.05);
+        m_settings->setScreenshotFolder("custom");
+        m_settings->setScreenshotCustomPath("D:/Shots");
+        m_state->save();
+
+        AppState again(m_path);
+        PlayerSettings loaded(&again);
+        QCOMPARE(loaded.endMode(), QString("loop"));
+        QCOMPARE(loaded.speedFactor(), 1.5);
+        QCOMPARE(loaded.speedStep(), 0.05);
+        QCOMPARE(loaded.screenshotFolder(), QString("custom"));
+        QCOMPARE(loaded.screenshotCustomPath(), QString("D:/Shots"));
+    }
+
+    void damagedValuesKeepDefaults()
+    {
+        QFile f(m_path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(R"({"schema":1,"playback":{"end":"explode","speed_factor":50,"speed_step":-1},)"
+                R"("screenshots":{"folder":7,"custom":["x"]}})");
+        f.close();
+        AppState damaged(m_path);
+        PlayerSettings loaded(&damaged);
+        QCOMPARE(loaded.endMode(), QString("stop"));
+        QCOMPARE(loaded.speedFactor(), 2.0);
+        QCOMPARE(loaded.speedStep(), 0.1);
+        QCOMPARE(loaded.screenshotFolder(), QString("desktop"));
+        QCOMPARE(loaded.screenshotCustomPath(), QString());
+    }
+
+private:
+    QTemporaryDir m_dir;
+    int m_n = 0;
+    QString m_path;
+    std::unique_ptr<AppState> m_state;
+    std::unique_ptr<PlayerSettings> m_settings;
+};
+
+QTEST_GUILESS_MAIN(TestPlayerSettings)
+#include "tst_playersettings.moc"

@@ -53,6 +53,41 @@ void AppState::setMixer(const MixerPrefs &prefs)
     changed();
 }
 
+void AppState::setEndMode(const QString &mode)
+{
+    if (mode == m_endMode) return;
+    m_endMode = mode;
+    changed();
+}
+
+void AppState::setSpeedFactor(double factor)
+{
+    if (factor == m_speedFactor) return;
+    m_speedFactor = factor;
+    changed();
+}
+
+void AppState::setSpeedStep(double step)
+{
+    if (step == m_speedStep) return;
+    m_speedStep = step;
+    changed();
+}
+
+void AppState::setScreenshotFolder(const QString &folder)
+{
+    if (folder == m_screenshotFolder) return;
+    m_screenshotFolder = folder;
+    changed();
+}
+
+void AppState::setScreenshotCustomPath(const QString &path)
+{
+    if (path == m_screenshotCustomPath) return;
+    m_screenshotCustomPath = path;
+    changed();
+}
+
 void AppState::setUpdateLastChecked(qint64 epochSeconds)
 {
     if (epochSeconds == m_updateLastChecked) return;
@@ -108,6 +143,19 @@ void AppState::load()
     for (const QJsonValue &id : mixer.value("mono").toArray())
         if (id.isDouble()) m_mixer.mono.insert(id.toInt());
 
+    const QJsonObject playback = s.value("playback").toObject();
+    static const QRegularExpression endMode("^(next|loop|stop)$");
+    if (endMode.match(playback.value("end").toString()).hasMatch()) m_endMode = playback.value("end").toString();
+    const double factor = playback.value("speed_factor").toDouble(-1);
+    if (factor >= 1.25 && factor <= 4) m_speedFactor = factor;
+    const double step = playback.value("speed_step").toDouble(-1);
+    if (step > 0 && step <= 1) m_speedStep = step;
+    const QJsonObject screenshots = s.value("screenshots").toObject();
+    static const QRegularExpression folder("^(desktop|videos|pictures|video_folder|custom)$");
+    if (folder.match(screenshots.value("folder").toString()).hasMatch())
+        m_screenshotFolder = screenshots.value("folder").toString();
+    if (screenshots.value("custom").isString()) m_screenshotCustomPath = screenshots.value("custom").toString();
+
     const QJsonObject update = s.value("update").toObject();
     if (update.value("last_checked").isDouble()) m_updateLastChecked = update.value("last_checked").toInteger();
     if (update.value("seen_version").isString()) m_updateSeenVersion = update.value("seen_version").toString();
@@ -130,6 +178,8 @@ void AppState::save()
         {"volume", m_volume},
         {"quality", m_quality},
         {"mixer", QJsonObject{{"default_on", m_mixer.defaultOn}, {"gains", gains}, {"mono", monoIds}}},
+        {"playback", QJsonObject{{"end", m_endMode}, {"speed_factor", m_speedFactor}, {"speed_step", m_speedStep}}},
+        {"screenshots", QJsonObject{{"folder", m_screenshotFolder}, {"custom", m_screenshotCustomPath}}},
         {"update", QJsonObject{{"last_checked", m_updateLastChecked}, {"seen_version", m_updateSeenVersion}}},
     };
 

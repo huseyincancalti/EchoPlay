@@ -5,6 +5,7 @@
 #include "I18n.h"
 #include "MixerController.h"
 #include "PictureQuality.h"
+#include "PlayerSettings.h"
 #include "ResumeStore.h"
 #include "SilenceCheck.h"
 #include "Theme.h"
@@ -25,6 +26,7 @@ struct Services
     Theme theme;
     MixerController mixer;
     PictureQuality quality;
+    PlayerSettings player;
     UpdateCheck updates;
     Thumbnailer thumbnails;
     SilenceCheck silence;

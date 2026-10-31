@@ -33,6 +33,17 @@ public:
     void setQuality(const QString &quality);
     MixerPrefs mixer() const { return m_mixer; }
     void setMixer(const MixerPrefs &prefs);
+    // Playback and screenshot settings (v1's): their values are checked by PlayerSettings, which owns them.
+    QString endMode() const { return m_endMode; } // "next", "loop", "stop"
+    void setEndMode(const QString &mode);
+    double speedFactor() const { return m_speedFactor; } // the speed the fixed-speed key toggles to
+    void setSpeedFactor(double factor);
+    double speedStep() const { return m_speedStep; } // the speed-down/up keys' step
+    void setSpeedStep(double step);
+    QString screenshotFolder() const { return m_screenshotFolder; } // "desktop", "videos", "pictures", "video_folder", "custom"
+    void setScreenshotFolder(const QString &folder);
+    QString screenshotCustomPath() const { return m_screenshotCustomPath; }
+    void setScreenshotCustomPath(const QString &path);
     // The daily update check: when it last ran, and the newest version already shown to the user (shown once).
     qint64 updateLastChecked() const { return m_updateLastChecked; } // seconds since the epoch; 0 = never
     void setUpdateLastChecked(qint64 epochSeconds);
@@ -65,6 +76,11 @@ private:
     double m_volume = 100;
     QString m_quality = QStringLiteral("auto");
     MixerPrefs m_mixer;
+    QString m_endMode = QStringLiteral("stop");
+    double m_speedFactor = 2.0;
+    double m_speedStep = 0.1;
+    QString m_screenshotFolder = QStringLiteral("desktop");
+    QString m_screenshotCustomPath;
     qint64 m_updateLastChecked = 0;
     QString m_updateSeenVersion;
 };

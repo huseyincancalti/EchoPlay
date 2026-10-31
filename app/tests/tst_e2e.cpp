@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickImageProvider>
 #include <QQuickWindow>
+#include <QStandardPaths>
 #include <QtQml/qqmlextensionplugin.h>
 #include <clocale>
 #include "MpvItem.h"
@@ -34,7 +35,7 @@ struct Launch
         // Read like the UI does: observed values, never a synchronous get that could stall the render loop.
         if (mpv) {
             for (const char *name : {"aid", "lavfi-complex", "pause", "volume", "speed", "time-pos", "scale", "dither",
-                                     "duration"})
+                                     "duration", "keep-open", "loop-file", "screenshot-dir"})
                 mpv->observeProperty(name);
         }
     }
@@ -149,6 +150,26 @@ private slots:
             QTRY_COMPARE(app.number("speed"), 1.1);
             app.key(Qt::Key_S);
             QTRY_COMPARE(app.number("speed"), 1.0);
+            app.services.player.setSpeedFactor(1.5); // the settings UI will set these
+            app.services.player.setSpeedStep(0.25);
+            app.key(Qt::Key_G);
+            QTRY_COMPARE(app.number("speed"), 1.5);
+            app.key(Qt::Key_G);
+            QTRY_COMPARE(app.number("speed"), 1.0);
+            app.key(Qt::Key_D);
+            QTRY_COMPARE(app.number("speed"), 1.25);
+            app.key(Qt::Key_S);
+            QTRY_COMPARE(app.number("speed"), 1.0);
+
+            // End of video and screenshot folder: v1's defaults, then a change reaches mpv at once.
+            QCOMPARE(app.prop("keep-open"), QString("always"));
+            QCOMPARE(app.prop("loop-file"), QString("no"));
+            QCOMPARE(app.prop("screenshot-dir"), QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+            app.services.player.setEndMode("loop");
+            QTRY_COMPARE(app.prop("loop-file"), QString("inf"));
+            QCOMPARE(app.prop("keep-open"), QString("no"));
+            app.services.player.setScreenshotFolder("video_folder");
+            QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QFileInfo(m_clip).absolutePath());
             const double before = app.number("time-pos");
             app.key(Qt::Key_Right);
             QTRY_VERIFY(app.number("time-pos") > before + 8);
@@ -187,6 +208,8 @@ private slots:
         QCOMPARE(state.value("mixer").toObject().value("default_on").toString(), QString("2"));
         QCOMPARE(state.value("volume").toDouble(), 85.0);
         QCOMPARE(state.value("quality").toString(), QString("low"));
+        QCOMPARE(state.value("playback").toObject().value("end").toString(), QString("loop"));
+        QCOMPARE(state.value("screenshots").toObject().value("folder").toString(), QString("video_folder"));
         QFile resume(QDir(m_path).filePath("resume.json"));
         QVERIFY(resume.open(QIODevice::ReadOnly));
         const QJsonObject entry =
@@ -203,6 +226,9 @@ private slots:
         QCOMPARE(app.prop("lavfi-complex"), QString());
         QCOMPARE(app.number("volume"), 85.0);
         QCOMPARE(app.prop("scale"), QString("bilinear")); // the forced tier from the first run
+        QCOMPARE(app.prop("loop-file"), QString("inf"));   // end of video: loop, set before the file opened
+        QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QFileInfo(m_clip).absolutePath());
+        QCOMPARE(app.services.player.speedFactor(), 1.5);
         QVERIFY(app.services.resume.position(m_clip) >= 25); // ready for the "Resume from 0:25?" prompt
     }
 

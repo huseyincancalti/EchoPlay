@@ -24,6 +24,8 @@ target_compile_definitions(tst_theme PRIVATE ECHOPLAY_THEME_JSON="${CMAKE_SOURCE
 echoplay_test(updatecheck ../src/UpdateCheck.h ../src/UpdateCheck.cpp ../src/AppState.h ../src/AppState.cpp ../src/Mixer.h ../src/Mixer.cpp)
 target_link_libraries(tst_updatecheck PRIVATE Qt6::Network)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
+echoplay_test(playersettings ../src/PlayerSettings.h ../src/PlayerSettings.cpp ../src/AppState.h ../src/AppState.cpp
+              ../src/Mixer.h ../src/Mixer.cpp)
 
 # Thumbnailer runs a hidden libmpv player (no window) on a clip ffmpeg makes first: a flat gray picture
 # that gets brighter every second, a keyframe every 2 s, so a picture tells which second it shows.

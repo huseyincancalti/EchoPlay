@@ -1,5 +1,6 @@
 #include <QtTest>
 #include <QQmlApplicationEngine>
+#include <QQuickImageProvider>
 #include <QQuickWindow>
 #include <QtQml/qqmlextensionplugin.h>
 #include <clocale>
@@ -113,6 +114,17 @@ private slots:
             app.key(Qt::Key_3, Qt::ControlModifier); // no third track: nothing changes
             QTest::qWait(300);
             QCOMPARE(app.prop("aid"), QString("2"));
+
+            // Seek-bar preview: the hidden player follows the playing file; its picture reaches QML through
+            // the image provider, and the video plays on (one VO init, checked after the window closes).
+            Thumbnailer &thumbs = app.services.thumbnails;
+            QTRY_COMPARE(QDir::fromNativeSeparators(thumbs.file()), m_clip); // the folder playlist's path
+            thumbs.request(40);
+            QTRY_COMPARE_WITH_TIMEOUT(thumbs.image().size(), QSize(Thumbnailer::MaxSize, 203), 10000); // 1280x720
+            auto *provider = static_cast<QQuickImageProvider *>(app.engine.imageProvider("thumbnail"));
+            QVERIFY(provider);
+            QCOMPARE(provider->requestImage(thumbs.source().path().mid(1), nullptr, {}), thumbs.image());
+            QCOMPARE(app.prop("pause"), QString("no"));
 
             // Volume (Down x3) and its memory.
             for (int i = 0; i < 3; ++i) app.key(Qt::Key_Down);

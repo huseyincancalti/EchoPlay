@@ -7,6 +7,7 @@
 #include "PictureQuality.h"
 #include "ResumeStore.h"
 #include "Theme.h"
+#include "Thumbnailer.h"
 #include "UpdateCheck.h"
 
 // Everything QML reaches as a singleton, created and wired in one place, so the app (main.cpp) and the
@@ -24,4 +25,5 @@ struct Services
     MixerController mixer;
     PictureQuality quality;
     UpdateCheck updates;
+    Thumbnailer thumbnails;
 };

@@ -138,6 +138,7 @@ Window {
             if (name === "track-list") MixerController.setTrackList(value || [])
             else if (name === "volume" && typeof value === "number") AppState.volume = value
             else if (name === "media-title") root.mediaTitle = value || ""
+            else if (name === "path") Thumbnailer.file = value || "" // seek-bar previews follow the playing file
         }
     }
     Connections {

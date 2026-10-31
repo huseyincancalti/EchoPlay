@@ -25,6 +25,20 @@ echoplay_test(updatecheck ../src/UpdateCheck.h ../src/UpdateCheck.cpp ../src/App
 target_link_libraries(tst_updatecheck PRIVATE Qt6::Network)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
 
+# Thumbnailer runs a hidden libmpv player (no window) on a clip ffmpeg makes first: a flat gray picture
+# that gets brighter every second, a keyframe every 2 s, so a picture tells which second it shows.
+find_program(FFMPEG ffmpeg REQUIRED)
+set(THUMB_CLIP "${CMAKE_CURRENT_BINARY_DIR}/thumbnailer-clip.mp4")
+add_test(NAME thumbnailer-clip COMMAND "${FFMPEG}" -y -v error -f lavfi
+         -i "color=c=black:s=640x360:r=30:d=40,format=yuv420p,geq=lum='16+5*floor(T)':cb=128:cr=128"
+         -c:v libx264 -preset ultrafast -qp 0 -g 60 "${THUMB_CLIP}")
+set_tests_properties(thumbnailer-clip PROPERTIES FIXTURES_SETUP thumbnailer-clip)
+echoplay_test(thumbnailer ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
+target_include_directories(tst_thumbnailer PRIVATE "${MPV_INCLUDE}")
+target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
+target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}")
+set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED thumbnailer-clip)
+
 # End-to-end: the real player window on a two-track clip, driven by synthetic keys and clicks. It opens a
 # window, so it is labeled e2e: tools/e2e.sh runs it, tools/check.sh (headless) leaves it out.
 qt_add_executable(tst_e2e tst_e2e.cpp)

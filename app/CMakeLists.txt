@@ -29,6 +29,7 @@ qt_add_qml_module(echoplay_lib
             src/UpdateCheck.h src/UpdateCheck.cpp src/ResumeStore.h src/ResumeStore.cpp
             src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp
             src/PictureQuality.h src/PictureQuality.cpp src/Thumbnailer.h src/Thumbnailer.cpp
+            src/SilenceCheck.h src/SilenceCheck.cpp
             src/Services.h src/Services.cpp
 )
 qt_add_executable(echoplay src/main.cpp)

@@ -39,6 +39,19 @@ target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.
 target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}")
 set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED thumbnailer-clip)
 
+# SilenceCheck on four audio tracks: a tone, digital silence, a quiet tone (-58 dBFS), silence then a tone.
+set(SILENCE_CLIP "${CMAKE_CURRENT_BINARY_DIR}/silencecheck-clip.mp4")
+add_test(NAME silencecheck-clip COMMAND "${FFMPEG}" -y -v error -f lavfi -i sine=frequency=440:duration=20
+         -f lavfi -i anullsrc=r=48000:cl=stereo -f lavfi -i "sine=frequency=880:duration=20,volume=-40dB"
+         -f lavfi -i "sine=frequency=1000:duration=20,volume='if(lt(t,15),0,1)':eval=frame"
+         -t 20 -map 0 -map 1 -map 2 -map 3 -c:a aac "${SILENCE_CLIP}")
+set_tests_properties(silencecheck-clip PROPERTIES FIXTURES_SETUP silencecheck-clip)
+echoplay_test(silencecheck ../src/SilenceCheck.h ../src/SilenceCheck.cpp)
+target_include_directories(tst_silencecheck PRIVATE "${MPV_INCLUDE}")
+target_link_libraries(tst_silencecheck PRIVATE "${MPV_DIR}/libmpv.dll.a")
+target_compile_definitions(tst_silencecheck PRIVATE ECHOPLAY_SILENCE_CLIP="${SILENCE_CLIP}")
+set_tests_properties(silencecheck PROPERTIES FIXTURES_REQUIRED silencecheck-clip)
+
 # End-to-end: the real player window on a two-track clip, driven by synthetic keys and clicks. It opens a
 # window, so it is labeled e2e: tools/e2e.sh runs it, tools/check.sh (headless) leaves it out.
 qt_add_executable(tst_e2e tst_e2e.cpp)

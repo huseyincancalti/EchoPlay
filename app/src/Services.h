@@ -6,6 +6,7 @@
 #include "MixerController.h"
 #include "PictureQuality.h"
 #include "ResumeStore.h"
+#include "SilenceCheck.h"
 #include "Theme.h"
 #include "Thumbnailer.h"
 #include "UpdateCheck.h"
@@ -26,4 +27,5 @@ struct Services
     PictureQuality quality;
     UpdateCheck updates;
     Thumbnailer thumbnails;
+    SilenceCheck silence;
 };

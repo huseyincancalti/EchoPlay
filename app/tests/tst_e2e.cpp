@@ -126,6 +126,11 @@ private slots:
             QCOMPARE(provider->requestImage(thumbs.source().path().mid(1), nullptr, {}), thumbs.image());
             QCOMPARE(app.prop("pause"), QString("no"));
 
+            // Silent-track check: it follows the playing file too; both tones are audible.
+            QTRY_VERIFY_WITH_TIMEOUT(app.services.silence.done(), 15000);
+            QCOMPARE(QDir::fromNativeSeparators(app.services.silence.file()), m_clip);
+            QVERIFY(app.services.silence.silent().isEmpty());
+
             // Volume (Down x3) and its memory.
             for (int i = 0; i < 3; ++i) app.key(Qt::Key_Down);
             QTRY_COMPARE(app.number("volume"), 85.0);

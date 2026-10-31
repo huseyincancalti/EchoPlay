@@ -8,7 +8,8 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
       mixer(&state),
       quality(&state),
       updates(&state, version),
-      thumbnails(nullptr)
+      thumbnails(nullptr),
+      silence(nullptr)
 {
     i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
     QObject::connect(&i18n, &I18n::languageChanged, &state, [this] { state.setLanguage(i18n.language()); });
@@ -21,4 +22,5 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
     PictureQuality::setInstance(&quality);
     UpdateCheck::setInstance(&updates);
     Thumbnailer::setInstance(&thumbnails);
+    SilenceCheck::setInstance(&silence);
 }

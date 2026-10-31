@@ -53,7 +53,8 @@ int main(int argc, char *argv[])
     QCommandLineOption mixToggle("mix-toggle", "Switch between the mix and track 1 alone every 2 s while playing.");
     QCommandLineOption shotAt("shot-at", "Pause at <seconds>, save a window screenshot to --shot-out, quit.", "seconds", "-1");
     QCommandLineOption shotOut("shot-out", "Screenshot path for --shot-at.", "path");
-    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut});
+    QCommandLineOption thumbScrub("thumb-scrub", "Request a seek-bar preview every 50 ms while playing, like a pointer on the seek bar.");
+    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub});
     cli.addHelpOption();
     cli.process(app);
     if (cli.isSet(smokeOpt)) return smoke();
@@ -90,6 +91,7 @@ int main(int argc, char *argv[])
         {"mix", cli.isSet(mix)},
         {"logFile", cli.value(logFile)},
         {"mixToggle", cli.isSet(mixToggle)},
+        {"thumbScrub", cli.isSet(thumbScrub)},
         {"shotAt", cli.value(shotAt).toDouble()},
         {"shotOut", cli.value(shotOut)},
         {"startup", QVariantMap{{"main_ms", tMain}, {"app_ms", tApp}, {"engine_ms", tEngine}}},

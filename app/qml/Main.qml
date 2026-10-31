@@ -17,6 +17,7 @@ Window {
     required property bool mix
     required property string logFile
     required property bool mixToggle
+    required property bool thumbScrub
     required property real shotAt
     required property string shotOut
     required property var startup // main_ms, app_ms from C++; qml_ms, render_ms, process_ms added here
@@ -34,7 +35,7 @@ Window {
     property string mediaTitle: ""
     // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
     // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
-    readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle
+    readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle || thumbScrub
 
     // A second launch hands its file here (SingleInstance). An empty file only brings the window forward.
     Connections {
@@ -100,6 +101,11 @@ Window {
                 observeProperty("frame-drop-count")
                 observeProperty("path")
                 observeProperty("time-pos")
+                observeProperty("duration")
+            } else if (root.benchSeconds > 0) {
+                // Read without blocking: a synchronous get every 100 ms can stall the render loop.
+                observeProperty("frame-drop-count")
+                observeProperty("playback-time")
                 observeProperty("duration")
             }
         }
@@ -216,10 +222,10 @@ Window {
     property int lastDrops: 0
     property int totalDrops: 0
     function countDrops() {
-        const n = mpv.getProperty("frame-drop-count") || 0
+        const n = mpv.observed("frame-drop-count") || 0
         if (n !== lastDrops) {
             totalDrops += n > lastDrops ? n - lastDrops : n
-            mpv.command(["print-text", "DROPS " + totalDrops + " at " + mpv.getProperty("playback-time")])
+            mpv.command(["print-text", "DROPS " + totalDrops + " at " + mpv.observed("playback-time")])
         }
         lastDrops = n
     }
@@ -228,6 +234,25 @@ Window {
         interval: 100
         repeat: true
         onTriggered: root.countDrops()
+    }
+
+    // Bench only (--thumb-scrub): a pointer moving over the seek bar for 1 s (a preview request every 50 ms,
+    // 1% of the file apart), then resting 0.5 s (the exact seek), over and over.
+    property int scrubTick: 0
+    property int thumbnails: 0 // pictures the hidden player delivered
+    Connections {
+        target: root.thumbScrub ? Thumbnailer : null
+        function onImageChanged() { root.thumbnails++ }
+    }
+    Timer {
+        running: root.thumbScrub && root.restarted
+        interval: 50
+        repeat: true
+        onTriggered: {
+            if (root.scrubTick++ % 30 >= 20) return
+            Thumbnailer.file = root.file
+            Thumbnailer.request((mpv.observed("duration") || 0) * (root.scrubTick % 100) / 100)
+        }
     }
 
     Timer {
@@ -293,7 +318,7 @@ Window {
                           "estimated-vf-fps", "playback-time", "frame-drop-count", "decoder-frame-drop-count",
                           "vo-delayed-frame-count"]
             root.countDrops()
-            const r = { glass: root.glass, mix: root.mix, "frame-drop-total": root.totalDrops }
+            const r = { glass: root.glass, mix: root.mix, "frame-drop-total": root.totalDrops, thumbnails: root.thumbnails }
             for (const k of keys) r[k] = mpv.getProperty(k)
             const line = "BENCH " + JSON.stringify(r)
             mpv.command(["print-text", line])

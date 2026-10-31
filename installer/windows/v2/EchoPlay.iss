@@ -60,7 +60,9 @@ Type: filesandordirs; Name: "{app}\portable_config"
 ; The staged app: EchoPlay.exe, Qt and MinGW runtime, QML modules, libmpv, lang\, theme.json.
 Source: "stage\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 Source: "..\..\..\assets\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\..\app\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\EchoPlay"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\logo.ico"

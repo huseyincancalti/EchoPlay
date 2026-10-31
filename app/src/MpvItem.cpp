@@ -18,6 +18,8 @@
 
 namespace {
 
+constexpr quint64 KeepAwakeReply = 1; // observeProperty() uses 0
+
 // QVariant -> mpv_node (strings, numbers, bools, lists). Owns the memory the node points into;
 // std::deque never moves existing elements, so pointers stay valid while it grows.
 struct NodeBuilder
@@ -138,6 +140,7 @@ MpvItem::MpvItem(QQuickItem *parent) : QQuickRhiItem(parent)
 
 MpvItem::~MpvItem()
 {
+    setKeepingAwake(false);
     if (renderContext) mpv_render_context_free(renderContext);
     mpv_set_wakeup_callback(m_mpv, nullptr, nullptr);
     mpv_terminate_destroy(m_mpv);
@@ -158,6 +161,19 @@ void MpvItem::setOption(const QString &name, const QString &value)
 void MpvItem::start()
 {
     if (mpv_initialize(m_mpv) < 0) throw std::runtime_error("mpv_initialize failed");
+    // core-idle: paused, or no file. Its own reply id keeps it out of propertyChanged/observed().
+    mpv_observe_property(m_mpv, KeepAwakeReply, "core-idle", MPV_FORMAT_FLAG);
+}
+
+// The same flags as mpv's own window (video/out/w32_common.c). Per thread: always the GUI thread here.
+void MpvItem::setKeepingAwake(bool on)
+{
+    if (on == m_keepingAwake) return;
+    m_keepingAwake = on;
+#ifdef Q_OS_WIN
+    SetThreadExecutionState(on ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED : ES_CONTINUOUS);
+#endif
+    emit keepingAwakeChanged();
 }
 
 void MpvItem::command(const QVariantList &args)
@@ -220,7 +236,10 @@ void MpvItem::drainEvents()
             case MPV_END_FILE_REASON_REDIRECT: emit fileEnded("redirect", {}); break;
             }
         }
-        if (e->event_id == MPV_EVENT_PROPERTY_CHANGE) {
+        if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == KeepAwakeReply) {
+            const auto *p = static_cast<mpv_event_property *>(e->data);
+            setKeepingAwake(p->format == MPV_FORMAT_FLAG && !*static_cast<int *>(p->data));
+        } else if (e->event_id == MPV_EVENT_PROPERTY_CHANGE) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
             const QVariant value = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)) : QVariant();
             const QString name = QString::fromUtf8(p->name);

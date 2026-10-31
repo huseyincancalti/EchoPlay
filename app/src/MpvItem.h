@@ -13,6 +13,9 @@ class MpvItem : public QQuickRhiItem
 {
     Q_OBJECT
     QML_ELEMENT
+    // The display and the PC stay awake while a file plays (not paused): mpv's own window does this
+    // (stop-screensaver), but with the render API the window is ours.
+    Q_PROPERTY(bool keepingAwake READ keepingAwake NOTIFY keepingAwakeChanged)
 
 public:
     explicit MpvItem(QQuickItem *parent = nullptr);
@@ -33,6 +36,7 @@ public:
     static qint64 processAgeMsNow(); // ms since the OS created this process; -1 if unknown
     Q_INVOKABLE QVariantMap startupMarks() const { return m_marks; } // item_ms, mpv_created_ms
 
+    bool keepingAwake() const { return m_keepingAwake; }
     mpv_handle *handle() const { return m_mpv; }
     mpv_render_context *renderContext = nullptr;
 
@@ -44,6 +48,7 @@ signals:
     // "unrecognized file format", "loading failed", ...) for the "This file can't be opened" state.
     void fileEnded(const QString &reason, const QString &error);
     void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
+    void keepingAwakeChanged();
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;
@@ -52,7 +57,10 @@ private slots:
     void drainEvents();
 
 private:
+    void setKeepingAwake(bool on);
+
     mpv_handle *m_mpv = nullptr;
+    bool m_keepingAwake = false;
     QVariantMap m_observed;
     QVariantMap m_marks;
 };

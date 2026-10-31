@@ -140,10 +140,13 @@ private slots:
             QTRY_COMPARE(app.services.state.volume(), 85.0);
 
             // Pause, speed, seek.
+            QVERIFY(app.mpv->keepingAwake()); // playing: the display does not sleep
             app.key(Qt::Key_Space);
             QTRY_COMPARE(app.prop("pause"), QString("yes"));
+            QTRY_VERIFY(!app.mpv->keepingAwake());
             app.key(Qt::Key_Space);
             QTRY_COMPARE(app.prop("pause"), QString("no"));
+            QTRY_VERIFY(app.mpv->keepingAwake());
             app.key(Qt::Key_G);
             QTRY_COMPARE(app.number("speed"), 2.0);
             app.key(Qt::Key_G);

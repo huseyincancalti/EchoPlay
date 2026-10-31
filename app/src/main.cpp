@@ -13,6 +13,7 @@
 #include "AppState.h"
 #include "I18n.h"
 #include "MpvItem.h"
+#include "ResumeStore.h"
 #include "SingleInstance.h"
 #include "Theme.h"
 #include "UpdateCheck.h"
@@ -75,6 +76,9 @@ int main(int argc, char *argv[])
     // Declared before the engine so they outlive it. QML reaches them through the singletons' create().
     AppState state(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/state.json");
     AppState::setInstance(&state);
+    // Where the user stopped in each file, next to state.json (it grows with every file watched).
+    ResumeStore resume(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/resume.json");
+    ResumeStore::setInstance(&resume);
     I18n i18n(QCoreApplication::applicationDirPath() + "/lang");
     i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
     I18n::setInstance(&i18n);

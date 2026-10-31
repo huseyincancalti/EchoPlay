@@ -1,0 +1,16 @@
+{
+  "lang_name": "Türkçe",
+  "mixer": "Ses Kaynakları",
+  "tracks_on": "%1/%2 açık",
+  "all_on": "Hepsini aç",
+  "mute": "Sustur",
+  "silent": "Sessiz",
+  "silent_warning": "Ses kapalı - Ayarlar > Ses Kaynakları'ndan açabilirsiniz",
+  "mono_short": "Mono",
+  "stereo_short": "Stereo",
+  "gain_down": "Sesi azalt",
+  "gain_up": "Sesi artır",
+  "language": "Dil",
+  "open_lang": "Dil klasörünü aç (çeviri ekle)",
+  "track_n": "Ses %1"
+}

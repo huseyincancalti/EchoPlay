@@ -1,0 +1,16 @@
+{
+  "lang_name": "English",
+  "mixer": "Audio Sources",
+  "tracks_on": "%1/%2 on",
+  "all_on": "Enable all",
+  "mute": "Mute",
+  "silent": "Silent",
+  "silent_warning": "Audio is off - enable it under Settings > Audio Sources",
+  "mono_short": "Mono",
+  "stereo_short": "Stereo",
+  "gain_down": "Lower volume",
+  "gain_up": "Raise volume",
+  "language": "Language",
+  "open_lang": "Open language folder (add a translation)",
+  "track_n": "Track %1"
+}

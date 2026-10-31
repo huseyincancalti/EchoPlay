@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <memory>
 #include <mpv/client.h>
+#include "I18n.h"
 #include "MpvItem.h"
 #include "SingleInstance.h"
 
@@ -60,6 +61,11 @@ int main(int argc, char *argv[])
         if (instance->sendToRunning(cli.positionalArguments().value(0), created)) return 0;
         instance->listen();
     }
+
+    // Declared before the engine so it outlives it. QML reaches it through I18n::create (setInstance).
+    I18n i18n(QCoreApplication::applicationDirPath() + "/lang");
+    i18n.setLanguage({});
+    I18n::setInstance(&i18n);
 
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();

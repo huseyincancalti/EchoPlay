@@ -31,6 +31,14 @@ void AppState::setLanguage(const QString &code)
     changed();
 }
 
+void AppState::setVolume(double volume)
+{
+    if (volume == m_volume) return;
+    m_volume = volume;
+    emit volumeChanged();
+    changed();
+}
+
 void AppState::setMixer(const MixerPrefs &prefs)
 {
     if (prefs == m_mixer) return;
@@ -74,6 +82,8 @@ void AppState::load()
     const QJsonObject s = doc.object();
 
     if (s.value("language").isString()) m_language = s.value("language").toString();
+    const double volume = s.value("volume").toDouble(-1);
+    if (volume >= 0 && volume <= VolumeMax) m_volume = volume;
 
     const QJsonObject mixer = s.value("mixer").toObject();
     static const QRegularExpression defaultOn("^(all|none|\\d+(,\\d+)*)$");
@@ -108,6 +118,7 @@ void AppState::save()
     const QJsonObject s{
         {"schema", Schema},
         {"language", m_language},
+        {"volume", m_volume},
         {"mixer", QJsonObject{{"default_on", m_mixer.defaultOn}, {"gains", gains}, {"mono", monoIds}}},
         {"update", QJsonObject{{"last_checked", m_updateLastChecked}, {"seen_version", m_updateSeenVersion}}},
     };

@@ -51,6 +51,7 @@ private slots:
             AppState s(m_path);
             s.setLanguage("tr");
             s.setMixer(somePrefs());
+            s.setVolume(65);
             s.setUpdateLastChecked(1761930000);
             s.setUpdateSeenVersion("2.1.0");
             s.save();
@@ -61,6 +62,7 @@ private slots:
         AppState again(m_path);
         QCOMPARE(again.language(), QString("tr"));
         QCOMPARE(again.mixer(), somePrefs());
+        QCOMPARE(again.volume(), 65.0);
         QCOMPARE(again.updateLastChecked(), 1761930000);
         QCOMPARE(again.updateSeenVersion(), QString("2.1.0"));
     }
@@ -115,13 +117,14 @@ private slots:
 
     void badFieldsAreSkippedOneByOne()
     {
-        write(m_path, R"({"schema": 1, "language": 5, "update": {"last_checked": "yesterday", "seen_version": 2},
+        write(m_path, R"({"schema": 1, "language": 5, "volume": 900, "update": {"last_checked": "yesterday", "seen_version": 2},
             "mixer": {"default_on": "1,x", "gains": {"x": 2, "2": "loud", "3": 9, "4": 0.5}, "mono": ["a", 2]}})");
         AppState s(m_path);
         QCOMPARE(s.language(), QString());
         QCOMPARE(s.mixer().defaultOn, QString("1"));
         QCOMPARE(s.mixer().gains, (QMap<int, double>{{4, 0.5}}));
         QCOMPARE(s.mixer().mono, QSet<int>{2});
+        QCOMPARE(s.volume(), 100.0);
         QCOMPARE(s.updateLastChecked(), 0);
         QCOMPARE(s.updateSeenVersion(), QString());
     }

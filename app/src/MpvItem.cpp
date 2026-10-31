@@ -178,6 +178,11 @@ void MpvItem::setProperty(const QString &name, const QVariant &value)
     mpv_set_property_async(m_mpv, 0, name.toUtf8().constData(), MPV_FORMAT_NODE, &node);
 }
 
+void MpvItem::observeProperty(const QString &name)
+{
+    mpv_observe_property(m_mpv, 0, name.toUtf8().constData(), MPV_FORMAT_NODE);
+}
+
 qint64 MpvItem::processAgeMsNow()
 {
 #ifdef Q_OS_WIN
@@ -197,6 +202,12 @@ void MpvItem::drainEvents()
         mpv_event *e = mpv_wait_event(m_mpv, 0);
         if (e->event_id == MPV_EVENT_NONE) break;
         if (e->event_id == MPV_EVENT_PLAYBACK_RESTART) emit playbackRestarted();
+        if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
         if (e->event_id == MPV_EVENT_END_FILE) emit fileEnded();
+        if (e->event_id == MPV_EVENT_PROPERTY_CHANGE) {
+            const auto *p = static_cast<mpv_event_property *>(e->data);
+            const QVariant value = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)) : QVariant();
+            emit propertyChanged(QString::fromUtf8(p->name), value);
+        }
     }
 }

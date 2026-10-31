@@ -16,15 +16,19 @@ class AppState : public QObject
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
+    Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
 
 public:
     static constexpr int Schema = 1;
+    static constexpr double VolumeMax = 300; // mpv's volume-max, as in v1
 
     explicit AppState(const QString &path, QObject *parent = nullptr); // loads the file
     ~AppState() override;                                               // writes a pending save
 
     QString language() const { return m_language; } // empty = follow the system language
     void setLanguage(const QString &code);
+    double volume() const { return m_volume; } // mpv's volume, 0..VolumeMax
+    void setVolume(double volume);
     MixerPrefs mixer() const { return m_mixer; }
     void setMixer(const MixerPrefs &prefs);
     // The daily update check: when it last ran, and the newest version already shown to the user (shown once).
@@ -46,6 +50,7 @@ public:
 
 signals:
     void languageChanged();
+    void volumeChanged();
 
 private:
     void load();
@@ -55,6 +60,7 @@ private:
     QString m_path;
     QTimer m_saveTimer;
     QString m_language;
+    double m_volume = 100;
     MixerPrefs m_mixer;
     qint64 m_updateLastChecked = 0;
     QString m_updateSeenVersion;

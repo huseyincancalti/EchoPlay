@@ -12,6 +12,7 @@
 #include <mpv/client.h>
 #include "AppState.h"
 #include "I18n.h"
+#include "MixerController.h"
 #include "MpvItem.h"
 #include "ResumeStore.h"
 #include "SingleInstance.h"
@@ -85,6 +86,8 @@ int main(int argc, char *argv[])
     QObject::connect(&i18n, &I18n::languageChanged, &state, [&] { state.setLanguage(i18n.language()); });
     Theme theme(":/theme/theme.json", QCoreApplication::applicationDirPath() + "/theme.json");
     Theme::setInstance(&theme);
+    MixerController mixer(&state);
+    MixerController::setInstance(&mixer);
     UpdateCheck updates(&state, ECHOPLAY_VERSION);
     UpdateCheck::setInstance(&updates);
     // 5 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay

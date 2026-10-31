@@ -23,6 +23,7 @@ public:
     Q_INVOKABLE void start();                                              // mpv_initialize
     Q_INVOKABLE QVariant getProperty(const QString &name) const;
     Q_INVOKABLE void setProperty(const QString &name, const QVariant &value);
+    Q_INVOKABLE void observeProperty(const QString &name); // propertyChanged now and on every change
     Q_INVOKABLE qint64 processAgeMs() const { return processAgeMsNow(); }
     static qint64 processAgeMsNow(); // ms since the OS created this process; -1 if unknown
     Q_INVOKABLE QVariantMap startupMarks() const { return m_marks; } // item_ms, mpv_created_ms
@@ -33,7 +34,9 @@ public:
 signals:
     void renderReady(); // render context exists: only now can a file with video be loaded
     void playbackRestarted();
+    void fileStarted();
     void fileEnded();
+    void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;

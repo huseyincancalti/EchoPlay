@@ -24,6 +24,7 @@ qt_add_qml_module(echoplay
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/ResumeStore.h src/ResumeStore.cpp
+            src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp
 )
 
 # libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship

@@ -9,7 +9,7 @@ Window {
     height: 720
     visible: true
     color: "black"
-    title: "EchoPlay spike"
+    title: mediaTitle || "EchoPlay"
 
     required property string file
     required property int benchSeconds
@@ -31,6 +31,10 @@ Window {
     property bool restarted: false
     property bool mixOn: mix
     property real handOverSentMs: 0 // epoch ms of a second launch whose file has not started playing yet
+    property string mediaTitle: ""
+    // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
+    // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
+    readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle
 
     // A second launch hands its file here (SingleInstance). An empty file only brings the window forward.
     Connections {
@@ -72,7 +76,25 @@ Window {
             }
             if (root.mix) setOption("lavfi-complex", root.mixGraph)
             if (root.benchSeconds > 0) setOption("mute", "yes")
+            if (!root.measuring) {
+                // v1's mpv.conf, player side.
+                setOption("autocreate-playlist", "same") // the other videos in the folder are the playlist,
+                setOption("directory-mode", "ignore")    // a subfolder next to them is not
+                setOption("keep-open", "always")         // v1's default end mode: stop on the last frame
+                setOption("volume-max", "300")
+                setOption("volume", String(AppState.volume))
+                setOption("af", "dynaudnorm=p=0.9:m=25:g=15") // v1's loudness levelling
+                setOption("screenshot-format", "png")
+                setOption("screenshot-directory", "~~desktop/")
+                setOption("cache", "auto")
+                setOption("demuxer-max-bytes", "256MiB")
+            }
             start()
+            if (!root.measuring) {
+                observeProperty("track-list")
+                observeProperty("volume")
+                observeProperty("media-title")
+            }
         }
         onRenderReady: {
             root.startup.render_ms = processAgeMs()
@@ -94,6 +116,56 @@ Window {
             if (root.shotAt >= 0) shotTimer.start()
             else root.unpauseOnSwap = true
         }
+    }
+
+    // The mixer (MixerController) gets mpv's tracks and hands back what to set, lavfi-complex first.
+    Connections {
+        target: mpv
+        enabled: !root.measuring
+        function onFileStarted() { MixerController.fileStarted() }
+        function onPropertyChanged(name, value) {
+            if (name === "track-list") MixerController.setTrackList(value || [])
+            else if (name === "volume" && typeof value === "number") AppState.volume = value
+            else if (name === "media-title") root.mediaTitle = value || ""
+        }
+    }
+    Connections {
+        target: MixerController
+        enabled: !root.measuring
+        function onOutputChanged(lavfi, aid) {
+            mpv.setProperty("lavfi-complex", lavfi)
+            if (aid) mpv.setProperty("aid", aid)
+        }
+    }
+
+    // v1's default keys (main.lua KEY_ACTIONS) and the mpv defaults v1 users rely on. Rebinding comes with
+    // the settings UI.
+    function toggleFullScreen() {
+        root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
+    }
+    Shortcut { sequence: "Space"; onActivated: mpv.command(["cycle", "pause"]) }
+    Shortcut { sequence: "M"; onActivated: mpv.command(["cycle", "mute"]) }
+    Shortcut { sequence: "Up"; onActivated: mpv.command(["add", "volume", 5]) }
+    Shortcut { sequence: "Down"; onActivated: mpv.command(["add", "volume", -5]) }
+    Shortcut { sequence: "Right"; onActivated: mpv.command(["seek", 10]) }
+    Shortcut { sequence: "Left"; onActivated: mpv.command(["seek", -10]) }
+    Shortcut { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
+    Shortcut { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
+    Shortcut { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }
+    Shortcut { sequence: "G"; onActivated: mpv.setProperty("speed", (mpv.getProperty("speed") || 1) > 1.01 ? 1 : 2) }
+    Shortcut { sequence: "S"; onActivated: mpv.command(["add", "speed", -0.1]) }
+    Shortcut { sequence: "D"; onActivated: mpv.command(["add", "speed", 0.1]) }
+    Shortcut { sequence: "F1"; onActivated: mpv.command(["screenshot"]) }
+    Shortcut { sequence: "Shift+S"; onActivated: mpv.command(["screenshot", "video"]) }
+    Shortcut { sequence: "Ctrl+S"; onActivated: mpv.command(["screenshot", "window"]) }
+    Shortcut { sequence: ">"; onActivated: mpv.command(["playlist-next"]) }
+    Shortcut { sequence: "<"; onActivated: mpv.command(["playlist-prev"]) }
+    Shortcut { sequence: "F"; onActivated: root.toggleFullScreen() }
+    Shortcut { sequence: "Esc"; onActivated: if (root.visibility === Window.FullScreen) root.visibility = Window.Windowed }
+    MouseArea {
+        anchors.fill: parent
+        onDoubleClicked: root.toggleFullScreen()
+        onWheel: wheel => mpv.command(["add", "volume", wheel.angleDelta.y > 0 ? 5 : -5])
     }
 
     // Bench only: log when dropped frames happen (the mpv log has no per-drop line at -v), and keep a

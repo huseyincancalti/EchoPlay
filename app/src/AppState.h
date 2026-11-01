@@ -3,6 +3,7 @@
 #include <QQmlEngine>
 #include <QObject>
 #include <QTimer>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 #include "Mixer.h"
 
@@ -44,6 +45,24 @@ public:
     void setScreenshotFolder(const QString &folder);
     QString screenshotCustomPath() const { return m_screenshotCustomPath; }
     void setScreenshotCustomPath(const QString &path);
+    int seekStep() const { return m_seekStep; } // seconds the left and right arrows jump
+    void setSeekStep(int seconds);
+    int volumeMax() const { return m_volumeMax; } // the highest level the slider and keys reach
+    void setVolumeMax(int percent);
+    bool loudnessBoost() const { return m_loudnessBoost; }
+    void setLoudnessBoost(bool on);
+    QString loudnessStrength() const { return m_loudnessStrength; } // "low", "medium", "high"
+    void setLoudnessStrength(const QString &strength);
+    QString audioDevice() const { return m_audioDevice; } // mpv's audio-device; "auto" follows Windows
+    void setAudioDevice(const QString &device);
+    QString tracksOnOpen() const { return m_tracksOnOpen; } // "last" (as the last clip), "all"
+    void setTracksOnOpen(const QString &tracks);
+    QString resumeMode() const { return m_resumeMode; } // "ask", "always", "never"
+    void setResumeMode(const QString &mode);
+    bool firstRunHintDone() const { return m_firstRunHintDone; }
+    void setFirstRunHintDone(bool done);
+    QVariantMap shortcuts() const { return m_shortcuts; } // action -> key sequence, only what the user changed
+    void setShortcuts(const QVariantMap &shortcuts);
     // Settings > Appearance: their values are checked by Theme, which owns them. Empty = the theme file's token.
     QString themeMode() const { return m_themeMode; } // "dark", "light", "system"
     void setThemeMode(const QString &mode);
@@ -92,6 +111,15 @@ private:
     double m_speedStep = 0.1;
     QString m_screenshotFolder = QStringLiteral("desktop");
     QString m_screenshotCustomPath;
+    int m_seekStep = 10;
+    int m_volumeMax = int(VolumeMax);
+    bool m_loudnessBoost = true;
+    QString m_loudnessStrength = QStringLiteral("medium");
+    QString m_audioDevice = QStringLiteral("auto");
+    QString m_tracksOnOpen = QStringLiteral("last");
+    QString m_resumeMode = QStringLiteral("ask");
+    bool m_firstRunHintDone = false;
+    QVariantMap m_shortcuts;
     QString m_themeMode = QStringLiteral("dark");
     QString m_accentColor;
     QString m_barStyle;

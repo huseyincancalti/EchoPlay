@@ -29,7 +29,9 @@ void MixerController::fileStarted()
 void MixerController::setTrackList(const QVariantList &trackList)
 {
     if (m_applied || !m_mixer.setTracks(trackList)) return;
-    m_mixer.applyPrefs(m_state->mixer());
+    MixerPrefs prefs = m_state->mixer();
+    if (m_state->tracksOnOpen() == "all") prefs.defaultOn = QStringLiteral("all");
+    m_mixer.applyPrefs(prefs);
     m_applied = true;
     emitOutput();
     emit tracksChanged();

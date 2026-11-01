@@ -89,6 +89,69 @@ void AppState::setScreenshotCustomPath(const QString &path)
     changed();
 }
 
+void AppState::setSeekStep(int seconds)
+{
+    if (seconds == m_seekStep) return;
+    m_seekStep = seconds;
+    changed();
+}
+
+void AppState::setVolumeMax(int percent)
+{
+    if (percent == m_volumeMax) return;
+    m_volumeMax = percent;
+    changed();
+}
+
+void AppState::setLoudnessBoost(bool on)
+{
+    if (on == m_loudnessBoost) return;
+    m_loudnessBoost = on;
+    changed();
+}
+
+void AppState::setLoudnessStrength(const QString &strength)
+{
+    if (strength == m_loudnessStrength) return;
+    m_loudnessStrength = strength;
+    changed();
+}
+
+void AppState::setAudioDevice(const QString &device)
+{
+    if (device == m_audioDevice) return;
+    m_audioDevice = device;
+    changed();
+}
+
+void AppState::setTracksOnOpen(const QString &tracks)
+{
+    if (tracks == m_tracksOnOpen) return;
+    m_tracksOnOpen = tracks;
+    changed();
+}
+
+void AppState::setResumeMode(const QString &mode)
+{
+    if (mode == m_resumeMode) return;
+    m_resumeMode = mode;
+    changed();
+}
+
+void AppState::setFirstRunHintDone(bool done)
+{
+    if (done == m_firstRunHintDone) return;
+    m_firstRunHintDone = done;
+    changed();
+}
+
+void AppState::setShortcuts(const QVariantMap &shortcuts)
+{
+    if (shortcuts == m_shortcuts) return;
+    m_shortcuts = shortcuts;
+    changed();
+}
+
 void AppState::setThemeMode(const QString &mode)
 {
     if (mode == m_themeMode) return;
@@ -186,6 +249,28 @@ void AppState::load()
     if (factor >= 1.25 && factor <= 4) m_speedFactor = factor;
     const double step = playback.value("speed_step").toDouble(-1);
     if (step > 0 && step <= 1) m_speedStep = step;
+    const int seekStep = playback.value("seek_step").toInt();
+    if (seekStep == 3 || seekStep == 5 || seekStep == 10 || seekStep == 30) m_seekStep = seekStep;
+    static const QRegularExpression resumeMode("^(ask|always|never)$");
+    if (resumeMode.match(playback.value("resume").toString()).hasMatch()) m_resumeMode = playback.value("resume").toString();
+
+    const QJsonObject audio = s.value("audio").toObject();
+    const int volumeMax = audio.value("volume_max").toInt();
+    if (volumeMax >= 100 && volumeMax <= VolumeMax) m_volumeMax = volumeMax;
+    if (audio.value("loudness_boost").isBool()) m_loudnessBoost = audio.value("loudness_boost").toBool();
+    static const QRegularExpression strength("^(low|medium|high)$");
+    if (strength.match(audio.value("loudness_strength").toString()).hasMatch())
+        m_loudnessStrength = audio.value("loudness_strength").toString();
+    if (!audio.value("device").toString().isEmpty()) m_audioDevice = audio.value("device").toString();
+    static const QRegularExpression tracksOnOpen("^(last|all)$");
+    if (tracksOnOpen.match(audio.value("tracks_on_open").toString()).hasMatch())
+        m_tracksOnOpen = audio.value("tracks_on_open").toString();
+
+    m_firstRunHintDone = s.value("first_run_hint_done").toBool();
+    const QJsonObject shortcuts = s.value("shortcuts").toObject();
+    for (auto it = shortcuts.begin(); it != shortcuts.end(); ++it)
+        if (it.value().isString()) m_shortcuts.insert(it.key(), it.value().toString());
+
     const QJsonObject screenshots = s.value("screenshots").toObject();
     static const QRegularExpression folder("^(desktop|videos|pictures|video_folder|custom)$");
     if (folder.match(screenshots.value("folder").toString()).hasMatch())
@@ -224,7 +309,13 @@ void AppState::save()
         {"volume", m_volume},
         {"quality", m_quality},
         {"mixer", QJsonObject{{"default_on", m_mixer.defaultOn}, {"gains", gains}, {"mono", monoIds}}},
-        {"playback", QJsonObject{{"end", m_endMode}, {"speed_factor", m_speedFactor}, {"speed_step", m_speedStep}}},
+        {"playback", QJsonObject{{"end", m_endMode}, {"speed_factor", m_speedFactor}, {"speed_step", m_speedStep},
+                                 {"seek_step", m_seekStep}, {"resume", m_resumeMode}}},
+        {"audio", QJsonObject{{"volume_max", m_volumeMax}, {"loudness_boost", m_loudnessBoost},
+                              {"loudness_strength", m_loudnessStrength}, {"device", m_audioDevice},
+                              {"tracks_on_open", m_tracksOnOpen}}},
+        {"first_run_hint_done", m_firstRunHintDone},
+        {"shortcuts", QJsonObject::fromVariantMap(m_shortcuts)},
         {"screenshots", QJsonObject{{"folder", m_screenshotFolder}, {"custom", m_screenshotCustomPath}}},
         {"appearance", QJsonObject{{"mode", m_themeMode}, {"accent", m_accentColor}, {"bar", m_barStyle},
                                    {"font", m_fontFamily}, {"glass", m_glassStrength}}},

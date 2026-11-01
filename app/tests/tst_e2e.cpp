@@ -64,7 +64,7 @@ struct Launch
         // Read like the UI does: observed values, never a synchronous get that could stall the render loop.
         if (mpv) {
             for (const char *name : {"aid", "lavfi-complex", "pause", "volume", "speed", "time-pos", "scale", "dither",
-                                     "duration", "keep-open", "loop-file", "screenshot-dir", "vo-configured"})
+                                     "duration", "keep-open", "loop-file", "screenshot-dir", "vo-configured", "af"})
                 mpv->observeProperty(name);
         }
     }
@@ -215,6 +215,20 @@ private slots:
             QTRY_VERIFY(app.number("time-pos") > before + 8);
             app.key(Qt::Key_Left);
             QTRY_VERIFY(app.number("time-pos") < before + 5);
+            app.services.player.setSeekStep(30); // the arrow step reaches the keys at once
+            const double beforeStep = app.number("time-pos");
+            app.key(Qt::Key_Right);
+            QTRY_VERIFY(app.number("time-pos") > beforeStep + 28);
+            app.services.player.setSeekStep(10);
+            app.mpv->command({"seek", 0, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") < 5);
+
+            // Loudness boost: v1's levelling by default; off removes the filter while the video plays on.
+            QCOMPARE(app.mpv->observed("af").toList().size(), 1);
+            app.services.player.setLoudnessBoost(false);
+            QTRY_COMPARE(app.mpv->observed("af").toList().size(), 0);
+            app.services.player.setLoudnessBoost(true);
+            QTRY_COMPARE(app.mpv->observed("af").toList().size(), 1);
 
             // Full screen: F and Esc, then double-click twice.
             app.key(Qt::Key_F);
@@ -269,6 +283,15 @@ private slots:
         QCOMPARE(app.prop("loop-file"), QString("inf"));   // end of video: loop, set before the file opened
         QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QFileInfo(m_clip).absolutePath());
         QCOMPARE(app.services.player.speedFactor(), 1.5);
+
+        // A lower maximum volume pulls a louder volume down with it, and the saved volume follows.
+        app.services.player.setVolumeMax(120);
+        QCOMPARE(app.number("volume"), 85.0);
+        app.mpv->setProperty("volume", 110);
+        QTRY_COMPARE(app.number("volume"), 110.0);
+        app.services.player.setVolumeMax(100);
+        QTRY_COMPARE(app.number("volume"), 100.0);
+        QTRY_COMPARE(app.services.state.volume(), 100.0);
 
         // A file that is not a video: the end-file reason and mpv's words for it (the error state's detail).
         const QString broken = QDir(m_path).filePath("not-a-video.mp4");

@@ -80,6 +80,68 @@ private slots:
         QCOMPARE(m_settings->screenshotFolder(), QString("pictures"));
     }
 
+    void seekStepVolumeMaxAndChoices()
+    {
+        QCOMPARE(m_settings->seekStep(), 10); // v1's arrow step
+        m_settings->setSeekStep(5);
+        m_settings->setSeekStep(7); // not on the list: ignored
+        QCOMPARE(m_settings->seekStep(), 5);
+
+        QCOMPARE(m_settings->volumeMax(), 300);
+        QCOMPARE(m_settings->mpvOptions({}).value("volume-max").toString(), QString("300"));
+        m_settings->setVolumeMax(50);
+        QCOMPARE(m_settings->volumeMax(), 100);
+        m_settings->setVolumeMax(900);
+        QCOMPARE(m_settings->volumeMax(), 300);
+        m_settings->setVolumeMax(200);
+        QCOMPARE(m_settings->mpvOptions({}).value("volume-max").toString(), QString("200"));
+
+        QCOMPARE(m_settings->tracksOnOpen(), QString("last"));
+        m_settings->setTracksOnOpen("all");
+        m_settings->setTracksOnOpen("some");
+        QCOMPARE(m_settings->tracksOnOpen(), QString("all"));
+
+        QCOMPARE(m_settings->resumeMode(), QString("ask"));
+        m_settings->setResumeMode("never");
+        m_settings->setResumeMode("maybe");
+        QCOMPARE(m_settings->resumeMode(), QString("never"));
+    }
+
+    void loudnessBoostAndAudioDevice()
+    {
+        const QString medium = "dynaudnorm=p=0.9:m=25:g=15"; // v1's
+        QCOMPARE(m_settings->mpvOptions({}).value("af").toString(), medium);
+        m_settings->setLoudnessStrength("high");
+        const QString high = m_settings->mpvOptions({}).value("af").toString();
+        m_settings->setLoudnessStrength("low");
+        const QString low = m_settings->mpvOptions({}).value("af").toString();
+        QVERIFY(high.startsWith("dynaudnorm") && low.startsWith("dynaudnorm"));
+        QVERIFY(high != medium && low != medium && high != low);
+        m_settings->setLoudnessStrength("max"); // not a strength: ignored
+        QCOMPARE(m_settings->loudnessStrength(), QString("low"));
+        m_settings->setLoudnessBoost(false);
+        QCOMPARE(m_settings->mpvOptions({}).value("af").toString(), QString());
+
+        QCOMPARE(m_settings->mpvOptions({}).value("audio-device").toString(), QString("auto"));
+        m_settings->setAudioDevice("wasapi/{1234}");
+        QCOMPARE(m_settings->mpvOptions({}).value("audio-device").toString(), QString("wasapi/{1234}"));
+        m_settings->setAudioDevice(QString());
+        QCOMPARE(m_settings->audioDevice(), QString("wasapi/{1234}"));
+    }
+
+    void shortcutsKeepOnlyWhatChanged()
+    {
+        QVERIFY(m_settings->shortcuts().isEmpty());
+        m_settings->setShortcut("mute", "N");
+        QCOMPARE(m_settings->shortcuts().value("mute").toString(), QString("N"));
+        QSignalSpy changed(m_settings.get(), &PlayerSettings::changed);
+        m_settings->setShortcut("mute", "N"); // the same key: no change
+        QCOMPARE(changed.count(), 0);
+        m_settings->resetShortcuts();
+        QVERIFY(m_settings->shortcuts().isEmpty());
+        QCOMPARE(changed.count(), 1);
+    }
+
     void savedAndLoaded()
     {
         m_settings->setEndMode("loop");
@@ -87,6 +149,15 @@ private slots:
         m_settings->setSpeedStep(0.05);
         m_settings->setScreenshotFolder("custom");
         m_settings->setScreenshotCustomPath("D:/Shots");
+        m_settings->setSeekStep(30);
+        m_settings->setVolumeMax(150);
+        m_settings->setLoudnessBoost(false);
+        m_settings->setLoudnessStrength("high");
+        m_settings->setAudioDevice("wasapi/{1234}");
+        m_settings->setTracksOnOpen("all");
+        m_settings->setResumeMode("always");
+        m_settings->setFirstRunHintDone(true);
+        m_settings->setShortcut("mute", "N");
         m_state->save();
 
         AppState again(m_path);
@@ -96,13 +167,24 @@ private slots:
         QCOMPARE(loaded.speedStep(), 0.05);
         QCOMPARE(loaded.screenshotFolder(), QString("custom"));
         QCOMPARE(loaded.screenshotCustomPath(), QString("D:/Shots"));
+        QCOMPARE(loaded.seekStep(), 30);
+        QCOMPARE(loaded.volumeMax(), 150);
+        QVERIFY(!loaded.loudnessBoost());
+        QCOMPARE(loaded.loudnessStrength(), QString("high"));
+        QCOMPARE(loaded.audioDevice(), QString("wasapi/{1234}"));
+        QCOMPARE(loaded.tracksOnOpen(), QString("all"));
+        QCOMPARE(loaded.resumeMode(), QString("always"));
+        QVERIFY(loaded.firstRunHintDone());
+        QCOMPARE(loaded.shortcuts().value("mute").toString(), QString("N"));
     }
 
     void damagedValuesKeepDefaults()
     {
         QFile f(m_path);
         QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write(R"({"schema":1,"playback":{"end":"explode","speed_factor":50,"speed_step":-1},)"
+        f.write(R"({"schema":1,"playback":{"end":"explode","speed_factor":50,"speed_step":-1,"seek_step":7,"resume":1},)"
+                R"("audio":{"volume_max":999,"loudness_boost":"yes","loudness_strength":"max","device":3,"tracks_on_open":"x"},)"
+                R"("first_run_hint_done":"yes","shortcuts":{"mute":5},)"
                 R"("screenshots":{"folder":7,"custom":["x"]}})");
         f.close();
         AppState damaged(m_path);
@@ -112,6 +194,15 @@ private slots:
         QCOMPARE(loaded.speedStep(), 0.1);
         QCOMPARE(loaded.screenshotFolder(), QString("desktop"));
         QCOMPARE(loaded.screenshotCustomPath(), QString());
+        QCOMPARE(loaded.seekStep(), 10);
+        QCOMPARE(loaded.volumeMax(), 300);
+        QVERIFY(loaded.loudnessBoost());
+        QCOMPARE(loaded.loudnessStrength(), QString("medium"));
+        QCOMPARE(loaded.audioDevice(), QString("auto"));
+        QCOMPARE(loaded.tracksOnOpen(), QString("last"));
+        QCOMPARE(loaded.resumeMode(), QString("ask"));
+        QVERIFY(!loaded.firstRunHintDone());
+        QVERIFY(loaded.shortcuts().isEmpty());
     }
 
 private:

@@ -52,6 +52,18 @@ private slots:
         QCOMPARE(m_mixer->tracks()[1].toMap().value("name").toString(), QString("Microphone"));
     }
 
+    void tracksOnOpenAllOverridesTheLastClip()
+    {
+        MixerPrefs prefs;
+        prefs.defaultOn = "2";
+        m_state->setMixer(prefs);
+        m_state->setTracksOnOpen("all");
+        QSignalSpy spy(m_mixer.get(), &MixerController::outputChanged);
+        m_mixer->setTrackList(clip(2));
+        QCOMPARE(outputs(spy), (Outputs{{Mix, "no"}}));
+        QCOMPARE(m_state->mixer().defaultOn, QString("2")); // nothing the user changed yet: nothing is saved
+    }
+
     void laterTrackListsDoNotUndoTheUsersChoice()
     {
         m_mixer->setTrackList(clip(2)); // first run: track 1 only

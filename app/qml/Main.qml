@@ -101,12 +101,10 @@ Window {
                 // v1's mpv.conf, player side.
                 setOption("autocreate-playlist", "same") // the other videos in the folder are the playlist,
                 setOption("directory-mode", "ignore")    // a subfolder next to them is not
-                setOption("volume-max", "300")
-                setOption("volume", String(AppState.volume))
-                setOption("af", "dynaudnorm=p=0.9:m=25:g=15") // v1's loudness levelling
+                setOption("volume", String(Math.min(AppState.volume, PlayerSettings.volumeMax)))
                 setOption("screenshot-format", "png")
-                const player = PlayerSettings.mpvOptions(root.file) // end of video, screenshot folder
-                for (const name in player) setOption(name, player[name])
+                root.appliedOptions = PlayerSettings.mpvOptions(root.file) // end of video, loudness, audio device, ...
+                for (const name in root.appliedOptions) setOption(name, root.appliedOptions[name])
                 setOption("cache", "auto")
                 setOption("demuxer-max-bytes", "256MiB")
                 const tier = PictureQuality.activeOptions() // a forced tier from the last session
@@ -197,9 +195,17 @@ Window {
             }
         }
     }
+    // Only what changed: writing af or audio-device again rebuilds mpv's audio chain, a short gap in the sound.
+    property var appliedOptions: ({})
     function applyPlayerSettings() {
         const options = PlayerSettings.mpvOptions(mpv.observed("path") || root.file)
-        for (const name in options) mpv.setProperty(name, options[name])
+        for (const name in options) {
+            if (root.appliedOptions[name] === options[name]) continue
+            root.appliedOptions[name] = options[name]
+            mpv.setProperty(name, options[name])
+        }
+        // A lower maximum also pulls the volume down: mpv's volume-max only limits later changes.
+        if ((mpv.observed("volume") || 0) > PlayerSettings.volumeMax) mpv.setProperty("volume", PlayerSettings.volumeMax)
     }
     Connections {
         target: PlayerSettings
@@ -255,8 +261,8 @@ Window {
     Key { sequence: "M"; onActivated: mpv.command(["cycle", "mute"]) }
     Key { sequence: "Up"; onActivated: mpv.command(["add", "volume", 5]) }
     Key { sequence: "Down"; onActivated: mpv.command(["add", "volume", -5]) }
-    Key { sequence: "Right"; onActivated: mpv.command(["seek", 10]) }
-    Key { sequence: "Left"; onActivated: mpv.command(["seek", -10]) }
+    Key { sequence: "Right"; onActivated: mpv.command(["seek", PlayerSettings.seekStep]) }
+    Key { sequence: "Left"; onActivated: mpv.command(["seek", -PlayerSettings.seekStep]) }
     Key { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
     Key { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
     Key { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }

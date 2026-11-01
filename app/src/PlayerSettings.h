@@ -7,8 +7,8 @@
 
 class AppState;
 
-// v1's playback and screenshot settings (main.lua): what happens when a video ends, the speed the fixed-speed
-// key toggles to, the speed keys' step, and where screenshots go. Values are checked here and saved in
+// The player settings behind Settings > Audio, Playback, Screenshots and Shortcuts: v1's (what happens when a
+// video ends, the speed keys, where screenshots go) and v2's own. Values are checked here and saved in
 // AppState. No libmpv here: QML sets mpvOptions() before the first file and again on changed() and on every
 // new file (the video's own folder is one of the screenshot places).
 class PlayerSettings : public QObject
@@ -21,6 +21,15 @@ class PlayerSettings : public QObject
     Q_PROPERTY(double speedStep READ speedStep WRITE setSpeedStep NOTIFY changed)          // 0 < step <= 1
     Q_PROPERTY(QString screenshotFolder READ screenshotFolder WRITE setScreenshotFolder NOTIFY changed)
     Q_PROPERTY(QString screenshotCustomPath READ screenshotCustomPath WRITE setScreenshotCustomPath NOTIFY changed)
+    Q_PROPERTY(int seekStep READ seekStep WRITE setSeekStep NOTIFY changed)                // 3, 5, 10, 30 seconds
+    Q_PROPERTY(int volumeMax READ volumeMax WRITE setVolumeMax NOTIFY changed)             // 100..300 percent
+    Q_PROPERTY(bool loudnessBoost READ loudnessBoost WRITE setLoudnessBoost NOTIFY changed)
+    Q_PROPERTY(QString loudnessStrength READ loudnessStrength WRITE setLoudnessStrength NOTIFY changed) // "low", "medium", "high"
+    Q_PROPERTY(QString audioDevice READ audioDevice WRITE setAudioDevice NOTIFY changed)   // mpv's audio-device
+    Q_PROPERTY(QString tracksOnOpen READ tracksOnOpen WRITE setTracksOnOpen NOTIFY changed) // "last", "all"
+    Q_PROPERTY(QString resumeMode READ resumeMode WRITE setResumeMode NOTIFY changed)      // "ask", "always", "never"
+    Q_PROPERTY(bool firstRunHintDone READ firstRunHintDone WRITE setFirstRunHintDone NOTIFY changed)
+    Q_PROPERTY(QVariantMap shortcuts READ shortcuts NOTIFY changed)                        // action -> key, only the changed ones
 
 public:
     static constexpr double SpeedFactorMin = 1.25, SpeedFactorMax = 4; // v1's range
@@ -38,8 +47,28 @@ public:
     void setScreenshotFolder(const QString &folder);
     QString screenshotCustomPath() const;
     void setScreenshotCustomPath(const QString &path);
+    int seekStep() const;
+    void setSeekStep(int seconds); // anything else is ignored
+    int volumeMax() const;
+    void setVolumeMax(int percent); // clamped to the range
+    bool loudnessBoost() const;
+    void setLoudnessBoost(bool on);
+    QString loudnessStrength() const;
+    void setLoudnessStrength(const QString &strength); // anything else is ignored
+    QString audioDevice() const;
+    void setAudioDevice(const QString &device); // empty is ignored: "auto" follows Windows
+    QString tracksOnOpen() const;
+    void setTracksOnOpen(const QString &tracks); // anything else is ignored
+    QString resumeMode() const;
+    void setResumeMode(const QString &mode); // anything else is ignored
+    bool firstRunHintDone() const;
+    void setFirstRunHintDone(bool done);
+    QVariantMap shortcuts() const;
+    Q_INVOKABLE void setShortcut(const QString &action, const QString &key);
+    Q_INVOKABLE void resetShortcuts();
 
-    // The mpv properties for these settings while `videoPath` plays: loop-file, keep-open, screenshot-dir.
+    // The mpv properties for these settings while `videoPath` plays: loop-file, keep-open, screenshot-dir,
+    // volume-max, af, audio-device.
     Q_INVOKABLE QVariantMap mpvOptions(const QString &videoPath) const;
     // The fixed-speed key (v1): from normal speed to speedFactor, from any faster speed back to 1x.
     Q_INVOKABLE double toggledSpeed(double current) const { return current > 1.01 ? 1 : speedFactor(); }

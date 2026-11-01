@@ -195,6 +195,18 @@ private slots:
         QCOMPARE(updated.whatsNew(), QString("Better mixer"));
     }
 
+    void aHotfixFoundRightAfterAnUpdateKeepsTheNotesUnseen()
+    {
+        AppState state(m_path);
+        state.setReleaseNotes("2.1.0", "Better mixer"); // saved by 2.0.0, waiting for 2.1.0's card
+        UpdateCheck updated(&state, "2.1.0");
+        updated.handleReply(R"({"tag_name": "v2.1.1", "body": "Hotfix"})");
+        QCOMPARE(updated.whatsNew(), QString("Better mixer"));
+        updated.closeWhatsNew(); // seen: the next find may save
+        updated.handleReply(R"({"tag_name": "v2.1.1", "body": "Hotfix"})");
+        QCOMPARE(UpdateCheck(&state, "2.1.1").whatsNew(), QString("Hotfix"));
+    }
+
     void laterReplyReplacesTheSetup()
     {
         AppState state(m_path);

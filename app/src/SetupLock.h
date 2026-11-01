@@ -1,6 +1,9 @@
 #pragma once
 
 #include <QString>
+#ifdef Q_OS_WIN
+#include <string>
+#endif
 
 // Keeps a new EchoPlay away from the files the setup is replacing. A running EchoPlay holds its exe and DLLs: the
 // silent setup would close its window, or fail on the file. While the setup runs (SetupMutex in
@@ -17,5 +20,10 @@ bool comeBackLater();
 // after unpacking itself, and a clip opened right after closing EchoPlay must not slip through. reopen starts the new
 // EchoPlay when it is done. False when it did not start, or when Windows is shutting down and would cut it off.
 bool startSetup(const QString &path, bool reopen);
+
+#ifdef Q_OS_WIN
+// One command line argument in quotes, as CommandLineToArgvW gives it back (tested with that round trip).
+std::wstring quoteArgument(const std::wstring &arg);
+#endif
 
 } // namespace SetupLock

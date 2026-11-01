@@ -678,9 +678,10 @@ private slots:
             QCOMPARE(app.item("updateLater")->property("text").toString(), app.services.i18n.strings().value("install_on_close").toString());
             app.wake();
             app.shot("update");
+            QSignalSpy installStarted(&app.services.updater, &Updater::changed);
             QVERIFY(app.click("updateLater"));
             QTRY_VERIFY(!app.item("updateNotice"));
-            QVERIFY(app.services.updater.onClose() || app.services.updater.state() == "idle"); // downloading, or already failed
+            QVERIFY(installStarted.count() >= 1); // the click started the quiet download (which may have failed since)
             QCOMPARE(app.services.state.notesVersion(), QString("99.0.0")); // kept for when that version runs
             QVERIFY(!app.item("whatsNewCard")); // this version is not that one
 

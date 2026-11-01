@@ -99,7 +99,9 @@ void UpdateCheck::handleReply(const QByteArray &json)
     m_latest = latest;
     m_updateAvailable = isNewer(latest, m_current);
     readSetup(release.value("assets").toArray());
-    if (m_updateAvailable) {
+    // Not over the running version's own notes while they wait to be shown: a hotfix found a few seconds after an update
+    // would take them away unseen.
+    if (m_updateAvailable && m_state->notesVersion() != m_current) {
         // Saved now: the new version shows them on its first start, which may have no network. The card has its own
         // title, so a heading on top ("## What's new in v2.1.0") goes.
         static const QRegularExpression heading("^#[^\n]*");

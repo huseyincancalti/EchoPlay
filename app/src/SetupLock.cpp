@@ -13,22 +13,13 @@ constexpr wchar_t SetupMutex[] = L"EchoPlaySetup"; // SetupMutex in installer/wi
 // The one startSetup holds. It cannot be the same one: Inno Setup quits without a word when its mutex already exists.
 constexpr wchar_t StartMutex[] = L"EchoPlaySetupStarting";
 
-// One command line argument in quotes. A file name cannot hold a quote; a trailing \ would escape the closing one.
-std::wstring quoted(std::wstring arg)
-{
-    size_t slashes = 0;
-    while (slashes < arg.size() && arg[arg.size() - 1 - slashes] == L'\\') ++slashes;
-    arg.append(slashes, L'\\');
-    return L"\"" + arg + L"\"";
-}
-
 // This process's arguments for its next start, past the lock whatever happens (a setup that hangs).
 std::wstring ownArguments()
 {
     std::wstring arguments = L"--after-setup";
     int count = 0;
     if (wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count)) {
-        for (int i = 1; i < count; ++i) arguments += L" " + quoted(args[i]);
+        for (int i = 1; i < count; ++i) arguments += L" " + SetupLock::quoteArgument(args[i]);
         LocalFree(args);
     }
     return arguments;
@@ -55,6 +46,26 @@ bool start(const std::wstring &program, std::wstring command, BOOL inheritHandle
 }
 
 } // namespace
+
+// The rules CommandLineToArgvW reads back: backslashes count only before a quote (they double, and a quote gets one
+// more), so a trailing \ or a " inside survives.
+std::wstring SetupLock::quoteArgument(const std::wstring &arg)
+{
+    std::wstring out = L"\"";
+    for (auto it = arg.begin();; ++it) {
+        size_t slashes = 0;
+        while (it != arg.end() && *it == L'\\') { ++it; ++slashes; }
+        if (it == arg.end()) {
+            out.append(slashes * 2, L'\\'); // before the closing quote
+            break;
+        }
+        if (*it == L'"') out.append(slashes * 2 + 1, L'\\');
+        else out.append(slashes, L'\\');
+        out.push_back(*it);
+    }
+    out.push_back(L'"');
+    return out;
+}
 
 bool SetupLock::isHeld()
 {
@@ -90,7 +101,7 @@ bool SetupLock::startSetup(const QString &path, bool reopen)
     SECURITY_ATTRIBUTES inheritable{sizeof inheritable, nullptr, TRUE};
     HANDLE lock = CreateMutexW(&inheritable, FALSE, StartMutex); // the setup inherits it and holds it to its end
     const std::wstring setup = QDir::toNativeSeparators(path).toStdWString();
-    std::wstring command = quoted(setup) + L" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART";
+    std::wstring command = quoteArgument(setup) + L" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART";
     if (reopen) command += L" /ECHOPLAYUPDATE=1"; // installer/windows/v2/EchoPlay.iss
     const bool started = start(setup, command, TRUE, 0);
     if (lock) CloseHandle(lock);

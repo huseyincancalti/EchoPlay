@@ -1,5 +1,6 @@
 #include "UpdateCheck.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -12,8 +13,10 @@
 
 namespace {
 
-constexpr qint64 CheckIntervalSeconds = 24 * 60 * 60;
 constexpr auto DevVersion = "0.0.0-dev";
+constexpr auto SetupAssetName = "EchoPlay-Setup.exe";
+// The only place a setup is downloaded from: this repo's releases.
+constexpr auto SetupUrlPrefix = "https://github.com/huseyincancalti/EchoPlay/releases/download/";
 
 std::optional<std::array<qint64, 3>> parseSemver(const QString &v)
 {
@@ -54,27 +57,20 @@ bool UpdateCheck::isNewer(const QString &a, const QString &b)
     return pa && pb && *pa > *pb; // std::array compares lexicographically: major, then minor, then patch
 }
 
-bool UpdateCheck::due(qint64 nowEpochSeconds) const
-{
-    if (m_current == DevVersion) return false; // nothing meaningful to compare against, and it would nag
-    const qint64 last = m_state->updateLastChecked();
-    return last == 0 || nowEpochSeconds - last >= CheckIntervalSeconds;
-}
-
 void UpdateCheck::start()
 {
-    if (due(QDateTime::currentSecsSinceEpoch())) check();
+    checkNow();
 }
 
 void UpdateCheck::checkNow()
 {
-    if (m_current != DevVersion) check();
+    if (m_current != DevVersion) check(); // nothing meaningful to compare against, and it would nag
 }
 
 void UpdateCheck::check()
 {
     if (m_reply) return; // one request at a time
-    // The time is stored before the request, like v1: a check that fails still counts as today's attempt.
+    // The time is stored before the request: a check that fails still shows when it was tried.
     m_state->setUpdateLastChecked(QDateTime::currentSecsSinceEpoch());
 
     QNetworkRequest request(QUrl("https://api.github.com/repos/huseyincancalti/EchoPlay/releases/latest"));
@@ -93,16 +89,34 @@ void UpdateCheck::check()
 
 void UpdateCheck::handleReply(const QByteArray &json)
 {
-    const QJsonValue tag = QJsonDocument::fromJson(json).object().value("tag_name");
+    const QJsonObject release = QJsonDocument::fromJson(json).object();
+    const QJsonValue tag = release.value("tag_name");
     if (!tag.isString()) return;
     QString latest = tag.toString();
     if (latest.startsWith('v')) latest.remove(0, 1);
 
     m_latest = latest;
     m_updateAvailable = isNewer(latest, m_current);
+    readSetup(release.value("assets").toArray());
     emit changed();
-    if (m_updateAvailable && latest != m_state->updateSeenVersion()) {
-        m_state->setUpdateSeenVersion(latest);
-        emit newVersionFound(latest);
+    if (m_updateAvailable) emit newVersionFound(latest);
+}
+
+// The setup is the asset named exactly EchoPlay-Setup.exe. A foreign download host or a missing or odd
+// digest leaves the matching field empty; nothing from an earlier reply stays.
+void UpdateCheck::readSetup(const QJsonArray &assets)
+{
+    m_setupUrl.clear();
+    m_setupSha256.clear();
+    for (const QJsonValue &value : assets) {
+        const QJsonObject asset = value.toObject();
+        if (asset.value("name").toString() != SetupAssetName) continue;
+        const QString url = asset.value("browser_download_url").toString();
+        if (!url.startsWith(SetupUrlPrefix)) return;
+        m_setupUrl = url;
+        static const QRegularExpression digest("^sha256:([0-9a-fA-F]{64})$");
+        const QRegularExpressionMatch m = digest.match(asset.value("digest").toString());
+        if (m.hasMatch()) m_setupSha256 = m.captured(1).toLower();
+        return;
     }
 }

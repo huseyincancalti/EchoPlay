@@ -99,6 +99,14 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch EchoPlay"; Flags: postinstall nowait skipifsilent unchecked
+; An update started from inside EchoPlay (Updater passes /ECHOPLAYUPDATE=1) reopens it, on the start screen.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsAppUpdate
+
+[Code]
+function IsAppUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:ECHOPLAYUPDATE|0}') = '1';
+end;
 
 [Messages]
 FinishedLabel=Setup has finished installing [name] on your computer.%n%nTo make EchoPlay your default player: right-click any video or audio file, choose "Open with" -> "EchoPlay" -> "Always".

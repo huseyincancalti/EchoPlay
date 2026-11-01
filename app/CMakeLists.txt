@@ -29,7 +29,8 @@ qt_add_qml_module(echoplay_lib
               qml/SeekBar.qml qml/VolumeSlider.qml qml/VolumeFlash.qml qml/ArrowSweep.qml qml/MixerPopover.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
-            src/UpdateCheck.h src/UpdateCheck.cpp src/ResumeStore.h src/ResumeStore.cpp
+            src/UpdateCheck.h src/UpdateCheck.cpp src/Updater.h src/Updater.cpp
+            src/ResumeStore.h src/ResumeStore.cpp
             src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp
             src/PictureQuality.h src/PictureQuality.cpp src/Thumbnailer.h src/Thumbnailer.cpp
             src/SilenceCheck.h src/SilenceCheck.cpp src/PlayerSettings.h src/PlayerSettings.cpp

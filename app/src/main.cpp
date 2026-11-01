@@ -78,10 +78,10 @@ int main(int argc, char *argv[])
     // Declared before the engine so it outlives it. QML reaches it through the singletons' create().
     Services services(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation),
                       QCoreApplication::applicationDirPath(), ECHOPLAY_VERSION);
-    // 5 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay
+    // 4 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay
     // offline (comparable measurements).
     if (!cli.isSet(bench) && cli.value(shotAt).toDouble() < 0)
-        QTimer::singleShot(5000, &services.updates, &UpdateCheck::start);
+        QTimer::singleShot(4000, &services.updates, &UpdateCheck::start);
 
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();

@@ -54,7 +54,6 @@ private slots:
             s.setVolume(65);
             s.setQuality("low");
             s.setUpdateLastChecked(1761930000);
-            s.setUpdateSeenVersion("2.1.0");
             s.save();
         }
         const QJsonObject json = read(m_path);
@@ -66,7 +65,6 @@ private slots:
         QCOMPARE(again.volume(), 65.0);
         QCOMPARE(again.quality(), QString("low"));
         QCOMPARE(again.updateLastChecked(), 1761930000);
-        QCOMPARE(again.updateSeenVersion(), QString("2.1.0"));
     }
 
     void changeSavesShortlyAfter()
@@ -119,7 +117,7 @@ private slots:
 
     void badFieldsAreSkippedOneByOne()
     {
-        write(m_path, R"({"schema": 1, "language": 5, "volume": 900, "quality": "max", "update": {"last_checked": "yesterday", "seen_version": 2},
+        write(m_path, R"({"schema": 1, "language": 5, "volume": 900, "quality": "max", "update": {"last_checked": "yesterday"},
             "mixer": {"default_on": "1,x", "gains": {"x": 2, "2": "loud", "3": 9, "4": 0.5}, "mono": ["a", 2]}})");
         AppState s(m_path);
         QCOMPARE(s.language(), QString());
@@ -129,7 +127,6 @@ private slots:
         QCOMPARE(s.volume(), 100.0);
         QCOMPARE(s.quality(), QString("auto"));
         QCOMPARE(s.updateLastChecked(), 0);
-        QCOMPARE(s.updateSeenVersion(), QString());
     }
 
     void newerSchemaKeepsKnownFields()

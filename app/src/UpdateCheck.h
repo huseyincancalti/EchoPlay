@@ -8,12 +8,13 @@
 #include <QtQml/qqmlregistration.h>
 
 class AppState;
+class QJsonArray;
 class QNetworkReply;
 
-// Tells the user a newer EchoPlay exists: one GET to GitHub's "latest release" at most once a day, no query
-// string, no IDs ("Checks GitHub once a day for a new version. Sends nothing else."). A dev build
-// (0.0.0-dev) never checks. Every failure is silent. The About page reads the properties; the card about a
-// new version is shown once per version (newVersionFound), not on every start.
+// Tells the user a newer EchoPlay exists: one GET to GitHub's latest release when EchoPlay starts and on
+// Check now, no query string, no IDs. A dev build (0.0.0-dev) never checks. Every failure is silent. The
+// About page reads the properties; newVersionFound fires on every check that finds a newer version. The
+// release's setup asset (setupUrl, setupSha256) is what Updater downloads.
 class UpdateCheck : public QObject
 {
     Q_OBJECT
@@ -25,6 +26,8 @@ class UpdateCheck : public QObject
     Q_PROPERTY(bool checking READ checking NOTIFY changed)
     Q_PROPERTY(QDateTime lastChecked READ lastChecked NOTIFY changed) // invalid when never checked
     Q_PROPERTY(QString releasesUrl READ releasesUrl CONSTANT)
+    Q_PROPERTY(QString setupUrl READ setupUrl NOTIFY changed)       // empty: the release has no usable setup
+    Q_PROPERTY(QString setupSha256 READ setupSha256 NOTIFY changed) // lowercase hex; empty: GitHub gave no digest
 
 public:
     UpdateCheck(AppState *state, const QString &currentVersion, QObject *parent = nullptr);
@@ -35,14 +38,14 @@ public:
     bool checking() const { return m_reply != nullptr; }
     QDateTime lastChecked() const;
     QString releasesUrl() const;
+    QString setupUrl() const { return m_setupUrl; }
+    QString setupSha256() const { return m_setupSha256; }
 
     // major.minor.patch, numeric; anything unparsable is never newer.
     static bool isNewer(const QString &a, const QString &b);
-    // True when a check is due: not a dev build, and 24 h or more since the last one (never = due).
-    bool due(qint64 nowEpochSeconds) const;
-    // Called 5 s after launch (main.cpp): checks when due.
+    // Called 4 s after launch (main.cpp): checks, unless this is a dev build.
     void start();
-    // About's "Check now": ignores the 24 h gate, still never runs for a dev build.
+    // About's "Check now": same check, still never runs for a dev build.
     Q_INVOKABLE void checkNow();
     // Reads GitHub's release JSON. Public for the tests; anything unexpected changes nothing.
     void handleReply(const QByteArray &json);
@@ -60,12 +63,15 @@ signals:
 
 private:
     void check();
+    void readSetup(const QJsonArray &assets);
 
     static inline UpdateCheck *s_instance = nullptr;
     AppState *m_state;
     QString m_current;
     QString m_latest;
     bool m_updateAvailable = false;
+    QString m_setupUrl;
+    QString m_setupSha256;
     QNetworkAccessManager m_net;
     QNetworkReply *m_reply = nullptr;
 };

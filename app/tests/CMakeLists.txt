@@ -23,6 +23,8 @@ echoplay_test(theme ../src/Theme.h ../src/Theme.cpp ../src/AppState.h ../src/App
 target_compile_definitions(tst_theme PRIVATE ECHOPLAY_THEME_JSON="${CMAKE_SOURCE_DIR}/theme/theme.json")
 echoplay_test(updatecheck ../src/UpdateCheck.h ../src/UpdateCheck.cpp ../src/AppState.h ../src/AppState.cpp ../src/Mixer.h ../src/Mixer.cpp)
 target_link_libraries(tst_updatecheck PRIVATE Qt6::Network)
+echoplay_test(updater ../src/Updater.h ../src/Updater.cpp)
+target_link_libraries(tst_updater PRIVATE Qt6::Network)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
 echoplay_test(playersettings ../src/PlayerSettings.h ../src/PlayerSettings.cpp ../src/AppState.h ../src/AppState.cpp
               ../src/Mixer.h ../src/Mixer.cpp)

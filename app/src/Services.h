@@ -11,6 +11,7 @@
 #include "Theme.h"
 #include "Thumbnailer.h"
 #include "UpdateCheck.h"
+#include "Updater.h"
 
 // Everything QML reaches as a singleton, created and wired in one place, so the app (main.cpp) and the
 // end-to-end test (tests/tst_e2e.cpp) start the same player. Create it before the QML engine and destroy it
@@ -28,6 +29,7 @@ struct Services
     PictureQuality quality;
     PlayerSettings player;
     UpdateCheck updates;
+    Updater updater;
     Thumbnailer thumbnails;
     SilenceCheck silence;
 };

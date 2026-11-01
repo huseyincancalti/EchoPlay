@@ -1,6 +1,24 @@
 #include <QtTest>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include "AppState.h"
 #include "UpdateCheck.h"
+
+namespace {
+
+const QString Download = "https://github.com/huseyincancalti/EchoPlay/releases/download/v2.1.0/";
+const QString Digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+// A release with one asset; an empty digest leaves the field out, like a release GitHub gave no digest for.
+QByteArray release(const QString &name, const QString &url, const QString &digest = QString())
+{
+    QJsonObject asset{{"name", name}, {"browser_download_url", url}};
+    if (!digest.isEmpty()) asset.insert("digest", digest);
+    return QJsonDocument(QJsonObject{{"tag_name", "v2.1.0"}, {"assets", QJsonArray{asset}}}).toJson();
+}
+
+} // namespace
 
 class TestUpdateCheck : public QObject
 {
@@ -20,45 +38,32 @@ private slots:
         QVERIFY(!UpdateCheck::isNewer("1.4.1", "nightly"));
     }
 
-    void devBuildIsNeverDue()
+    void devBuildNeverChecks()
     {
         AppState state(m_path);
         UpdateCheck check(&state, "0.0.0-dev");
-        QVERIFY(!check.due(2000000000));
+        check.start();
+        check.checkNow();
+        QVERIFY(!check.checking());
+        QVERIFY(!check.lastChecked().isValid());
     }
 
-    void dueFollowsTheLastCheck()
+    void newerTagIsAvailableAndAnnouncedOnEveryCheck()
     {
-        const qint64 now = 2000000000;
         AppState state(m_path);
         UpdateCheck check(&state, "2.0.0");
-        QVERIFY(check.due(now)); // never checked
-        state.setUpdateLastChecked(now - 23 * 3600);
-        QVERIFY(!check.due(now));
-        state.setUpdateLastChecked(now - 24 * 3600);
-        QVERIFY(check.due(now));
-    }
+        QSignalSpy found(&check, &UpdateCheck::newVersionFound);
 
-    void newerTagIsAvailableAndAnnouncedOnce()
-    {
-        {
-            AppState state(m_path);
-            UpdateCheck check(&state, "2.0.0");
-            QSignalSpy found(&check, &UpdateCheck::newVersionFound);
+        check.handleReply(R"({"tag_name": "v2.1.0"})");
+        QCOMPARE(check.latestVersion(), QString("2.1.0"));
+        QVERIFY(check.updateAvailable());
+        QCOMPARE(found.count(), 1);
+        QCOMPARE(found.at(0).at(0).toString(), QString("2.1.0"));
 
-            check.handleReply(R"({"tag_name": "v2.1.0"})");
-            QCOMPARE(check.latestVersion(), QString("2.1.0"));
-            QVERIFY(check.updateAvailable());
-            QCOMPARE(state.updateSeenVersion(), QString("2.1.0"));
-            QCOMPARE(found.count(), 1);
-            QCOMPARE(found.at(0).at(0).toString(), QString("2.1.0"));
-
-            check.handleReply(R"({"tag_name": "v2.1.0"})");
-            QVERIFY(check.updateAvailable()); // still newer, but already shown
-            QCOMPARE(found.count(), 1);
-            state.save();
-        }
-        QCOMPARE(AppState(m_path).updateSeenVersion(), QString("2.1.0")); // persisted
+        check.handleReply(R"({"tag_name": "v2.1.0"})");
+        QVERIFY(check.updateAvailable());
+        QCOMPARE(found.count(), 2); // the same version again: the next start announces it again
+        QCOMPARE(found.at(1).at(0).toString(), QString("2.1.0"));
     }
 
     void equalOrOlderTagIsNotAvailable()
@@ -71,7 +76,6 @@ private slots:
             QVERIFY(!check.updateAvailable());
         }
         QCOMPARE(found.count(), 0);
-        QCOMPARE(state.updateSeenVersion(), QString());
     }
 
     void badRepliesChangeNothing()
@@ -84,9 +88,66 @@ private slots:
             check.handleReply(json);
         QCOMPARE(check.latestVersion(), QString());
         QVERIFY(!check.updateAvailable());
-        QCOMPARE(state.updateSeenVersion(), QString());
         QCOMPARE(found.count(), 0);
         QCOMPARE(changed.count(), 0);
+    }
+
+    void setupAssetGivesUrlAndLowercaseDigest()
+    {
+        AppState state(m_path);
+        UpdateCheck check(&state, "2.0.0");
+        check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", "sha256:" + Digest.toUpper()));
+        QCOMPARE(check.setupUrl(), Download + "EchoPlay-Setup.exe");
+        QCOMPARE(check.setupSha256(), Digest);
+    }
+
+    void wrongAssetNameGivesNoSetup()
+    {
+        AppState state(m_path);
+        UpdateCheck check(&state, "2.0.0");
+        for (const char *name : {"EchoPlay-Setup-2.1.0.exe", "EchoPlay-Setup.exe.sha256", "echoplay-setup.exe"}) {
+            check.handleReply(release(name, Download + name, "sha256:" + Digest));
+            QVERIFY(check.setupUrl().isEmpty());
+            QVERIFY(check.setupSha256().isEmpty());
+        }
+        check.handleReply(R"({"tag_name": "v2.1.0"})"); // no assets at all
+        QVERIFY(check.setupUrl().isEmpty());
+    }
+
+    void foreignDownloadHostGivesNoSetup()
+    {
+        AppState state(m_path);
+        UpdateCheck check(&state, "2.0.0");
+        for (const char *url : {"https://example.com/EchoPlay-Setup.exe",
+                                "http://github.com/huseyincancalti/EchoPlay/releases/download/v2.1.0/EchoPlay-Setup.exe",
+                                "https://github.com/someone/EchoPlay/releases/download/v2.1.0/EchoPlay-Setup.exe"}) {
+            check.handleReply(release("EchoPlay-Setup.exe", url, "sha256:" + Digest));
+            QVERIFY(check.setupUrl().isEmpty());
+            QVERIFY(check.setupSha256().isEmpty()); // a setup that is not taken has no hash either
+        }
+    }
+
+    void missingOrOddDigestLeavesTheHashEmpty()
+    {
+        AppState state(m_path);
+        UpdateCheck check(&state, "2.0.0");
+        for (const char *digest : {"", "md5:" "0123456789abcdef0123456789abcdef", "sha256:", "sha256:xyz", "sha256:0123"}) {
+            check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", digest));
+            QCOMPARE(check.setupUrl(), Download + "EchoPlay-Setup.exe");
+            QVERIFY(check.setupSha256().isEmpty());
+        }
+    }
+
+    void laterReplyReplacesTheSetup()
+    {
+        AppState state(m_path);
+        UpdateCheck check(&state, "2.0.0");
+        check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", "sha256:" + Digest));
+        QVERIFY(!check.setupUrl().isEmpty());
+        check.handleReply(R"({"tag_name": "v2.2.0", "assets": []})");
+        QCOMPARE(check.latestVersion(), QString("2.2.0"));
+        QVERIFY(check.setupUrl().isEmpty());
+        QVERIFY(check.setupSha256().isEmpty());
     }
 
 private:

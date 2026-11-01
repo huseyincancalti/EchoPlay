@@ -704,6 +704,12 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!info("clip 10.mp4").isEmpty(), 10000);
         QCOMPARE(info("clip 1.mp4").value("audioTracks").toInt(), 2);
         QCOMPARE(info("clip 2.mp4").value("audioTracks").toInt(), 0);
+        // What the rows themselves got: the C++ side alone passed while every row stayed empty.
+        const auto rowInfo = [&](const char *row) { return app.item(row)->property("info").toMap(); };
+        QTRY_COMPARE(rowInfo("playlistRow-0").value("audioTracks").toInt(), 2);
+        QVERIFY(rowInfo("playlistRow-0").value("duration").toDouble() > 50);
+        QVERIFY(rowInfo("playlistRow-0").value("thumbnail").toString().startsWith("image://clipinfo/"));
+        QTRY_COMPARE(rowInfo("playlistRow-1").value("audioTracks").toInt(), 0);
         QTest::qWait(100);
         app.shot("playlist");
         QVERIFY(app.click("playlistRow-1"));

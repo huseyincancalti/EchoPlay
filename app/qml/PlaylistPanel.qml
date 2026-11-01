@@ -92,9 +92,10 @@ GlassPanel {
             required property int index
             readonly property string path: modelData.filename
             readonly property bool playing: !!(modelData.playing || modelData.current)
-            readonly property var info: {
-                ClipInfo.revision
-                return ClipInfo.info(path)
+            property var info: ClipInfo.info(path)
+            Connections { // a method call is no binding dependency, and a bare read of revision left the rows empty
+                target: ClipInfo
+                function onChanged() { row.info = ClipInfo.info(row.path) }
             }
             objectName: "playlistRow-" + index
             width: list.width

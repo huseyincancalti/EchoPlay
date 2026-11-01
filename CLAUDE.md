@@ -30,7 +30,8 @@ screenshots) is written as a script in `tools/` from the start (maintainer, 2026
 hand. One-off investigations stay manual.
 `tools/bench.sh` and `tools/shot-compare.sh` open real player windows on the maintainer's screen (frame
 timing needs a real, undisturbed window). Run them only when the maintainer says they are away or asks
-for a measurement (maintainer, 2026-10-31). `tools/check.sh` is headless and fine any time. `tools/e2e.sh` opens a player window for a few seconds but needs
+for a measurement (maintainer, 2026-10-31). `tools/window-live.sh` takes the real mouse and keyboard for ~20 s: only when
+the maintainer says so. `tools/check.sh` is headless and fine any time. `tools/e2e.sh` opens a player window for a few seconds but needs
 no quiet screen (its input goes to the test window only): run it after every v2 change, before saying "done".
 
 ## Work split (save Claude credits)
@@ -73,7 +74,9 @@ no quiet screen (its input goes to the test window only): run it after every v2 
 ```bash
 bash tools/setup-dev.sh                 # one-time: Qt (MinGW kit), MinGW, CMake, Ninja, libmpv into ~/.echoplay-dev
 bash tools/check.sh v2                  # configure + build + ctest (sources .out/devenv.sh)
-bash tools/e2e.sh                       # the real player window, driven by synthetic keys: mixer, volume, keys, memory
+bash tools/e2e.sh                       # the real player window, driven by synthetic input: every screen, mixer, keys, memory
+ECHOPLAY_E2E_SHOTS="$(pwd)/.out/shots" bash tools/e2e.sh   # the same, with a PNG per state to compare with the design boards
+bash tools/window-live.sh               # resize edges, Aero Snap, snap layouts with the REAL mouse and keyboard (ask first)
 [VERSION=2.0.0] bash tools/package-v2.sh   # Windows installer: stage (checked without dev PATH) + Inno Setup
 bash tools/make-clips.sh <recording> [start] [len]   # test clips in .out/clips: 1080p cut + 4K60 upscale, all tracks
 RUNS=3 TOGGLE=1 bash tools/bench.sh <seconds> <videos>  # v1 engine vs v2: startup, dropped frames, live mixer

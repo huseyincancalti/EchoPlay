@@ -12,6 +12,8 @@ GlassPanel {
     readonly property var strings: I18n.strings
     readonly property var entries: ui.window.playlist
     readonly property string folder: entries.length ? entries[0].filename.replace(/[\\/][^\\/]*$/, "") : ""
+    readonly property int rowHeight: 70
+    readonly property real wanted: list.y + entries.length * rowHeight + 10 // title, the rows, the bottom margin
 
     objectName: "playlistPanel"
     backdrop: ui.backdrop
@@ -99,7 +101,7 @@ GlassPanel {
             }
             objectName: "playlistRow-" + index
             width: list.width
-            height: 70
+            height: panel.rowHeight
             activeFocusOnTab: true
             Accessible.role: Accessible.ListItem
             Accessible.name: name.text

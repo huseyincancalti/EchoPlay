@@ -1,8 +1,9 @@
 import QtQuick
 import EchoPlay
 
-// A file that cannot play: what happened, a way out (next clip, another file), and the report (Copy details, Report a
-// problem). EchoPlay sends nothing itself.
+// A file that cannot play: what happened, the whole report from the start, and what to do about it. Solving it comes
+// first (Report a problem, then Copy details); the ways out (next clip, another file) are plain. EchoPlay sends nothing
+// itself.
 Rectangle {
     id: screen
 
@@ -13,14 +14,18 @@ Rectangle {
     readonly property var colors: Theme.colors
     readonly property var strings: I18n.strings
     readonly property string kind: ErrorReport.kind(why)
-    property string report // once Copy details was clicked; it replaces mpv's short words on the card
-    readonly property bool copied: report !== ""
-
-    function details() { report = window.errorReportText() }
+    property int stamp // bumped once: mpv writes its last line about a failure just after it reports the failure
+    readonly property string report: { stamp; return window.errorReportText() }
+    property bool copied
 
     objectName: "errorScreen"
     color: colors.bg
 
+    Timer {
+        running: true
+        interval: 250
+        onTriggered: screen.stamp++
+    }
     MouseArea { anchors.fill: parent } // nothing reaches the video below
     TitleBar {
         z: 1
@@ -43,7 +48,7 @@ Rectangle {
             objectName: "errorCard"
             x: (screen.width - width) / 2
             y: Math.max(16, (parent.height - height) / 2)
-            width: Math.min(screen.copied ? 760 : 520, screen.width - 32)
+            width: Math.min(760, screen.width - 32)
             height: column.height + 56
             radius: Theme.tokens.radius.xl
             color: Qt.alpha(screen.colors.text, 0.05)
@@ -79,96 +84,87 @@ Rectangle {
                     color: screen.colors.textMuted
                 }
                 Item { width: 1; height: 12 }
-                Rectangle { // mpv's own words; after Copy details, the whole report
+                Rectangle { // the whole report, as it is copied
                     width: parent.width
-                    height: mono.height + (screen.copied ? 24 : 16)
+                    height: mono.height + 24
                     radius: 10
                     color: Qt.alpha(screen.colors.text, 0.06)
                     Text {
                         id: mono
                         objectName: "errorText"
-                        x: screen.copied ? 14 : 10
-                        y: screen.copied ? 12 : 8
+                        x: 14
+                        y: 12
                         width: parent.width - 2 * x
                         wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                        text: screen.copied ? screen.report : "mpv: " + screen.why
+                        text: screen.report
                         color: screen.colors.textMuted
                         font.family: "Consolas"
                         font.pixelSize: Theme.tokens.type.caption
-                        lineHeight: screen.copied ? 18 : 16
+                        lineHeight: 18
                         lineHeightMode: Text.FixedHeight
                     }
                 }
-                Item { visible: !screen.copied; width: 1; height: 20 }
+                Item { width: 1; height: 20 }
                 Flow {
-                    visible: !screen.copied
                     width: parent.width
                     spacing: 8
+                    TextButton {
+                        objectName: "errorReport"
+                        implicitHeight: 40
+                        padding: 16
+                        style: "primary"
+                        icon: "flag"
+                        iconSize: Theme.tokens.icon.sm
+                        text: screen.strings.report_problem
+                        onClicked: Qt.openUrlExternally(ErrorReport.issueUrl(screen.window.errorReportText()))
+                    }
+                    TextButton {
+                        objectName: "errorCopy"
+                        implicitHeight: 40
+                        padding: 16
+                        icon: screen.copied ? "check" : "content_copy"
+                        iconSize: Theme.tokens.icon.sm
+                        text: screen.copied ? screen.strings.copied : screen.strings.copy_details
+                        textColor: screen.colors.text
+                        controlColor: screen.copied ? Qt.alpha(screen.colors.success, 0.14) : screen.colors.controlStrong
+                        onClicked: {
+                            ErrorReport.copy(screen.window.errorReportText())
+                            screen.copied = true
+                        }
+                    }
                     TextButton {
                         visible: screen.window.nextClip() >= 0
                         objectName: "errorNext"
                         implicitHeight: 40
                         padding: 16
-                        style: "primary"
+                        style: "plain"
                         icon: "skip_next"
                         iconFilled: true
                         iconSize: Theme.tokens.icon.sm
                         text: screen.strings.play_next_clip
+                        fontWeight: Font.DemiBold
+                        textColor: screen.colors.text
                         onClicked: screen.window.playNextClip()
                     }
                     TextButton {
                         objectName: "errorOpen"
                         implicitHeight: 40
                         padding: 16
+                        style: "plain"
                         icon: "file_open"
                         iconSize: Theme.tokens.icon.sm
                         text: screen.strings.open_another
+                        fontWeight: Font.DemiBold
                         textColor: screen.colors.text
-                        controlColor: screen.colors.controlStrong
                         onClicked: screen.window.pickFile()
                     }
                 }
-                Item { width: 1; height: 16 }
-                Rectangle { width: parent.width; height: 1; color: screen.colors.hairline }
-                Item { width: 1; height: 12 }
-                Item {
+                Label {
                     width: parent.width
-                    height: 36
-                    Row {
-                        spacing: 4
-                        TextButton {
-                            objectName: "errorCopy"
-                            padding: 10
-                            style: screen.copied ? "control" : "plain"
-                            icon: screen.copied ? "check" : "content_copy"
-                            text: screen.copied ? screen.strings.copied : screen.strings.copy_details
-                            fontWeight: Font.DemiBold
-                            textColor: screen.colors.text
-                            controlColor: Qt.alpha(screen.colors.success, 0.14)
-                            onClicked: {
-                                screen.details()
-                                ErrorReport.copy(screen.report)
-                            }
-                        }
-                        TextButton {
-                            objectName: "errorReport"
-                            padding: 10
-                            style: "plain"
-                            icon: "flag"
-                            text: screen.strings.report_problem
-                            fontWeight: Font.DemiBold
-                            textColor: screen.colors.text
-                            onClicked: Qt.openUrlExternally(ErrorReport.issueUrl(screen.window.errorReportText()))
-                        }
-                    }
-                    Label {
-                        visible: screen.width >= 620
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: screen.strings.sends_nothing
-                        color: screen.colors.textMuted
-                        font.pixelSize: Theme.tokens.type.caption
-                    }
+                    topPadding: 14
+                    text: screen.strings.sends_nothing
+                    color: screen.colors.textMuted
+                    font.pixelSize: Theme.tokens.type.caption
                 }
             }
         }

@@ -126,6 +126,7 @@
 
   "shotfolder_title": "Ekran görüntüleri nereye",
   "shotfolder_desc": "Ekran görüntüsü tuşları buraya kaydeder.",
+  "folder_app": "EchoPlay klasörü",
   "folder_desktop": "Masaüstü",
   "folder_videos": "Videolar",
   "folder_pictures": "Resimler",
@@ -133,6 +134,7 @@
   "folder_custom": "Seçtiğim klasör",
   "shotcustom_title": "Seçilen klasör",
   "choose_folder": "Klasör seç",
+  "open_shot_folder": "Klasörü aç",
   "no_folder": "Henüz klasör seçilmedi.",
 
   "shortcuts_title": "Klavye kısayolları",

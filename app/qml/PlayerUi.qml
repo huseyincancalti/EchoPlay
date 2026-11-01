@@ -268,14 +268,16 @@ Item {
         }
     }
 
-    Loader {
+    Loader { // as tall as its clips, growing up from the bar; it scrolls only when they do not fit below the title bar
+        id: playlistLoader
+        readonly property real highest: ui.fullScreen ? Theme.tokens.bar.inset : 56 // the panel's top edge, at most
         x: ui.width - 360 - Theme.tokens.bar.inset
-        y: ui.fullScreen ? Theme.tokens.bar.inset : 56
+        y: controlBar.y - 12 - (item ? item.height : 0)
         active: ui.playlistOpen
         sourceComponent: PlaylistPanel {
             ui: player
             width: 360
-            height: controlBar.y - 12 - parent.y
+            height: Math.min(wanted, controlBar.y - 12 - playlistLoader.highest)
         }
     }
 

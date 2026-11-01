@@ -42,11 +42,15 @@ public:
     void setSpeedFactor(double factor); // clamped to the range
     double speedStep() const;
     void setSpeedStep(double step); // ignored outside (0, 1]
-    // "desktop", "videos", "pictures", "video_folder" (next to the video), or "custom" (screenshotCustomPath)
+    // "app" (EchoPlay's own folder in AppData, the default), "desktop", "videos", "pictures", "video_folder" (next to
+    // the video), or "custom" (screenshotCustomPath)
     QString screenshotFolder() const;
     void setScreenshotFolder(const QString &folder);
     QString screenshotCustomPath() const;
     void setScreenshotCustomPath(const QString &path);
+    // Where the shots go now, as Windows writes it; for "next to the video" that is the default, as no video is named.
+    Q_INVOKABLE QString screenshotPath() const;
+    Q_INVOKABLE bool openScreenshotFolder() const; // in Explorer; the folder is made if it is not there yet
     int seekStep() const;
     void setSeekStep(int seconds); // anything else is ignored
     int volumeMax() const;
@@ -86,6 +90,8 @@ signals:
     void changed();
 
 private:
+    QString screenshotDir(const QString &videoPath) const;
+
     static inline PlayerSettings *s_instance = nullptr;
     AppState *m_state;
 };

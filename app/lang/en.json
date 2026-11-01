@@ -126,6 +126,7 @@
 
   "shotfolder_title": "Where screenshots go",
   "shotfolder_desc": "The screenshot keys save here.",
+  "folder_app": "EchoPlay's folder",
   "folder_desktop": "Desktop",
   "folder_videos": "Videos",
   "folder_pictures": "Pictures",
@@ -133,6 +134,7 @@
   "folder_custom": "A folder I choose",
   "shotcustom_title": "Chosen folder",
   "choose_folder": "Choose folder",
+  "open_shot_folder": "Open folder",
   "no_folder": "No folder chosen yet.",
 
   "shortcuts_title": "Keyboard shortcuts",

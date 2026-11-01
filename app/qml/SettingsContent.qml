@@ -389,15 +389,25 @@ Column {
     Row_ {
         tab: "screenshots"
         title: content.strings.shotfolder_title
-        description: content.strings.shotfolder_desc
-        Drop {
-            implicitWidth: 220
-            name: content.strings.shotfolder_title
-            options: [{value: "desktop", label: content.strings.folder_desktop}, {value: "videos", label: content.strings.folder_videos},
-                      {value: "pictures", label: content.strings.folder_pictures}, {value: "video_folder", label: content.strings.folder_video},
-                      {value: "custom", label: content.strings.folder_custom}]
-            value: PlayerSettings.screenshotFolder
-            onChosen: value => PlayerSettings.screenshotFolder = value
+        description: PlayerSettings.screenshotFolder === "app" ? PlayerSettings.screenshotPath() : content.strings.shotfolder_desc
+        Row {
+            spacing: 12
+            Drop {
+                implicitWidth: 200
+                name: content.strings.shotfolder_title
+                options: [{value: "app", label: content.strings.folder_app}, {value: "desktop", label: content.strings.folder_desktop},
+                          {value: "videos", label: content.strings.folder_videos}, {value: "pictures", label: content.strings.folder_pictures},
+                          {value: "video_folder", label: content.strings.folder_video}, {value: "custom", label: content.strings.folder_custom}]
+                value: PlayerSettings.screenshotFolder
+                onChosen: value => PlayerSettings.screenshotFolder = value
+            }
+            Button_ { // "next to the video" has no one place to open
+                objectName: "openShotFolder"
+                visible: PlayerSettings.screenshotFolder !== "video_folder"
+                icon: "folder_open"
+                text: content.strings.open_shot_folder
+                onClicked: PlayerSettings.openScreenshotFolder()
+            }
         }
     }
     Row_ {

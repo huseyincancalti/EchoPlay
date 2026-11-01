@@ -321,10 +321,18 @@ private slots:
             // End of video and screenshot folder: v1's defaults, then a change reaches mpv at once.
             QCOMPARE(app.prop("keep-open"), QString("always"));
             QCOMPARE(app.prop("loop-file"), QString("no"));
-            QCOMPARE(app.prop("screenshot-dir"), QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+            QCOMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QDir::cleanPath(m_path + "/Screenshots"));
             app.services.player.setEndMode("loop");
             QTRY_COMPARE(app.prop("loop-file"), QString("inf"));
             QCOMPARE(app.prop("keep-open"), QString("no"));
+            // mpv makes the folder at the first screenshot: the default place in AppData needs no setup.
+            const QString shots = QDir(m_path).filePath("shots-new");
+            QVERIFY(!QDir(shots).exists());
+            app.services.player.setScreenshotFolder("custom");
+            app.services.player.setScreenshotCustomPath(shots);
+            QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QDir::cleanPath(shots));
+            app.mpv->command({"screenshot", "video"});
+            QTRY_VERIFY_WITH_TIMEOUT(!QDir(shots).entryList(QDir::Files).isEmpty(), 5000);
             app.services.player.setScreenshotFolder("video_folder");
             QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QFileInfo(m_clip).absolutePath());
             const double before = app.number("time-pos");
@@ -725,12 +733,14 @@ private slots:
             QVERIFY(app.item("errorScreen")); // mpv did not go on to the next clip by itself
             app.shot("error");
             QVERIFY(Launch::searchVisible(app.window->contentItem(), "errorNext")); // b-good.mp4 comes after it
-            // The button would overwrite the clipboard of whoever sits at the PC: the report is read from the screen.
-            QVERIFY(QMetaObject::invokeMethod(app.item("errorScreen"), "details"));
-            QTest::qWait(60);
-            app.shot("error-details");
+            QVERIFY(Launch::searchVisible(app.window->contentItem(), "errorReport"));
+            QVERIFY(Launch::searchVisible(app.window->contentItem(), "errorCopy"));
+            QVERIFY(Launch::searchVisible(app.window->contentItem(), "errorOpen"));
+            // The whole report is on the card from the start. Copy details would overwrite the clipboard of whoever sits
+            // at the PC: the report is read from the screen.
             const QString text = app.item("errorText")->property("text").toString();
             QVERIFY2(text.contains("Cause, from the mpv engine: unrecognized file format."), qPrintable(text));
+            QVERIFY2(text.contains("Failed to recognize file format"), qPrintable(text)); // mpv's last line, after the failure
             QVERIFY2(text.contains("a-broken.mp4"), qPrintable(text));
             QVERIFY2(text.contains("Last log lines:"), qPrintable(text));
             QVERIFY2(!text.contains(QDir::home().dirName(), Qt::CaseInsensitive), qPrintable(text));
@@ -885,6 +895,10 @@ private slots:
         QVERIFY(app.click("playlistButton"));
         QTRY_VERIFY(app.item("playlistPanel"));
         QTRY_VERIFY(app.item("playlistRow-2"));
+        // As tall as its three clips (title 60, rows 70 each, margin 10), standing on the bar.
+        QQuickItem *panel = app.item("playlistPanel");
+        QTRY_COMPARE(panel->height(), 60.0 + 3 * 70 + 10);
+        QTRY_VERIFY(panel->mapToScene(QPointF(0, panel->height())).y() <= app.item("controlBar")->mapToScene(QPointF()).y());
         // Natural order, from mpv: 1, 2, 10. The rows on screen get read in the background.
         const auto info = [&](const char *name) { // mpv's playlist has the native path
             return app.services.clipInfo.info(QDir::toNativeSeparators(clips + "/" + name));

@@ -1,4 +1,6 @@
 #include <QtTest>
+#include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include "AppState.h"
 #include "PlayerSettings.h"
@@ -21,12 +23,11 @@ private slots:
         QCOMPARE(m_settings->endMode(), QString("stop"));
         QCOMPARE(m_settings->speedFactor(), 2.0);
         QCOMPARE(m_settings->speedStep(), 0.1);
-        QCOMPARE(m_settings->screenshotFolder(), QString("desktop"));
+        QCOMPARE(m_settings->screenshotFolder(), QString("app")); // EchoPlay's own folder, not v1's desktop
         const QVariantMap o = m_settings->mpvOptions("C:/Videos/a.mp4");
         QCOMPARE(o.value("keep-open").toString(), QString("always")); // stays on the last frame, no next file
         QCOMPARE(o.value("loop-file").toString(), QString("no"));
-        QCOMPARE(o.value("screenshot-dir").toString(),
-                 QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+        QCOMPARE(o.value("screenshot-dir").toString(), appShots());
     }
 
     void endModes()
@@ -67,12 +68,17 @@ private slots:
         m_settings->setScreenshotFolder("video_folder");
         QCOMPARE(m_settings->mpvOptions("C:/Videos/Clips/a.mp4").value("screenshot-dir").toString(),
                  QString("C:/Videos/Clips"));
-        const QString desktop = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
-        QCOMPARE(m_settings->mpvOptions("https://example.com/a.mp4").value("screenshot-dir").toString(), desktop);
+        // Where the chosen place does not apply, EchoPlay's folder gets the shot
+        QCOMPARE(m_settings->mpvOptions("https://example.com/a.mp4").value("screenshot-dir").toString(), appShots());
         m_settings->setScreenshotFolder("custom"); // no folder picked yet
-        QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(), desktop);
+        QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(), appShots());
         m_settings->setScreenshotCustomPath("D:/Shots");
         QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(), QString("D:/Shots"));
+        m_settings->setScreenshotFolder("desktop");
+        QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(),
+                 QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+        m_settings->setScreenshotFolder("app");
+        QCOMPARE(m_settings->screenshotPath(), QDir::toNativeSeparators(appShots()));
         m_settings->setScreenshotFolder("pictures");
         QCOMPARE(m_settings->mpvOptions({}).value("screenshot-dir").toString(),
                  QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
@@ -203,7 +209,7 @@ private slots:
         QCOMPARE(loaded.endMode(), QString("stop"));
         QCOMPARE(loaded.speedFactor(), 2.0);
         QCOMPARE(loaded.speedStep(), 0.1);
-        QCOMPARE(loaded.screenshotFolder(), QString("desktop"));
+        QCOMPARE(loaded.screenshotFolder(), QString("app"));
         QCOMPARE(loaded.screenshotCustomPath(), QString());
         QCOMPARE(loaded.seekStep(), 10);
         QCOMPARE(loaded.volumeMax(), 300);
@@ -217,6 +223,7 @@ private slots:
     }
 
 private:
+    QString appShots() const { return QFileInfo(m_path).absolutePath() + "/Screenshots"; } // next to state.json
     QTemporaryDir m_dir;
     int m_n = 0;
     QString m_path;

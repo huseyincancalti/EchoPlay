@@ -41,7 +41,8 @@ public:
     void setSpeedFactor(double factor);
     double speedStep() const { return m_speedStep; } // the speed-down/up keys' step
     void setSpeedStep(double step);
-    QString screenshotFolder() const { return m_screenshotFolder; } // "desktop", "videos", "pictures", "video_folder", "custom"
+    QString directory() const; // the folder of the state file: EchoPlay's own folder in the user's AppData
+    QString screenshotFolder() const { return m_screenshotFolder; } // "app", "desktop", "videos", "pictures", "video_folder", "custom"
     void setScreenshotFolder(const QString &folder);
     QString screenshotCustomPath() const { return m_screenshotCustomPath; }
     void setScreenshotCustomPath(const QString &path);
@@ -111,7 +112,7 @@ private:
     QString m_endMode = QStringLiteral("stop");
     double m_speedFactor = 2.0;
     double m_speedStep = 0.1;
-    QString m_screenshotFolder = QStringLiteral("desktop");
+    QString m_screenshotFolder = QStringLiteral("app");
     QString m_screenshotCustomPath;
     int m_seekStep = 10;
     int m_volumeMax = int(VolumeMax);

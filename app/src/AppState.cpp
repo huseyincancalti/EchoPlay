@@ -75,6 +75,8 @@ void AppState::setSpeedStep(double step)
     changed();
 }
 
+QString AppState::directory() const { return QFileInfo(m_path).absolutePath(); }
+
 void AppState::setScreenshotFolder(const QString &folder)
 {
     if (folder == m_screenshotFolder) return;
@@ -273,7 +275,7 @@ void AppState::load()
         if (it.value().isString()) m_shortcuts.insert(it.key(), it.value().toString());
 
     const QJsonObject screenshots = s.value("screenshots").toObject();
-    static const QRegularExpression folder("^(desktop|videos|pictures|video_folder|custom)$");
+    static const QRegularExpression folder("^(app|desktop|videos|pictures|video_folder|custom)$");
     if (folder.match(screenshots.value("folder").toString()).hasMatch())
         m_screenshotFolder = screenshots.value("folder").toString();
     if (screenshots.value("custom").isString()) m_screenshotCustomPath = screenshots.value("custom").toString();

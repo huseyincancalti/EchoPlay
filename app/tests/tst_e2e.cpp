@@ -10,6 +10,7 @@
 #include <QtQml/qqmlextensionplugin.h>
 #include <atomic>
 #include <clocale>
+#include <cmath>
 #include <functional>
 #include <thread>
 #include "MpvItem.h"
@@ -261,7 +262,7 @@ private slots:
             app.wake();
             QTRY_VERIFY(app.item("controlBar")->isVisible());
             app.shot("bar");
-            QTRY_VERIFY_WITH_TIMEOUT(!app.item("controlBar")->isVisible(), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!app.item("controlBar")->isVisible(), 8000); // a real pointer over the window wakes it too
             app.shot("idle");
 
             // The mixer: the chip opens it, a switch in a row changes what mpv plays.
@@ -309,6 +310,8 @@ private slots:
             QTRY_COMPARE(app.number("volume"), 85.0);
 
             // Pause, speed, seek.
+            const auto toast = [&] { return app.item("toastText")->property("text").toString(); };
+            const auto text = [&](const char *key) { return app.services.i18n.strings().value(key).toString(); };
             QVERIFY(app.mpv->keepingAwake()); // playing: the display does not sleep
             app.key(Qt::Key_Space);
             QTRY_COMPARE(app.prop("pause"), QString("yes"));
@@ -318,6 +321,7 @@ private slots:
             QTRY_VERIFY(app.mpv->keepingAwake());
             app.key(Qt::Key_G);
             QTRY_COMPARE(app.number("speed"), 2.0);
+            QTRY_COMPARE(toast(), text("speed_now").arg("2")); // with the bar down, nothing else says it
             app.key(Qt::Key_G);
             QTRY_COMPARE(app.number("speed"), 1.0);
             app.key(Qt::Key_D);
@@ -350,6 +354,9 @@ private slots:
             QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QDir::cleanPath(shots));
             app.mpv->command({"screenshot", "video"});
             QTRY_VERIFY_WITH_TIMEOUT(!QDir(shots).entryList(QDir::Files).isEmpty(), 5000);
+            app.key(Qt::Key_F1); // the key says it worked
+            QTRY_COMPARE(toast(), text("shot_saved"));
+            QTRY_COMPARE(QDir(shots).entryList(QDir::Files).size(), 2);
             app.services.player.setScreenshotFolder("video_folder");
             QTRY_COMPARE(QDir::fromNativeSeparators(app.prop("screenshot-dir")), QFileInfo(m_clip).absolutePath());
             const double before = app.number("time-pos");
@@ -364,6 +371,60 @@ private slots:
             app.services.player.setSeekStep(10);
             app.mpv->command({"seek", 0, "absolute"});
             QTRY_VERIFY(app.number("time-pos") < 5);
+
+            // One frame at a time, and it stops there. A second at a time with Shift. 0-9 jump to that tenth of the clip.
+            app.mpv->command({"seek", 10, "absolute+exact"});
+            QTRY_VERIFY(std::abs(app.number("time-pos") - 10) < 0.5);
+            app.key(Qt::Key_Period);
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
+            QTest::qWait(200); // the step has landed
+            const double frame = app.number("time-pos");
+            app.key(Qt::Key_Period);
+            QTRY_VERIFY(app.number("time-pos") > frame);
+            QVERIFY2(app.number("time-pos") - frame < 0.05, "more than one frame at 60 fps");
+            const double nextFrame = app.number("time-pos");
+            app.key(Qt::Key_Comma);
+            QTRY_VERIFY(app.number("time-pos") < nextFrame);
+            const double second = app.number("time-pos");
+            app.key(Qt::Key_Right, Qt::ShiftModifier);
+            QTRY_VERIFY(std::abs(app.number("time-pos") - second - 1) < 0.05);
+            app.key(Qt::Key_Left, Qt::ShiftModifier);
+            QTRY_VERIFY(std::abs(app.number("time-pos") - second) < 0.05);
+            app.key(Qt::Key_5);
+            QTRY_VERIFY(std::abs(app.number("time-pos") - 30) < 0.1);
+            app.key(Qt::Key_0);
+            QTRY_VERIFY(app.number("time-pos") < 0.1);
+
+            // A part on a loop: its start, its end, off. The seek bar shows it, and it plays round.
+            const auto loopSet = [&](const char *name) { return app.mpv->observed(name).typeId() == QMetaType::Double; };
+            app.mpv->command({"seek", 10, "absolute+exact"});
+            QTRY_VERIFY(std::abs(app.number("time-pos") - 10) < 0.1);
+            app.key(Qt::Key_L);
+            QTRY_VERIFY(loopSet("ab-loop-a"));
+            QVERIFY2(toast().contains("0:10"), qPrintable(toast()));
+            app.mpv->command({"seek", 11, "absolute+exact"});
+            QTRY_VERIFY(std::abs(app.number("time-pos") - 11) < 0.1);
+            app.key(Qt::Key_L);
+            QTRY_VERIFY(loopSet("ab-loop-b"));
+            app.wake();
+            QTRY_VERIFY(Launch::searchVisible(app.window->contentItem(), "loopEndMark"));
+            QVERIFY(Launch::searchVisible(app.window->contentItem(), "loopStartMark"));
+            app.shot("loop");
+            app.key(Qt::Key_Space);
+            QTRY_COMPARE(app.prop("pause"), QString("no"));
+            QTRY_VERIFY(app.number("time-pos") > 10.6);
+            QTRY_VERIFY(app.number("time-pos") < 10.4); // back at its start
+            app.key(Qt::Key_L);
+            QTRY_VERIFY(!loopSet("ab-loop-a"));
+            QTRY_VERIFY(!Launch::searchVisible(app.window->contentItem(), "loopEndMark"));
+
+            // A click on the time: what is left, and back.
+            app.wake();
+            QTRY_VERIFY(app.item("timeDisplay")->isVisible());
+            QVERIFY(app.click("timeDisplay"));
+            QTRY_VERIFY(app.item("timeText")->property("text").toString().startsWith("-"));
+            QVERIFY(app.click("timeDisplay"));
+            QTRY_VERIFY(!app.item("timeText")->property("text").toString().startsWith("-"));
 
             // Loudness boost: v1's levelling by default; off removes the filter while the video plays on.
             QCOMPARE(app.mpv->observed("af").toList().size(), 1);
@@ -382,6 +443,40 @@ private slots:
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             QTest::mouseDClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
+            QTest::qWait(100);
+            QTRY_COMPARE(app.prop("pause"), QString("no")); // a double click's first click takes nothing with it
+
+            // A click on the video pauses and plays. One that closes something does only that. It can be turned off.
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
+            QTRY_COMPARE(app.prop("pause"), QString("no"));
+            app.wake();
+            QTRY_VERIFY(app.item("gearButton")->isVisible());
+            QVERIFY(app.click("gearButton"));
+            QTRY_VERIFY(app.item("quickPopover"));
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
+            QTRY_VERIFY(!app.item("quickPopover"));
+            QTest::qWait(100);
+            QCOMPARE(app.prop("pause"), QString("no"));
+            app.services.player.setClickPauses(false);
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
+            QTest::qWait(100);
+            QCOMPARE(app.prop("pause"), QString("no"));
+            app.services.player.setClickPauses(true);
+
+#ifdef Q_OS_WIN
+            // Always on top: T, and the next run comes back with it.
+            const auto onTop = [&] { return (GetWindowLongPtrW(HWND(app.window->winId()), GWL_EXSTYLE) & WS_EX_TOPMOST) != 0; };
+            QVERIFY(!onTop());
+            app.key(Qt::Key_T);
+            QTRY_VERIFY(onTop());
+            app.key(Qt::Key_T);
+            QTRY_VERIFY(!onTop());
+            app.key(Qt::Key_T);
+            QTRY_VERIFY(onTop());
+            QTRY_COMPARE(toast(), text("on_top_on"));
+#endif
 
             // Picture quality: a forced tier reaches mpv at once (the settings UI will set pref).
             QCOMPARE(app.prop("scale"), QString("lanczos")); // Auto starts at Normal
@@ -398,6 +493,13 @@ private slots:
         } // closed: pending state is written now
 
         QCOMPARE(voInits(log), 1); // every mixer switch kept the video running (no VO re-init)
+        // Picture and sound start together, at the start of the clip: nothing played while the window was coming up.
+        QFile startLog(log);
+        QVERIFY(startLog.open(QIODevice::ReadOnly));
+        const QRegularExpressionMatch firstFrame = QRegularExpression("playback restart complete @ ([0-9.]+), audio=\\w+, video=playing")
+                                                       .match(QString::fromUtf8(startLog.readAll()));
+        QVERIFY(firstFrame.hasMatch());
+        QVERIFY2(firstFrame.captured(1).toDouble() < 0.1, qPrintable("the first frame shown is at " + firstFrame.captured(1)));
         QFile f(QDir(m_path).filePath("state.json"));
         QVERIFY(f.open(QIODevice::ReadOnly));
         const QJsonObject state = QJsonDocument::fromJson(f.readAll()).object();
@@ -789,6 +891,10 @@ private slots:
             QTRY_VERIFY(app.number("time-pos") >= 30); // "always": no question
             QVERIFY(!app.item("resumeCard"));
 
+            QTRY_VERIFY(app.item("controlBar"));
+            app.key(Qt::Key_L); // a part on a loop means nothing in the next file
+            QTRY_VERIFY(app.mpv->observed("ab-loop-a").typeId() == QMetaType::Double);
+
             // A bad file: the error screen, its way out and the report. The playlist stays for the next clip.
             const QString badDir = QDir(m_path).filePath("bad");
             QVERIFY(QDir().mkpath(badDir));
@@ -800,6 +906,7 @@ private slots:
             QVERIFY(QFile::copy(m_clip, badDir + "/b-good.mp4"));
             QVERIFY(QMetaObject::invokeMethod(app.window, "openPath", Q_ARG(QVariant, badDir + "/a-broken.mp4")));
             QTRY_VERIFY(app.item("errorScreen"));
+            QTRY_VERIFY(app.mpv->observed("ab-loop-a").typeId() != QMetaType::Double);
             QTest::qWait(300);
             QVERIFY(app.item("errorScreen")); // mpv did not go on to the next clip by itself
             app.shot("error");
@@ -885,6 +992,8 @@ private slots:
             // Clicks outside the card end it, and still do what they do.
             QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
             QTRY_VERIFY(!app.item("resumeCard"));
+            QTest::qWait(100);
+            QCOMPARE(app.prop("pause"), QString("yes")); // on the video, that click only ended the question
             QVERIFY(ask());
             QVERIFY(app.click("seekBar"));
             QTRY_VERIFY(!app.item("resumeCard"));
@@ -1326,11 +1435,60 @@ private slots:
     }
 #endif
 
+    // The window comes back where it was left, maximized or not. Full screen comes back as what it came from.
+    void windowPlaceIsRemembered()
+    {
+        const QString state = QDir(m_path).filePath("place");
+        QVERIFY(QDir().mkpath(state));
+        QRect normal;
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("place1.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            app.window->setGeometry(70, 90, 900, 520);
+            QTRY_COMPARE(app.window->width(), 900);
+            normal = app.window->geometry();
+            app.window->findChild<WindowChrome *>()->toggleMaximized();
+            QTRY_COMPARE(app.window->visibility(), QWindow::Maximized);
+            app.window->close();
+        }
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("place2.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QTRY_COMPARE(app.window->visibility(), QWindow::Maximized);
+            app.window->findChild<WindowChrome *>()->toggleMaximized();
+            QTRY_COMPARE(app.window->geometry(), normal);
+            app.key(Qt::Key_F);
+            QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
+            app.window->close();
+        }
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("place3.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QCOMPARE(app.window->visibility(), QWindow::Windowed);
+            QCOMPARE(app.window->geometry(), normal);
+
+            // A clip opened on purpose plays, even if the last one was paused.
+            app.key(Qt::Key_Space);
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
+            QVERIFY(QMetaObject::invokeMethod(app.window, "openPath", Q_ARG(QVariant, m_clip)));
+            QTRY_COMPARE(app.prop("pause"), QString("no"));
+        }
+    }
+
     void secondRunRestoresMixerAndVolume()
     {
         Launch app(m_path, m_clip, QDir(m_path).filePath("run2.log"));
         QVERIFY(app.mpv);
         QVERIFY2(app.playing(), "the clip did not start playing");
+#ifdef Q_OS_WIN
+        const auto onTop = [&] { return (GetWindowLongPtrW(HWND(app.window->winId()), GWL_EXSTYLE) & WS_EX_TOPMOST) != 0; };
+        QVERIFY(onTop()); // the first run left it on
+        app.key(Qt::Key_T);
+        QTRY_VERIFY(!onTop());
+#endif
         QTRY_COMPARE(app.prop("aid"), QString("2"));
         QCOMPARE(app.prop("lavfi-complex"), QString());
         QCOMPARE(app.number("volume"), 85.0);

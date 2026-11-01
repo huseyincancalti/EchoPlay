@@ -39,6 +39,8 @@ GlassPanel {
         position: bar.ui.position
         duration: bar.ui.duration
         hasVideo: bar.ui.hasVideo
+        loopA: bar.ui.loopA
+        loopB: bar.ui.loopB
         bounds: bar.parent
         onSeekRequested: (seconds, exact) => bar.ui.seekTo(seconds, exact)
     }
@@ -87,19 +89,31 @@ GlassPanel {
             font.features: {"tnum": 1}
         }
         Item { width: 6; height: 1 }
-        Row {
+        Item { // a click: what has played, or what is left
+            objectName: "timeDisplay"
             anchors.verticalCenter: parent.verticalCenter
-            Label {
-                text: Format.time(bar.ui.position)
-                color: bar.glass.text
-                font.weight: Font.DemiBold
-                font.features: {"tnum": 1}
+            width: times.width
+            height: times.height
+            Row {
+                id: times
+                Label {
+                    objectName: "timeText"
+                    text: PlayerSettings.showRemaining ? "-" + Format.time(Math.max(0, bar.ui.duration - bar.ui.position)) : Format.time(bar.ui.position)
+                    color: bar.glass.text
+                    font.weight: Font.DemiBold
+                    font.features: {"tnum": 1}
+                }
+                Label {
+                    text: " / " + Format.time(bar.ui.duration)
+                    color: bar.glass.textMuted
+                    font.weight: Font.Medium
+                    font.features: {"tnum": 1}
+                }
             }
-            Label {
-                text: " / " + Format.time(bar.ui.duration)
-                color: bar.glass.textMuted
-                font.weight: Font.Medium
-                font.features: {"tnum": 1}
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: PlayerSettings.showRemaining = !PlayerSettings.showRemaining
             }
         }
     }

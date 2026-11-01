@@ -1,5 +1,6 @@
 import QtQuick
 import EchoPlay
+import "Format.js" as Format
 
 // Everything over the video. Main.qml keeps the startup sequence and mpv's setup; this reads mpv only through
 // observed values (a synchronous get can stall the render loop) and polls the position on a timer, never per frame.
@@ -28,6 +29,8 @@ Item {
     property real position: 0
     property var trackList: []
     property var subtitleTrack: false
+    property real loopA: -1 // the A-B loop's ends in seconds, -1 while not set
+    property real loopB: -1
 
     readonly property var tracks: MixerController.tracks
     readonly property bool hasVideo: trackList.some(t => t.type === "video")
@@ -84,6 +87,15 @@ Item {
     }
     function flashVolume() { flash.request() }
     function sweepArrows(forward) { sweep.play(forward) }
+    // mpv's three steps: its start here, its end here, off. The bar comes up to show them on the seek bar.
+    function cycleLoop() {
+        const now = mpv.observed("time-pos") || 0
+        window.showToast(loopA < 0 ? I18n.strings.loop_start.arg(Format.time(now))
+                         : loopB < 0 ? I18n.strings.loop_on.arg(Format.time(Math.min(loopA, now))).arg(Format.time(Math.max(loopA, now)))
+                         : I18n.strings.loop_off, 2500)
+        wake()
+        mpv.command(["ab-loop"])
+    }
 
     function observe(name, value) {
         switch (name) {
@@ -94,10 +106,12 @@ Item {
         case "duration": duration = value || 0; break
         case "track-list": trackList = value || []; break
         case "sid": subtitleTrack = value; break
+        case "ab-loop-a": loopA = typeof value === "number" ? value : -1; break // "no" while not set
+        case "ab-loop-b": loopB = typeof value === "number" ? value : -1; break
         }
     }
     Component.onCompleted: {
-        for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid"]) {
+        for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid", "ab-loop-a", "ab-loop-b"]) {
             mpv.observeProperty(name)
             observe(name, mpv.observed(name))
         }
@@ -152,11 +166,19 @@ Item {
         active: ui.chromeUp || flash.shown || resumeLoader.active || ui.window.cardShown
     }
     MouseArea { // the video itself
+        property bool pausedByClick: false
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         cursorShape: ui.chromeUp ? Qt.ArrowCursor : Qt.BlankCursor
-        onClicked: ui.closeTop()
-        onDoubleClicked: ui.toggleFullScreen()
+        // A click that closes something, or ends the resume question, does only that.
+        onClicked: {
+            pausedByClick = !ui.closeTop() && !ui.window.clickEndedQuestion() && PlayerSettings.clickPauses
+            if (pausedByClick) ui.mpv.command(["cycle", "pause"])
+        }
+        onDoubleClicked: {
+            if (pausedByClick) ui.mpv.command(["cycle", "pause"]) // the first click's, as on YouTube: no wait before a pause
+            ui.toggleFullScreen()
+        }
         onWheel: wheel => {
             ui.flashVolume()
             ui.mpv.command(["add", "volume", wheel.angleDelta.y > 0 ? 5 : -5])

@@ -62,6 +62,14 @@ public:
     void setResumeMode(const QString &mode);
     bool firstRunHintDone() const { return m_firstRunHintDone; }
     void setFirstRunHintDone(bool done);
+    bool clickPauses() const { return m_clickPauses; } // a click on the video pauses and plays
+    void setClickPauses(bool on);
+    bool showRemaining() const { return m_showRemaining; } // the bar's time: what is left instead of what has played
+    void setShowRemaining(bool on);
+    bool alwaysOnTop() const { return m_alwaysOnTop; }
+    void setAlwaysOnTop(bool on);
+    QVariantMap windowPlacement() const { return m_windowPlacement; } // WindowChrome's; empty until the first close
+    void setWindowPlacement(const QVariantMap &placement);
     QVariantMap shortcuts() const { return m_shortcuts; } // action -> key sequence, only what the user changed
     void setShortcuts(const QVariantMap &shortcuts);
     // Settings > Appearance: their values are checked by Theme, which owns them. Empty = the theme file's token.
@@ -122,6 +130,10 @@ private:
     QString m_tracksOnOpen = QStringLiteral("last");
     QString m_resumeMode = QStringLiteral("ask");
     bool m_firstRunHintDone = false;
+    bool m_clickPauses = true;
+    bool m_showRemaining = false;
+    bool m_alwaysOnTop = false;
+    QVariantMap m_windowPlacement;
     QVariantMap m_shortcuts;
     QString m_themeMode = QStringLiteral("dark");
     QString m_accentColor;

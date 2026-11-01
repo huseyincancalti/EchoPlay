@@ -67,8 +67,8 @@ void WindowChrome::toggleFullScreen()
 #endif
     if (m_window->visibility() != QWindow::FullScreen) {
 #ifdef Q_OS_WIN
-        m_maximizedBefore = IsZoomed(hwnd) && GetWindowPlacement(hwnd, &placement);
-        if (m_maximizedBefore) {
+        m_maximizedBefore = IsZoomed(hwnd);
+        if (GetWindowPlacement(hwnd, &placement)) {
             const RECT &r = placement.rcNormalPosition;
             m_restoreRect = QRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
         }
@@ -85,6 +85,52 @@ void WindowChrome::toggleFullScreen()
                                       m_restoreRect.top() + m_restoreRect.height()};
         SetWindowPlacement(hwnd, &placement);
     }
+#endif
+}
+
+void WindowChrome::setAlwaysOnTop(bool on)
+{
+    if (!m_window) return;
+#ifdef Q_OS_WIN
+    SetWindowPos(HWND(m_handle), on ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+#else
+    m_window->setFlag(Qt::WindowStaysOnTopHint, on);
+#endif
+}
+
+QVariantMap WindowChrome::placement() const
+{
+    if (!m_window) return {};
+#ifdef Q_OS_WIN
+    const HWND hwnd = HWND(m_handle);
+    QRect normal = m_restoreRect;
+    bool maximized = m_maximizedBefore;
+    if (m_window->visibility() != QWindow::FullScreen) {
+        WINDOWPLACEMENT placement{};
+        placement.length = sizeof(placement);
+        if (!GetWindowPlacement(hwnd, &placement)) return {};
+        const RECT &r = placement.rcNormalPosition;
+        normal = QRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+        maximized = IsZoomed(hwnd) || (IsIconic(hwnd) && (placement.flags & WPF_RESTORETOMAXIMIZED));
+    }
+    return {{"x", normal.x()}, {"y", normal.y()}, {"width", normal.width()}, {"height", normal.height()}, {"maximized", maximized}};
+#else
+    return {};
+#endif
+}
+
+void WindowChrome::restorePlacement(const QVariantMap &saved)
+{
+    if (!m_window || saved.value("width").toInt() <= 0 || saved.value("height").toInt() <= 0) return;
+#ifdef Q_OS_WIN
+    const HWND hwnd = HWND(m_handle);
+    WINDOWPLACEMENT placement{};
+    placement.length = sizeof(placement);
+    if (!GetWindowPlacement(hwnd, &placement)) return;
+    const int x = saved.value("x").toInt(), y = saved.value("y").toInt();
+    placement.rcNormalPosition = {x, y, x + saved.value("width").toInt(), y + saved.value("height").toInt()};
+    placement.showCmd = SW_HIDE;
+    SetWindowPlacement(hwnd, &placement);
 #endif
 }
 

@@ -81,6 +81,7 @@ ECHOPLAY_E2E_SHOTS="$(pwd)/.out/shots" bash tools/e2e.sh   # the same, with a PN
 bash tools/window-live.sh               # resize edges, Aero Snap, snap layouts with the REAL mouse and keyboard (ask first)
 [VERSION=2.0.0] bash tools/package-v2.sh   # Windows installer: stage (checked without dev PATH) + Inno Setup
 bash tools/setup-live.sh                # the real setup in a test install: update on close, a clip opened during it, Install now
+bash tools/media-keys.sh                # media keys and Windows' media overlay: a real media session, play/pause through it
 bash tools/make-clips.sh <recording> [start] [len]   # test clips in .out/clips: 1080p cut + 4K60 upscale, all tracks
 RUNS=3 TOGGLE=1 bash tools/bench.sh <seconds> <videos>  # v1 engine vs v2: startup, dropped frames, live mixer
 bash tools/shot-compare.sh <video> <seconds>         # same paused frame from v1 and v2, SSIM/PSNR

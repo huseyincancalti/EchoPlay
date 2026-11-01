@@ -23,6 +23,7 @@ public:
     ~MpvItem() override;
 
     Q_INVOKABLE void command(const QVariantList &args);
+    Q_INVOKABLE void screenshot(const QString &mode); // "subtitles", "video", "window"; screenshotFinished says how it went
     Q_INVOKABLE void setOption(const QString &name, const QString &value); // before start() only
     Q_INVOKABLE void start();                                              // mpv_initialize
     // Synchronous: waits for mpv's core. Avoid it while playing. A GUI thread blocked on the core stalls Qt's
@@ -54,6 +55,7 @@ signals:
     void fileEnded(const QString &reason, const QString &error, qint64 entryId);
     void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
     void keepingAwakeChanged();
+    void screenshotFinished(bool saved);
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;

@@ -48,6 +48,8 @@ Window {
     property var resumeOffer: null    // {at, savedAt}: "Resume from 1:24?" is open
     property bool keepOldSpot: false  // it was asked and Start over was not chosen: only a new spot worth saving replaces the old
     property bool updateDismissed: false // Install on close, the cross or 15 s: for this run
+    property real questionEndedAt: 0  // when a click outside the card ended the resume question
+    property bool speedKeyUsed: false // the next speed change came from a key: say it, as nothing else shows it with the bar down
     // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
     // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
     readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle || thumbScrub || tierCycle
@@ -67,17 +69,21 @@ Window {
     }
 
     // Opened paused: mpv dropped the first ~8 frames when the clock ran while Qt was still building its first
-    // frames. Playback starts once the first video frame is on screen (onFrameSwapped).
+    // frames. Playback starts once the first video frame is on screen (onFrameSwapped). The property, not a loadfile
+    // option: the folder playlist replaces the opened entry and that option is gone, and the first half second of the
+    // clip played with no picture.
     function openFile(file) {
-        const start = root.shotAt >= 0 ? "start=" + root.shotAt + "," : ""
-        mpv.command(["loadfile", file, "replace", -1, start + "pause=yes"])
+        mpv.setProperty("pause", true)
+        mpv.command(["loadfile", file, "replace", -1, root.shotAt >= 0 ? "start=" + root.shotAt : ""])
     }
     // Every way of opening after the first start: the start screen, a drop, a second launch's hand-over.
     function openPath(path) {
         root.file = path
         root.earlyRestart = root.endedEarly = root.videoRetried = false
-        if (root.videoOn) mpv.command(["loadfile", path, "replace"])
-        else root.openFile(path)
+        if (root.videoOn) {
+            mpv.setProperty("pause", false) // a clip opened on purpose plays, whatever the last one was doing
+            mpv.command(["loadfile", path, "replace"])
+        } else root.openFile(path)
     }
     function openUrl(url) {
         const path = MediaFiles.pathToOpen(url)
@@ -88,6 +94,9 @@ Window {
         dialogs.active = true
         return dialogs.item
     }
+    function showToast(message, ms) { toast.show(message, ms) }
+    // That same click is on its way to the video.
+    function clickEndedQuestion() { return Date.now() - root.questionEndedAt < 1000 }
     function pickFile() { chooser().pickVideo(url => root.openUrl(url)) }
     function pickFolder() { chooser().pickFolder(url => root.openUrl(url)) }
     // The clip after the one that failed, or -1. A file that fails stops playback (showError), the playlist stays.
@@ -164,6 +173,7 @@ Window {
                 setOption("directory-mode", "ignore")    // a subfolder next to them is not
                 setOption("volume", String(Math.min(AppState.volume, PlayerSettings.volumeMax)))
                 setOption("screenshot-format", "png")
+                setOption("media-controls", "yes") // keyboards' media keys, headset buttons, Windows' media overlay
                 root.appliedOptions = PlayerSettings.mpvOptions(root.file) // end of video, loudness, audio device, ...
                 for (const name in root.appliedOptions) setOption(name, root.appliedOptions[name])
                 setOption("cache", "auto")
@@ -181,8 +191,15 @@ Window {
             // The file opens (demuxer, audio device: WASAPI alone took ~190 ms) while Qt creates the window, the
             // D3D11 device and the first frame (~600 ms before; measured 2026-10-31), instead of after them.
             if (root.file) root.openFile(root.file)
+            if (!root.measuring) chrome.restorePlacement(PlayerSettings.windowPlacement)
             root.visible = true
             if (!root.measuring) {
+                if (PlayerSettings.windowPlacement.maximized) chrome.toggleMaximized()
+                chrome.setAlwaysOnTop(PlayerSettings.alwaysOnTop)
+                // What media-controls sends. No other key ever reaches mpv: Qt has them all (root.actions).
+                for (const [key, action] of [["PLAY", "set pause no"], ["PAUSE", "set pause yes"], ["PLAYPAUSE", "cycle pause"],
+                                             ["STOP", "set pause yes"], ["NEXT", "playlist-next"], ["PREV", "playlist-prev"]])
+                    command(["keybind", key, action])
                 observeProperty("volume")
                 observeProperty("media-title")
                 observeProperty("speed")
@@ -253,10 +270,17 @@ Window {
             MixerController.fileStarted()
             PictureQuality.fileStarted()
             ResumeStore.save() // the previous file's spot, in case EchoPlay does not close cleanly later
+            mpv.setProperty("ab-loop-a", "no") // a part of the last clip means nothing in this one
+            mpv.setProperty("ab-loop-b", "no")
         }
+        function onScreenshotFinished(saved) { toast.show(saved ? I18n.strings.shot_saved : I18n.strings.shot_failed, 2000) }
         function onPropertyChanged(name, value) {
             if (name === "track-list") MixerController.setTrackList(value || [])
             else if (name === "volume" && typeof value === "number") AppState.volume = value
+            else if (name === "speed" && root.speedKeyUsed) {
+                root.speedKeyUsed = false
+                toast.show(I18n.strings.speed_now.arg(Number((value || 1).toFixed(2))), 1500)
+            }
             else if (name === "media-title") root.mediaTitle = value || ""
             else if (name === "playlist") root.playlist = value || []
             else if (name === "path") { // seek-bar previews and the silent-track check follow the playing file
@@ -282,6 +306,7 @@ Window {
         }
         // A lower maximum also pulls the volume down: mpv's volume-max only limits later changes.
         if ((mpv.observed("volume") || 0) > PlayerSettings.volumeMax) mpv.setProperty("volume", PlayerSettings.volumeMax)
+        chrome.setAlwaysOnTop(PlayerSettings.alwaysOnTop)
     }
     Connections {
         target: PlayerSettings
@@ -310,7 +335,10 @@ Window {
         repeat: true
         onTriggered: root.rememberPosition()
     }
-    onClosing: rememberPosition()
+    onClosing: {
+        rememberPosition()
+        if (!root.measuring) PlayerSettings.windowPlacement = chrome.placement()
+    }
 
     // Picture quality: Auto steps tiers on sustained frame drops (PictureQuality).
     Timer {
@@ -338,27 +366,40 @@ Window {
         {id: "volume_down", key: "Down", run: () => root.changeVolume(-5)},
         {id: "seek_forward", key: "Right", run: () => root.seekBy(PlayerSettings.seekStep)},
         {id: "seek_back", key: "Left", run: () => root.seekBy(-PlayerSettings.seekStep)},
+        {id: "seek_fine_forward", key: "Shift+Right", run: () => root.seekBy(1, true)},
+        {id: "seek_fine_back", key: "Shift+Left", run: () => root.seekBy(-1, true)},
+        {id: "frame_next", key: ".", run: () => mpv.command(["frame-step"])},
+        {id: "frame_previous", key: ",", run: () => mpv.command(["frame-back-step"])},
+        {id: "ab_loop", key: "L", run: () => { if (ui.item) ui.item.cycleLoop() }},
         {id: "track_1", key: "Ctrl+1", run: () => MixerController.toggle(1)},
         {id: "track_2", key: "Ctrl+2", run: () => MixerController.toggle(2)},
         {id: "track_3", key: "Ctrl+3", run: () => MixerController.toggle(3)},
-        {id: "fixed_speed", key: "G", run: () => mpv.setProperty("speed", PlayerSettings.toggledSpeed(mpv.observed("speed") || 1))},
-        {id: "speed_down", key: "S", run: () => mpv.command(["add", "speed", -PlayerSettings.speedStep])},
-        {id: "speed_up", key: "D", run: () => mpv.command(["add", "speed", PlayerSettings.speedStep])},
-        {id: "screenshot", key: "F1", run: () => mpv.command(["screenshot"])},
-        {id: "screenshot_video", key: "Shift+S", run: () => mpv.command(["screenshot", "video"])},
-        {id: "screenshot_window", key: "Ctrl+S", run: () => mpv.command(["screenshot", "window"])},
+        {id: "fixed_speed", key: "G", run: () => root.changeSpeed(["set", "speed", String(PlayerSettings.toggledSpeed(mpv.observed("speed") || 1))])},
+        {id: "speed_down", key: "S", run: () => root.changeSpeed(["add", "speed", -PlayerSettings.speedStep])},
+        {id: "speed_up", key: "D", run: () => root.changeSpeed(["add", "speed", PlayerSettings.speedStep])},
+        {id: "screenshot", key: "F1", run: () => mpv.screenshot("subtitles")},
+        {id: "screenshot_video", key: "Shift+S", run: () => mpv.screenshot("video")},
+        {id: "screenshot_window", key: "Ctrl+S", run: () => mpv.screenshot("window")},
         {id: "next", key: ">", run: () => mpv.command(["playlist-next"])},
         {id: "previous", key: "<", run: () => mpv.command(["playlist-prev"])},
         {id: "fullscreen", key: "F", run: () => chrome.toggleFullScreen()},
+        {id: "always_on_top", key: "T", run: () => {
+            PlayerSettings.alwaysOnTop = !PlayerSettings.alwaysOnTop
+            toast.show(PlayerSettings.alwaysOnTop ? I18n.strings.on_top_on : I18n.strings.on_top_off, 1500)
+        }},
     ]
     function changeVolume(step) {
         if (ui.item) ui.item.flashVolume()
         mpv.command(["add", "volume", step])
     }
-    function seekBy(seconds) {
+    function changeSpeed(change) {
+        root.speedKeyUsed = true
+        mpv.command(change)
+    }
+    function seekBy(seconds, exact) {
         root.resumeOffer = null // a seek of their own: the question is over
         if (ui.item) ui.item.sweepArrows(seconds > 0)
-        mpv.command(["seek", seconds])
+        mpv.command(exact ? ["seek", seconds, "relative+exact"] : ["seek", seconds])
     }
     // Application-wide (EchoPlay has one window): a key works whichever item has focus, and the end-to-end
     // test's synthetic keys arrive even while another app holds the OS focus.
@@ -370,6 +411,21 @@ Window {
             enabled: root.restarted && !root.fileError // with nothing open, a key would only change what the next file opens with
             sequence: PlayerSettings.shortcuts[modelData.id] || modelData.key
             onActivated: modelData.run()
+        }
+    }
+    // 0-9 jump to that tenth of the clip, as on YouTube. Not ten more rows in Settings > Shortcuts; a digit given to
+    // an action there wins.
+    Instantiator {
+        model: 10
+        delegate: Shortcut {
+            required property int index
+            context: Qt.ApplicationShortcut
+            enabled: root.restarted && !root.fileError && !Object.values(PlayerSettings.shortcuts).includes(String(index))
+            sequence: String(index)
+            onActivated: {
+                root.resumeOffer = null
+                mpv.command(["seek", index * 10, "absolute-percent+exact"])
+            }
         }
     }
     Shortcut {
@@ -538,7 +594,10 @@ Window {
         onPressed: mouse => {
             mouse.accepted = false
             const card = ui.item ? ui.item.resumeCard : null
-            if (!card || !card.contains(mapToItem(card, mouse.x, mouse.y))) root.resumeOffer = null
+            if (!card || !card.contains(mapToItem(card, mouse.x, mouse.y))) {
+                root.resumeOffer = null
+                root.questionEndedAt = Date.now()
+            }
         }
     }
 

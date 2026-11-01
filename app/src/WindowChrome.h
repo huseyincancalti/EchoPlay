@@ -33,6 +33,13 @@ public:
     Q_INVOKABLE void toggleMaximized();
     Q_INVOKABLE void minimize();
     Q_INVOKABLE void toggleFullScreen(); // back to where it came from, maximized or not
+    Q_INVOKABLE void setAlwaysOnTop(bool on);
+    // Where the window is when not maximized or full screen, in Windows' own numbers, and whether it is maximized:
+    // {x, y, width, height, maximized}. Full screen counts as where it came from. Empty when there is nothing to say.
+    Q_INVOKABLE QVariantMap placement() const;
+    // Before the window first shows. Windows moves it back on screen if that monitor is gone. Maximizing stays the
+    // caller's, after showing.
+    Q_INVOKABLE void restorePlacement(const QVariantMap &placement);
 
     bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) override;
 
@@ -50,5 +57,5 @@ private:
     bool m_maximizeHovered = false;
     qreal m_inset = 0;
     bool m_maximizedBefore = false; // before full screen
-    QRect m_restoreRect;            // then: where Windows restores the window to
+    QRect m_restoreRect;            // and where Windows restores the window to
 };

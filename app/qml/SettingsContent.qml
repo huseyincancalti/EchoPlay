@@ -223,6 +223,34 @@ Column {
             onChosen: value => PlayerSettings.resumeMode = value
         }
     }
+    Row_ {
+        tab: "playback"
+        title: content.strings.clickpause_title
+        description: content.strings.clickpause_desc
+        ToggleSwitch {
+            objectName: "clickPauseSwitch"
+            width: 44
+            height: 26
+            name: content.strings.clickpause_title
+            offColor: content.colors.track
+            checked: PlayerSettings.clickPauses
+            onToggled: PlayerSettings.clickPauses = !checked
+        }
+    }
+    Row_ {
+        tab: "playback"
+        title: content.strings.ontop_title
+        description: content.strings.ontop_desc
+        ToggleSwitch {
+            objectName: "onTopSwitch"
+            width: 44
+            height: 26
+            name: content.strings.ontop_title
+            offColor: content.colors.track
+            checked: PlayerSettings.alwaysOnTop
+            onToggled: PlayerSettings.alwaysOnTop = !checked
+        }
+    }
 
     // Picture
     Row_ {

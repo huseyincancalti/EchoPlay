@@ -147,6 +147,34 @@ void AppState::setFirstRunHintDone(bool done)
     changed();
 }
 
+void AppState::setClickPauses(bool on)
+{
+    if (on == m_clickPauses) return;
+    m_clickPauses = on;
+    changed();
+}
+
+void AppState::setShowRemaining(bool on)
+{
+    if (on == m_showRemaining) return;
+    m_showRemaining = on;
+    changed();
+}
+
+void AppState::setAlwaysOnTop(bool on)
+{
+    if (on == m_alwaysOnTop) return;
+    m_alwaysOnTop = on;
+    changed();
+}
+
+void AppState::setWindowPlacement(const QVariantMap &placement)
+{
+    if (placement == m_windowPlacement) return;
+    m_windowPlacement = placement;
+    changed();
+}
+
 void AppState::setShortcuts(const QVariantMap &shortcuts)
 {
     if (shortcuts == m_shortcuts) return;
@@ -256,6 +284,13 @@ void AppState::load()
     if (seekStep == 3 || seekStep == 5 || seekStep == 10 || seekStep == 30) m_seekStep = seekStep;
     static const QRegularExpression resumeMode("^(ask|always|never)$");
     if (resumeMode.match(playback.value("resume").toString()).hasMatch()) m_resumeMode = playback.value("resume").toString();
+    if (playback.value("click_pauses").isBool()) m_clickPauses = playback.value("click_pauses").toBool();
+    m_showRemaining = playback.value("show_remaining").toBool();
+
+    m_alwaysOnTop = s.value("always_on_top").toBool();
+    const QJsonObject place = s.value("window_placement").toObject();
+    if (place.value("x").isDouble() && place.value("y").isDouble() && place.value("width").toInt() > 0 && place.value("height").toInt() > 0)
+        m_windowPlacement = place.toVariantMap();
 
     const QJsonObject audio = s.value("audio").toObject();
     const int volumeMax = audio.value("volume_max").toInt();
@@ -314,7 +349,10 @@ void AppState::save()
         {"quality", m_quality},
         {"mixer", QJsonObject{{"default_on", m_mixer.defaultOn}, {"gains", gains}, {"mono", monoIds}}},
         {"playback", QJsonObject{{"end", m_endMode}, {"speed_factor", m_speedFactor}, {"speed_step", m_speedStep},
-                                 {"seek_step", m_seekStep}, {"resume", m_resumeMode}}},
+                                 {"seek_step", m_seekStep}, {"resume", m_resumeMode}, {"click_pauses", m_clickPauses},
+                                 {"show_remaining", m_showRemaining}}},
+        {"always_on_top", m_alwaysOnTop},
+        {"window_placement", QJsonObject::fromVariantMap(m_windowPlacement)},
         {"audio", QJsonObject{{"volume_max", m_volumeMax}, {"loudness_boost", m_loudnessBoost},
                               {"loudness_strength", m_loudnessStrength}, {"device", m_audioDevice},
                               {"tracks_on_open", m_tracksOnOpen}}},

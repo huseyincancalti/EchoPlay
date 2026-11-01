@@ -155,6 +155,42 @@ void PlayerSettings::setFirstRunHintDone(bool done)
     emit changed();
 }
 
+bool PlayerSettings::clickPauses() const { return m_state->clickPauses(); }
+
+void PlayerSettings::setClickPauses(bool on)
+{
+    if (on == clickPauses()) return;
+    m_state->setClickPauses(on);
+    emit changed();
+}
+
+bool PlayerSettings::showRemaining() const { return m_state->showRemaining(); }
+
+void PlayerSettings::setShowRemaining(bool on)
+{
+    if (on == showRemaining()) return;
+    m_state->setShowRemaining(on);
+    emit changed();
+}
+
+bool PlayerSettings::alwaysOnTop() const { return m_state->alwaysOnTop(); }
+
+void PlayerSettings::setAlwaysOnTop(bool on)
+{
+    if (on == alwaysOnTop()) return;
+    m_state->setAlwaysOnTop(on);
+    emit changed();
+}
+
+QVariantMap PlayerSettings::windowPlacement() const { return m_state->windowPlacement(); }
+
+void PlayerSettings::setWindowPlacement(const QVariantMap &placement)
+{
+    if (placement == windowPlacement()) return;
+    m_state->setWindowPlacement(placement);
+    emit changed();
+}
+
 QVariantMap PlayerSettings::shortcuts() const { return m_state->shortcuts(); }
 
 void PlayerSettings::setShortcut(const QString &action, const QString &key)

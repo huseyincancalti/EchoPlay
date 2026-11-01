@@ -9,6 +9,8 @@ Item {
     required property real position
     required property real duration
     property bool hasVideo: true
+    property real loopA: -1 // the A-B loop's two ends in seconds, -1 while not set
+    property real loopB: -1
     property Item bounds: parent // the preview stays inside this item
     signal seekRequested(real seconds, bool exact)
     readonly property bool active: hover.hovered || mouse.pressed
@@ -42,6 +44,27 @@ Item {
             height: parent.height
             radius: height / 2
             color: Theme.accent
+        }
+        Rectangle { // the A-B loop, over what has played
+            visible: seek.loopA >= 0 && seek.loopB >= 0 && seek.duration > 0
+            x: parent.width * Math.min(seek.loopA, seek.loopB) / Math.max(1, seek.duration)
+            width: parent.width * Math.abs(seek.loopB - seek.loopA) / Math.max(1, seek.duration)
+            height: parent.height
+            color: Qt.alpha(Theme.tokens.glass.text, 0.45)
+        }
+    }
+    Repeater { // its ends
+        model: [{name: "loopStartMark", at: seek.loopA}, {name: "loopEndMark", at: seek.loopB}]
+        Rectangle {
+            required property var modelData
+            objectName: modelData.name
+            visible: modelData.at >= 0 && seek.duration > 0
+            anchors.verticalCenter: parent.verticalCenter
+            x: seek.width * modelData.at / Math.max(1, seek.duration) - 1
+            width: 2
+            height: 14
+            radius: 1
+            color: Theme.tokens.glass.text
         }
     }
     Rectangle {

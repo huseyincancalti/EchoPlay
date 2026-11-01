@@ -174,6 +174,10 @@ private slots:
         m_settings->setTracksOnOpen("all");
         m_settings->setResumeMode("always");
         m_settings->setFirstRunHintDone(true);
+        m_settings->setClickPauses(false);
+        m_settings->setShowRemaining(true);
+        m_settings->setAlwaysOnTop(true);
+        m_settings->setWindowPlacement({{"x", -40}, {"y", 20}, {"width", 900}, {"height", 500}, {"maximized", true}});
         m_settings->setShortcut("mute", "N");
         m_state->save();
 
@@ -192,6 +196,12 @@ private slots:
         QCOMPARE(loaded.tracksOnOpen(), QString("all"));
         QCOMPARE(loaded.resumeMode(), QString("always"));
         QVERIFY(loaded.firstRunHintDone());
+        QVERIFY(!loaded.clickPauses());
+        QVERIFY(loaded.showRemaining());
+        QVERIFY(loaded.alwaysOnTop());
+        QCOMPARE(loaded.windowPlacement().value("x").toInt(), -40); // left of the main screen: a second monitor
+        QCOMPARE(loaded.windowPlacement().value("height").toInt(), 500);
+        QVERIFY(loaded.windowPlacement().value("maximized").toBool());
         QCOMPARE(loaded.shortcuts().value("mute").toString(), QString("N"));
     }
 
@@ -199,7 +209,8 @@ private slots:
     {
         QFile f(m_path);
         QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write(R"({"schema":1,"playback":{"end":"explode","speed_factor":50,"speed_step":-1,"seek_step":7,"resume":1},)"
+        f.write(R"({"schema":1,"always_on_top":"x","window_placement":{"x":1,"y":1,"width":-5,"height":100},)"
+                R"("playback":{"end":"explode","speed_factor":50,"speed_step":-1,"seek_step":7,"resume":1,"click_pauses":1,"show_remaining":"x"},)"
                 R"("audio":{"volume_max":999,"loudness_boost":"yes","loudness_strength":"max","device":3,"tracks_on_open":"x"},)"
                 R"("first_run_hint_done":"yes","shortcuts":{"mute":5},)"
                 R"("screenshots":{"folder":7,"custom":["x"]}})");
@@ -219,6 +230,10 @@ private slots:
         QCOMPARE(loaded.tracksOnOpen(), QString("last"));
         QCOMPARE(loaded.resumeMode(), QString("ask"));
         QVERIFY(!loaded.firstRunHintDone());
+        QVERIFY(loaded.clickPauses());
+        QVERIFY(!loaded.showRemaining());
+        QVERIFY(!loaded.alwaysOnTop());
+        QVERIFY(loaded.windowPlacement().isEmpty());
         QVERIFY(loaded.shortcuts().isEmpty());
     }
 

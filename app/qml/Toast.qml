@@ -5,9 +5,10 @@ import EchoPlay
 Rectangle {
     id: toast
 
-    function show(message) {
+    function show(message, ms) {
         words.text = message
         visible = true
+        hide.interval = ms || 4000
         hide.restart()
     }
 
@@ -21,13 +22,13 @@ Rectangle {
     border.color: Theme.tokens.glass.border
     Label {
         id: words
+        objectName: "toastText"
         anchors.centerIn: parent
         color: Theme.tokens.glass.text
         font.weight: Font.DemiBold
     }
     Timer {
         id: hide
-        interval: 4000
         onTriggered: toast.visible = false
     }
 }

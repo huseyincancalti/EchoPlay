@@ -29,6 +29,10 @@ class PlayerSettings : public QObject
     Q_PROPERTY(QString tracksOnOpen READ tracksOnOpen WRITE setTracksOnOpen NOTIFY changed) // "last", "all"
     Q_PROPERTY(QString resumeMode READ resumeMode WRITE setResumeMode NOTIFY changed)      // "ask", "always", "never"
     Q_PROPERTY(bool firstRunHintDone READ firstRunHintDone WRITE setFirstRunHintDone NOTIFY changed)
+    Q_PROPERTY(bool clickPauses READ clickPauses WRITE setClickPauses NOTIFY changed)
+    Q_PROPERTY(bool showRemaining READ showRemaining WRITE setShowRemaining NOTIFY changed)
+    Q_PROPERTY(bool alwaysOnTop READ alwaysOnTop WRITE setAlwaysOnTop NOTIFY changed)
+    Q_PROPERTY(QVariantMap windowPlacement READ windowPlacement WRITE setWindowPlacement NOTIFY changed) // WindowChrome's
     Q_PROPERTY(QVariantMap shortcuts READ shortcuts NOTIFY changed)                        // action -> key, only the changed ones
 
 public:
@@ -67,6 +71,14 @@ public:
     void setResumeMode(const QString &mode); // anything else is ignored
     bool firstRunHintDone() const;
     void setFirstRunHintDone(bool done);
+    bool clickPauses() const;
+    void setClickPauses(bool on);
+    bool showRemaining() const;
+    void setShowRemaining(bool on);
+    bool alwaysOnTop() const;
+    void setAlwaysOnTop(bool on);
+    QVariantMap windowPlacement() const;
+    void setWindowPlacement(const QVariantMap &placement);
     QVariantMap shortcuts() const;
     Q_INVOKABLE void setShortcut(const QString &action, const QString &key);
     Q_INVOKABLE void resetShortcuts();

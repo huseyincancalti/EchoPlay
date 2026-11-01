@@ -19,6 +19,7 @@
 namespace {
 
 constexpr quint64 KeepAwakeReply = 1; // observeProperty() uses 0
+constexpr quint64 ScreenshotReply = 2; // command() uses 0
 constexpr int RecentLogLines = 12;
 
 // QVariant -> mpv_node (strings, numbers, bools, lists). Owns the memory the node points into;
@@ -186,6 +187,14 @@ void MpvItem::command(const QVariantList &args)
     mpv_command_node_async(m_mpv, 0, &node);
 }
 
+void MpvItem::screenshot(const QString &mode)
+{
+    NodeBuilder b;
+    mpv_node node;
+    b.build(QVariantList{"screenshot", mode}, node);
+    mpv_command_node_async(m_mpv, ScreenshotReply, &node);
+}
+
 QVariant MpvItem::getProperty(const QString &name) const
 {
     mpv_node node;
@@ -233,6 +242,7 @@ void MpvItem::drainEvents()
             emit playbackRestarted(); // a client reads after the log messages that follow it
         }
         if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
+        if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == ScreenshotReply) emit screenshotFinished(e->error >= 0);
         if (e->event_id == MPV_EVENT_LOG_MESSAGE) {
             const auto *message = static_cast<mpv_event_log_message *>(e->data);
             m_recentLog << QString("[%1] %2").arg(message->prefix, QString::fromUtf8(message->text).trimmed());

@@ -28,7 +28,7 @@ AQT="$DEV/venv/Scripts/aqt"
 QT_DIR="$DEV/qt/$QT_VERSION/mingw_64"
 if [ ! -f "$QT_DIR/bin/qmake.exe" ]; then
   echo "qt: installing $QT_VERSION $QT_ARCH"
-  "$AQT" install-qt windows desktop "$QT_VERSION" "$QT_ARCH" -O "$DEV/qt"
+  "$AQT" install-qt windows desktop "$QT_VERSION" "$QT_ARCH" -m qtshadertools -O "$DEV/qt"
 fi
 
 MINGW_DIR="$(ls -d "$DEV"/qt/Tools/mingw*_64 2>/dev/null | head -n 1 || true)"

@@ -37,6 +37,14 @@ The C++ runtime of the compiler EchoPlay is built with (MinGW-w64, GCC 13.1):
 - `libwinpthread-1.dll`: mingw-w64 winpthreads, MIT-style license (`licenses/mingw-w64-winpthreads.txt`).
   Source: <https://www.mingw-w64.org>.
 
+## Fonts
+
+Embedded in `EchoPlay.exe`, unmodified:
+- Geist, Manrope, Plus Jakarta Sans: SIL Open Font License 1.1 (`licenses/OFL-Geist.txt`,
+  `licenses/OFL-Manrope.txt`, `licenses/OFL-PlusJakartaSans.txt`). Source: <https://github.com/google/fonts>.
+- Material Symbols Rounded (the icons), cut down to the glyphs EchoPlay uses by `tools/make-fonts.sh`: Apache License 2.0
+  (`licenses/Apache-2.0.txt`). Source: <https://github.com/google/material-design-icons>.
+
 ## Microsoft D3DCompiler
 
 `D3Dcompiler_47.dll` (Direct3D shader compiler), redistributed as provided by Microsoft with the Windows

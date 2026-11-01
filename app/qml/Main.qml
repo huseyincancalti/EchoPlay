@@ -41,6 +41,12 @@ Window {
     property bool mixOn: mix
     property real handOverSentMs: 0 // epoch ms of a second launch whose file has not started playing yet
     property string mediaTitle: ""
+    property string positionFile: ""  // the file whose time-pos can be trusted: it restarted
+    property var playlist: []         // mpv's: the opened file's folder
+    property var fileError: null      // {path, why, report}: the error screen shows
+    property bool resumePending: false
+    property var resumeOffer: null    // {at, savedAt}: "Resume from 1:24?" is open
+    property bool updateDismissed: false // Later, or 15 s: for this run
     // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
     // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
     readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle || thumbScrub || tierCycle
@@ -75,6 +81,7 @@ Window {
     function openUrl(url) {
         const path = MediaFiles.pathToOpen(url)
         if (path) root.openPath(path)
+        else toast.show(I18n.strings.no_videos_in_folder)
     }
     function chooser() {
         dialogs.active = true
@@ -82,6 +89,32 @@ Window {
     }
     function pickFile() { chooser().pickVideo(url => root.openUrl(url)) }
     function pickFolder() { chooser().pickFolder(url => root.openUrl(url)) }
+    // The clip after the one that failed, or -1. A file that fails stops playback (showError), the playlist stays.
+    function nextClip() {
+        const list = (playlist || []).map(entry => entry.filename.replace(/\\/g, "/"))
+        const at = list.indexOf(root.fileError ? root.fileError.path.replace(/\\/g, "/") : "")
+        return at >= 0 && at + 1 < list.length ? at + 1 : -1
+    }
+    function playNextClip() { mpv.command(["playlist-play-index", nextClip()]) }
+    // mpv would go on to the next clip by itself and the failure would pass unseen: it stops here, on the error screen.
+    function showError(why, entryId) {
+        mpv.command(["stop", "keep-playlist"])
+        const entry = root.playlist.find(e => e.id === entryId)
+        const path = entry ? entry.filename : root.file
+        root.fileError = {path: path, why: why,
+                          report: ErrorReport.report(path, why, mpv.recentLog(), UpdateCheck.currentVersion, mpv.observed("mpv-version") || "mpv")}
+    }
+    // Once per file, on its first restart: where it was left, by the resume setting.
+    function applyResume() {
+        if (!root.resumePending || root.measuring) return
+        root.resumePending = false
+        const path = mpv.observed("path") || ""
+        root.positionFile = path
+        const at = ResumeStore.position(path)
+        if (at <= 0 || PlayerSettings.resumeMode === "never") return
+        if (PlayerSettings.resumeMode === "always") mpv.command(["seek", at, "absolute+exact"])
+        else root.resumeOffer = {at: at, savedAt: ResumeStore.savedAt(path)}
+    }
     function firstRestart() {
         if (root.restarted) return
         root.restarted = true
@@ -149,6 +182,8 @@ Window {
                 observeProperty("path")
                 observeProperty("time-pos")
                 observeProperty("duration")
+                observeProperty("playlist")
+                observeProperty("mpv-version")
             } else if (root.benchSeconds > 0) {
                 // Read without blocking: a synchronous get every 100 ms can stall the render loop.
                 observeProperty("frame-drop-count")
@@ -166,7 +201,10 @@ Window {
             // file still opens, the seek fails and the first restart comes with video anyway.)
             command(["seek", 0, "relative+exact"])
             // A file without video restarted already (audio only) and gets no second restart.
-            if (root.earlyRestart && !(observed("track-list") || []).some(t => t.type === "video")) root.firstRestart()
+            if (root.earlyRestart && !(observed("track-list") || []).some(t => t.type === "video")) {
+                root.firstRestart()
+                root.applyResume()
+            }
         }
         onPlaybackRestarted: {
             if (root.handOverSentMs) {
@@ -185,14 +223,17 @@ Window {
                 return
             }
             root.firstRestart()
+            root.fileError = null
+            root.applyResume()
         }
         // An error, not the folder playlist's redirect: a file without audio has nothing to play while vid=no.
         // Once video is on, the same can still happen on a slow open (tracks picked before vid=auto): open it once
-        // more.
-        onFileEnded: reason => {
-            if (reason !== "error" || root.restarted) return
-            if (!root.videoOn) root.endedEarly = true
-            else if (!root.videoRetried) { root.videoRetried = true; root.openFile(root.file) }
+        // more. Anything else is a file that cannot play.
+        onFileEnded: (reason, error, entryId) => {
+            if (reason !== "error") return
+            if (!root.restarted && !root.videoOn) { root.endedEarly = true; root.videoRetried = true; return }
+            if (!root.restarted && !root.videoRetried) { root.videoRetried = true; root.openFile(root.file); return }
+            if (!root.measuring) root.showError(error, entryId)
         }
     }
 
@@ -209,7 +250,12 @@ Window {
             if (name === "track-list") MixerController.setTrackList(value || [])
             else if (name === "volume" && typeof value === "number") AppState.volume = value
             else if (name === "media-title") root.mediaTitle = value || ""
+            else if (name === "playlist") root.playlist = value || []
             else if (name === "path") { // seek-bar previews and the silent-track check follow the playing file
+                if (value) {
+                    root.resumePending = true
+                    root.resumeOffer = null
+                }
                 Thumbnailer.file = value || ""
                 SilenceCheck.file = value || ""
                 root.applyPlayerSettings() // the screenshot folder can be the video's own
@@ -242,10 +288,12 @@ Window {
         }
     }
 
-    // Where the user is in the file, for "Resume from 1:24?" next time (v1: every 5 s and on close).
+    // Where the user is in the file, for "Resume from 1:24?" next time (v1: every 5 s and on close). Not for a file
+    // still opening, whose time-pos is the previous one's; not while the question is open, or the answer would be gone.
     function rememberPosition() {
-        if (root.measuring || !root.restarted) return
-        ResumeStore.update(mpv.observed("path") || "", mpv.observed("time-pos") || 0, mpv.observed("duration") || 0)
+        if (root.measuring || !root.restarted || root.resumeOffer) return
+        const path = mpv.observed("path") || ""
+        if (path === root.positionFile) ResumeStore.update(path, mpv.observed("time-pos") || 0, mpv.observed("duration") || 0)
     }
     Timer {
         running: !root.measuring && root.restarted
@@ -312,7 +360,7 @@ Window {
         delegate: Shortcut {
             required property var modelData
             context: Qt.ApplicationShortcut
-            enabled: root.restarted // with nothing open, a key would only change what the next file opens with
+            enabled: root.restarted && !root.fileError // with nothing open, a key would only change what the next file opens with
             sequence: PlayerSettings.shortcuts[modelData.id] || modelData.key
             onActivated: modelData.run()
         }
@@ -434,6 +482,36 @@ Window {
             root.openUrl(event.urls[0])
             event.accept(Qt.CopyAction)
         }
+    }
+    Loader {
+        id: errorScreen
+        anchors.fill: parent
+        anchors.margins: chrome.inset
+        active: !!root.fileError
+        onActiveChanged: if (active) setSource("ErrorScreen.qml", {
+            chrome: chrome, window: root,
+            path: Qt.binding(() => root.fileError ? root.fileError.path : ""),
+            why: Qt.binding(() => root.fileError ? root.fileError.why : ""),
+            report: Qt.binding(() => root.fileError ? root.fileError.report : "")
+        })
+    }
+    Connections {
+        target: Updater
+        function onQuitRequested() { root.close() } // the setup is running and replaces the files
+    }
+    Loader { // bottom right, above the bar when there is one; not over settings, whose About has it too
+        id: updateNotice
+        readonly property var player: ui.item
+        active: !root.measuring && !root.fileError && !root.updateDismissed && !(player && player.settingsOpen)
+                && (UpdateCheck.updateAvailable || Updater.state === "downloading" || Updater.state === "installing" || Updater.state === "failed")
+        x: parent.width - chrome.inset - (item ? item.width : 0) - 16
+        y: (item && player ? chrome.inset + player.bar.y - item.height - 12 : parent.height - chrome.inset - (item ? item.height : 0) - 16)
+        onActiveChanged: if (active) setSource("UpdateNotice.qml", {window: root, backdrop: Qt.binding(() => player ? player.backdrop : null)})
+    }
+    Toast {
+        id: toast
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: chrome.inset + 56
     }
     Loader {
         anchors.fill: parent

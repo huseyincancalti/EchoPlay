@@ -55,10 +55,11 @@ protected:
 // One start of the player, as main.cpp does it (without the single-instance pipe and the update check).
 struct Launch
 {
-    Launch(const QString &configDir, const QString &clip, const QString &log)
-        : services(configDir, QCoreApplication::applicationDirPath(), "0.0.0-dev")
+    Launch(const QString &configDir, const QString &clip, const QString &log, const QString &version = "0.0.0-dev")
+        : services(configDir, QCoreApplication::applicationDirPath(), version)
     {
         qApp->installEventFilter(&realInput);
+        services.player.setFirstRunHintDone(true); // it keeps the chrome up: only notices() wants it
         engine.setInitialProperties({{"file", clip}, {"benchSeconds", 0}, {"glass", true}, {"mix", false},
                                      {"logFile", log}, {"mixToggle", false}, {"thumbScrub", false}, {"tierCycle", false}, {"shotAt", -1.0},
                                      {"shotOut", QString()}, {"startup", QVariantMap{}},
@@ -580,6 +581,99 @@ private slots:
 
         app.key(Qt::Key_Escape);
         QTRY_VERIFY(!app.item("settingsOverlay"));
+    }
+
+    // What the player tells on its own: the first-run hint, no sound, resume per setting, a new version, a bad file.
+    void notices()
+    {
+        const QString state = QDir(m_path).filePath("notices");
+        QVERIFY(QDir().mkpath(state));
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("notices1.log"));
+            app.services.player.setFirstRunHintDone(false);
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QTRY_VERIFY(app.item("hintCard"));
+            QTest::qWait(1300); // it holds the chrome up while it waits
+            QVERIFY(app.item("controlBar")->isVisible());
+            app.shot("hint");
+            QVERIFY(app.click("hintGotIt"));
+            QTRY_VERIFY(!app.item("hintCard"));
+            QVERIFY(app.services.player.firstRunHintDone());
+
+            app.wake();
+            app.key(Qt::Key_1, Qt::ControlModifier); // the only track on goes off
+            QTRY_VERIFY(app.item("noSoundCard"));
+            app.shot("no-sound");
+            QVERIFY(app.click("turnAllOn"));
+            QTRY_VERIFY(!app.item("noSoundCard"));
+            QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
+
+            // A new version: the card, Later hides it for this run.
+            app.mpv->command({"seek", 25, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") >= 25);
+            app.window->close();
+        }
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("notices2.log"), "2.0.0");
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QVERIFY(!app.item("hintCard")); // once, never again
+            QTRY_VERIFY(app.item("resumeCard"));
+            app.wake();
+            app.shot("resume");
+            QVERIFY(app.click("resumeButton"));
+            QTRY_VERIFY(app.number("time-pos") >= 25);
+            QTRY_VERIFY(!app.item("resumeCard"));
+
+            app.services.updates.handleReply(R"({"tag_name": "v2.1.0", "assets": []})");
+            QTRY_VERIFY(app.item("updateNotice"));
+            app.wake();
+            app.shot("update");
+            QVERIFY(app.click("updateLater"));
+            QTRY_VERIFY(!app.item("updateNotice"));
+
+            app.services.player.setResumeMode("always");
+            app.mpv->command({"seek", 30, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") >= 30);
+            app.window->close();
+        }
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("notices3.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QTRY_VERIFY(app.number("time-pos") >= 30); // "always": no question
+            QVERIFY(!app.item("resumeCard"));
+
+            // A bad file: the error screen, its way out and the report. The playlist stays for the next clip.
+            const QString badDir = QDir(m_path).filePath("bad");
+            QVERIFY(QDir().mkpath(badDir));
+            QFile junk(badDir + "/a-broken.mp4");
+            QVERIFY(junk.open(QIODevice::WriteOnly));
+            junk.write(QByteArray(4096, 'x'));
+            junk.close();
+            QFile::remove(badDir + "/b-good.mp4");
+            QVERIFY(QFile::copy(m_clip, badDir + "/b-good.mp4"));
+            QVERIFY(QMetaObject::invokeMethod(app.window, "openPath", Q_ARG(QVariant, badDir + "/a-broken.mp4")));
+            QTRY_VERIFY(app.item("errorScreen"));
+            QTest::qWait(300);
+            QVERIFY(app.item("errorScreen")); // mpv did not go on to the next clip by itself
+            app.shot("error");
+            QVERIFY(Launch::searchVisible(app.window->contentItem(), "errorNext")); // b-good.mp4 comes after it
+            // The button would overwrite the clipboard of whoever sits at the PC: the report is read from the screen.
+            QVERIFY(app.item("errorScreen")->setProperty("copied", true));
+            QTest::qWait(60);
+            app.shot("error-details");
+            const QString text = app.item("errorText")->property("text").toString();
+            QVERIFY2(text.contains("Cause, from the mpv engine: unrecognized file format."), qPrintable(text));
+            QVERIFY2(text.contains("a-broken.mp4"), qPrintable(text));
+            QVERIFY2(!text.contains(QDir::home().dirName(), Qt::CaseInsensitive), qPrintable(text));
+
+            // Next clip works from the plain view.
+            QVERIFY(QMetaObject::invokeMethod(app.window, "playNextClip"));
+            QTRY_VERIFY(!app.item("errorScreen"));
+            QTRY_COMPARE(app.window->title(), QString("b-good.mp4"));
+        }
     }
 
 #ifdef Q_OS_WIN

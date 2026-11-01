@@ -27,6 +27,7 @@ echoplay_test(updater ../src/Updater.h ../src/Updater.cpp)
 target_link_libraries(tst_updater PRIVATE Qt6::Network)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
 echoplay_test(mediafiles ../src/MediaFiles.h ../src/MediaFiles.cpp)
+echoplay_test(errorreport ../src/ErrorReport.h ../src/ErrorReport.cpp)
 echoplay_test(playersettings ../src/PlayerSettings.h ../src/PlayerSettings.cpp ../src/AppState.h ../src/AppState.cpp
               ../src/Mixer.h ../src/Mixer.cpp)
 

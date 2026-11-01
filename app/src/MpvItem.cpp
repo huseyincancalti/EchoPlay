@@ -19,6 +19,7 @@
 namespace {
 
 constexpr quint64 KeepAwakeReply = 1; // observeProperty() uses 0
+constexpr int RecentLogLines = 12;
 
 // QVariant -> mpv_node (strings, numbers, bools, lists). Owns the memory the node points into;
 // std::deque never moves existing elements, so pointers stay valid while it grows.
@@ -162,6 +163,7 @@ void MpvItem::start()
 {
     if (mpv_initialize(m_mpv) < 0) throw std::runtime_error("mpv_initialize failed");
     // core-idle: paused, or no file. Its own reply id keeps it out of propertyChanged/observed().
+    mpv_request_log_messages(m_mpv, "warn");
     mpv_observe_property(m_mpv, KeepAwakeReply, "core-idle", MPV_FORMAT_FLAG);
 }
 
@@ -227,15 +229,23 @@ void MpvItem::drainEvents()
         mpv_event *e = mpv_wait_event(m_mpv, 0);
         if (e->event_id == MPV_EVENT_NONE) break;
         if (e->event_id == MPV_EVENT_PLAYBACK_RESTART) emit playbackRestarted();
-        if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
+        if (e->event_id == MPV_EVENT_START_FILE) {
+            m_recentLog.clear(); // the report is about this file
+            emit fileStarted();
+        }
+        if (e->event_id == MPV_EVENT_LOG_MESSAGE) {
+            const auto *message = static_cast<mpv_event_log_message *>(e->data);
+            m_recentLog << QString("[%1] %2").arg(message->prefix, QString::fromUtf8(message->text).trimmed());
+            if (m_recentLog.size() > RecentLogLines) m_recentLog.removeFirst();
+        }
         if (e->event_id == MPV_EVENT_END_FILE) {
             const auto *end = static_cast<mpv_event_end_file *>(e->data);
             switch (end->reason) {
-            case MPV_END_FILE_REASON_EOF: emit fileEnded("eof", {}); break;
-            case MPV_END_FILE_REASON_STOP: emit fileEnded("stop", {}); break;
-            case MPV_END_FILE_REASON_QUIT: emit fileEnded("quit", {}); break;
-            case MPV_END_FILE_REASON_ERROR: emit fileEnded("error", QString::fromUtf8(mpv_error_string(end->error))); break;
-            case MPV_END_FILE_REASON_REDIRECT: emit fileEnded("redirect", {}); break;
+            case MPV_END_FILE_REASON_EOF: emit fileEnded("eof", {}, end->playlist_entry_id); break;
+            case MPV_END_FILE_REASON_STOP: emit fileEnded("stop", {}, end->playlist_entry_id); break;
+            case MPV_END_FILE_REASON_QUIT: emit fileEnded("quit", {}, end->playlist_entry_id); break;
+            case MPV_END_FILE_REASON_ERROR: emit fileEnded("error", QString::fromUtf8(mpv_error_string(end->error)), end->playlist_entry_id); break;
+            case MPV_END_FILE_REASON_REDIRECT: emit fileEnded("redirect", {}, end->playlist_entry_id); break;
             }
         }
         if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == KeepAwakeReply) {

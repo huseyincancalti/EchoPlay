@@ -50,6 +50,12 @@ double ResumeStore::position(const QString &path) const
     return it == m_entries.constEnd() ? -1 : it->pos;
 }
 
+QDateTime ResumeStore::savedAt(const QString &path) const
+{
+    const auto it = m_entries.constFind(key(path));
+    return it == m_entries.constEnd() ? QDateTime() : QDateTime::fromSecsSinceEpoch(it->at);
+}
+
 // Each entry is read only when it has the expected shape; a bad one is skipped without a word.
 void ResumeStore::load()
 {

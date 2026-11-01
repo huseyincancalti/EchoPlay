@@ -35,6 +35,8 @@ public:
     // The last value of an observed property; never blocks.
     Q_INVOKABLE QVariant observed(const QString &name) const { return m_observed.value(name); }
     Q_INVOKABLE qint64 processAgeMs() const { return processAgeMsNow(); }
+    // mpv's last warnings and errors, for the error report.
+    Q_INVOKABLE QStringList recentLog() const { return m_recentLog; }
     static qint64 processAgeMsNow(); // ms since the OS created this process; -1 if unknown
     Q_INVOKABLE QVariantMap startupMarks() const { return m_marks; } // item_ms, mpv_created_ms
 
@@ -47,8 +49,9 @@ signals:
     void playbackRestarted();
     void fileStarted();
     // mpv's end-file reason: eof, stop, quit, error, redirect. With "error", why (mpv_error_string, English:
-    // "unrecognized file format", "loading failed", ...) for the "This file can't be opened" state.
-    void fileEnded(const QString &reason, const QString &error);
+    // "unrecognized file format", "loading failed", ...) for the "This file can't be opened" state. entryId is its
+    // id in mpv's playlist: mpv's path never shows a file that fails at once.
+    void fileEnded(const QString &reason, const QString &error, qint64 entryId);
     void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
     void keepingAwakeChanged();
 
@@ -66,4 +69,5 @@ private:
     QSet<QString> m_observedNames;
     QVariantMap m_observed;
     QVariantMap m_marks;
+    QStringList m_recentLog;
 };

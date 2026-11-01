@@ -37,7 +37,9 @@ Item {
     property string popover: forceChrome ? "mixer" : ""
     property bool playlistOpen: false
     property bool settingsOpen: false
-    property bool hintShown: false
+    // Once ever, and never in a bench run. Opening the mixer counts as seeing it.
+    readonly property bool hintShown: !forceChrome && !PlayerSettings.firstRunHintDone && tracks.length >= 2
+    readonly property bool noSound: tracks.length > 0 && !tracks.some(t => t.enabled)
     readonly property string subtitleName: {
         const selected = subtitleTracks.find(t => t.id === subtitleTrack)
         return selected ? trackLabel(selected) : I18n.strings.off
@@ -45,6 +47,7 @@ Item {
 
     function togglePopover(name) {
         popover = popover === name ? "" : name
+        if (name === "mixer") PlayerSettings.firstRunHintDone = true
     }
     function toggleFullScreen() { chrome.toggleFullScreen() }
     function trackLabel(track) { return track.title || track.lang || I18n.strings.track_n.arg(track.id) }
@@ -108,7 +111,7 @@ Item {
     // control; then only a 2 px progress line remains, and a blank cursor.
     property bool pointerMoving: true
     readonly property bool overControls: controlBar.hovered || (titleBar.visible && titleBar.hovered)
-    readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || settingsOpen || overControls
+    readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || settingsOpen || hintShown || overControls
 
     function wake() {
         pointerMoving = true
@@ -217,16 +220,18 @@ Item {
         height: implicitHeight
     }
 
-    component PopoverLoader: Loader {
-        required property string name
-        readonly property bool open: ui.popover === name
-        active: open
+    component AnchoredLoader: Loader { // above the bar, centered on a button as far as the window allows
         x: {
             if (!item) return 0
             return Math.min(ui.width - item.width - 16, Math.max(16, anchorX - item.width / 2))
         }
         y: item ? controlBar.y - item.height - 12 : 0
         property real anchorX: 0
+    }
+    component PopoverLoader: AnchoredLoader {
+        required property string name
+        readonly property bool open: ui.popover === name
+        active: open
     }
     PopoverLoader {
         name: "mixer"
@@ -252,6 +257,34 @@ Item {
         sourceComponent: SubtitlesPopover {
             ui: player
             pointerX: controlBar.subtitlesCenter - x - parent.x
+            height: implicitHeight
+        }
+    }
+
+    AnchoredLoader {
+        anchorX: controlBar.chipCenter
+        active: ui.hintShown && ui.popover === "" && !ui.settingsOpen
+        sourceComponent: HintCard {
+            ui: player
+            pointerX: controlBar.chipCenter - x - parent.x
+            height: implicitHeight
+        }
+    }
+    AnchoredLoader {
+        anchorX: controlBar.chipCenter
+        active: ui.noSound && ui.chromeUp && ui.popover === "" && !ui.settingsOpen && !ui.hintShown
+        sourceComponent: NoSoundCard {
+            ui: player
+            pointerX: controlBar.chipCenter - x - parent.x
+            height: implicitHeight
+        }
+    }
+    Loader {
+        x: Theme.tokens.bar.inset
+        y: item ? controlBar.y - item.height - 12 : 0
+        active: !!ui.window.resumeOffer && !ui.settingsOpen
+        sourceComponent: ResumeCard {
+            ui: player
             height: implicitHeight
         }
     }

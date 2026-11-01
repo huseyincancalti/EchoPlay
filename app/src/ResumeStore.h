@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDateTime>
 #include <QHash>
 #include <QObject>
 #include <QQmlEngine>
@@ -28,6 +29,8 @@ public:
     Q_INVOKABLE void update(const QString &path, double pos, double duration);
     // The saved position in seconds, or -1 when there is none.
     Q_INVOKABLE double position(const QString &path) const;
+    // When that position was saved, invalid when there is none: "You stopped here on Oct 30."
+    Q_INVOKABLE QDateTime savedAt(const QString &path) const;
     // Keeps the newest MaxEntries and writes now. The UI calls it when a file ends.
     Q_INVOKABLE void save();
 

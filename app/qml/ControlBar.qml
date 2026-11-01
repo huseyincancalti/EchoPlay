@@ -17,7 +17,7 @@ GlassPanel {
     readonly property var glass: Theme.tokens.glass
     readonly property bool boosted: ui.volume > 100
     readonly property color volumeColor: !boosted ? glass.text : ui.volume >= 200 ? glass.danger : Theme.accent
-    readonly property bool noSound: ui.tracks.length > 0 && !ui.tracks.some(t => t.enabled)
+    readonly property bool noSound: ui.noSound
 
     objectName: "controlBar"
     backdrop: ui.backdrop

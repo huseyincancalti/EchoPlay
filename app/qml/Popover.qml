@@ -7,6 +7,7 @@ GlassPanel {
 
     default property alias content: body.data
     property real pointerX: width / 2
+    property bool pointed: true // a notice in a corner points at nothing
     property color pointerBorder: borderColor
 
     implicitHeight: body.implicitHeight
@@ -24,6 +25,7 @@ GlassPanel {
         implicitHeight: childrenRect.height
     }
     Item { // the pointer: a rotated square, cut in half
+        visible: popover.pointed
         x: popover.pointerX - 8
         y: popover.height
         width: 16

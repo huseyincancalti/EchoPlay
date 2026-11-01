@@ -23,7 +23,7 @@ qt_add_qml_module(echoplay_lib
     URI EchoPlay
     VERSION 1.0
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/EchoPlay" # qmldir path must match the URI (qmllint, tooling)
-    QML_FILES qml/Main.qml
+    QML_FILES qml/Main.qml qml/Icons.js qml/Icon.qml qml/Label.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/ResumeStore.h src/ResumeStore.cpp
@@ -71,6 +71,9 @@ endif()
 # The shipped theme: embedded as :/theme/theme.json (the defaults), and copied next to the exe, where the
 # same-named file overrides single tokens without a rebuild.
 qt_add_resources(echoplay_lib theme PREFIX "/theme" BASE "${CMAKE_CURRENT_SOURCE_DIR}/theme" FILES theme/theme.json)
+# Fonts: the bundled UI fonts and the icon font (tools/make-fonts.sh). Theme loads only the chosen one.
+qt_add_resources(echoplay_lib fonts PREFIX "/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/fonts" FILES
+                 fonts/Geist.ttf fonts/Manrope.ttf fonts/PlusJakartaSans.ttf fonts/Icons.ttf fonts/IconsFilled.ttf)
 add_custom_command(TARGET echoplay POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "$<TARGET_FILE_DIR:echoplay>")
 

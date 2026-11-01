@@ -44,6 +44,17 @@ public:
     void setScreenshotFolder(const QString &folder);
     QString screenshotCustomPath() const { return m_screenshotCustomPath; }
     void setScreenshotCustomPath(const QString &path);
+    // Settings > Appearance: their values are checked by Theme, which owns them. Empty = the theme file's token.
+    QString themeMode() const { return m_themeMode; } // "dark", "light", "system"
+    void setThemeMode(const QString &mode);
+    QString accentColor() const { return m_accentColor; }
+    void setAccentColor(const QString &color);
+    QString barStyle() const { return m_barStyle; } // "island", "full"
+    void setBarStyle(const QString &style);
+    QString fontFamily() const { return m_fontFamily; }
+    void setFontFamily(const QString &family);
+    int glassStrength() const { return m_glassStrength; } // 0..2
+    void setGlassStrength(int strength);
     // The daily update check: when it last ran, and the newest version already shown to the user (shown once).
     qint64 updateLastChecked() const { return m_updateLastChecked; } // seconds since the epoch; 0 = never
     void setUpdateLastChecked(qint64 epochSeconds);
@@ -81,6 +92,11 @@ private:
     double m_speedStep = 0.1;
     QString m_screenshotFolder = QStringLiteral("desktop");
     QString m_screenshotCustomPath;
+    QString m_themeMode = QStringLiteral("dark");
+    QString m_accentColor;
+    QString m_barStyle;
+    QString m_fontFamily;
+    int m_glassStrength = 1;
     qint64 m_updateLastChecked = 0;
     QString m_updateSeenVersion;
 };

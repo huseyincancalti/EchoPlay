@@ -1,12 +1,33 @@
 {
-  "bg": "#0E0D0C", "text": "#F5F2EE", "textMuted": "#B3ACA4",
-  "accent": "#FF7D26", "onAccent": "#1A0F06",
-  "success": "#3FB950", "warning": "#D29922", "danger": "#F85149",
-  "glass": { "fill": "#141210", "opacity": 0.35 }, "glassBorder": "#29FFFFFF",
-  "blur": { "panel": 48 },
-  "radius": { "sm": 6, "md": 10, "lg": 16, "xl": 24 },
-  "spacing": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24 },
-  "font": { "family": "Segoe UI Variable", "caption": 12, "body": 14, "title": 18, "display": 28 },
-  "icon": { "sm": 16, "md": 20, "lg": 24 },
-  "motion": { "fast": 120, "base": 200 }
+  "dark": {
+    "bg": "#111012", "surface": "#1A191B",
+    "panel": "#111012", "panelOpacity": 0.86, "border": "#1AFFFFFF", "hairline": "#14FFFFFF",
+    "text": "#F4F2EF", "textMuted": "#BDB7B0",
+    "control": "#14FFFFFF", "controlStrong": "#1FFFFFFF", "selected": "#1FFFFFFF", "track": "#2EFFFFFF",
+    "success": "#5CCB8A", "warning": "#F2B441", "danger": "#F06A5D"
+  },
+  "light": {
+    "bg": "#F5F3F0", "surface": "#FFFFFF",
+    "panel": "#FAF8F5", "panelOpacity": 0.84, "border": "#1F141210", "hairline": "#14141210",
+    "text": "#1B1917", "textMuted": "#56514B",
+    "control": "#0F141210", "controlStrong": "#1A141210", "selected": "#12141210", "track": "#24141210",
+    "success": "#1F8A55", "warning": "#9A6200", "danger": "#C2362B"
+  },
+  "glass": {
+    "fill": "#111012", "bar": 0.78, "popover": 0.84, "strengthStep": 0.12, "border": "#1AFFFFFF", "hairline": "#14FFFFFF",
+    "text": "#F4F2EF", "textMuted": "#BDB7B0",
+    "control": "#1AFFFFFF", "controlSubtle": "#14FFFFFF", "track": "#33FFFFFF", "trackOff": "#38FFFFFF",
+    "success": "#5CCB8A", "warning": "#F2B441", "danger": "#F06A5D"
+  },
+  "accent": "#FF7D26",
+  "onAccent": { "dark": "#1C0E04", "light": "#FFFFFF" },
+  "radius": { "sm": 8, "md": 12, "lg": 18, "xl": 22, "pill": 999 },
+  "blur": { "panel": 28, "overlay": 40 },
+  "space": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "xxl": 32, "xxxl": 48 },
+  "type": { "caption": 12, "small": 13, "body": 14, "label": 15, "title": 17, "heading": 22, "display": 28 },
+  "icon": { "sm": 20, "md": 24, "lg": 32 },
+  "motion": { "fast": 120, "base": 200, "sweep": 360, "jolt": 240 },
+  "shadow": { "y": 16, "blur": 48, "opacity": 0.35 },
+  "bar": { "style": "island", "inset": 16 },
+  "font": { "family": "Geist", "file": "" }
 }

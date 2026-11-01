@@ -4,7 +4,7 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
     : state(configDir + "/state.json"),
       resume(configDir + "/resume.json"), // its own file: it grows with every file watched
       i18n(appDir + "/lang"),
-      theme(":/theme/theme.json", appDir + "/theme.json"),
+      theme(&state, ":/theme/theme.json", appDir + "/theme.json", configDir + "/fonts"),
       mixer(&state),
       quality(&state),
       player(&state),
@@ -14,6 +14,7 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
 {
     i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
     QObject::connect(&i18n, &I18n::languageChanged, &state, [this] { state.setLanguage(i18n.language()); });
+    theme.startGui();
 
     AppState::setInstance(&state);
     ResumeStore::setInstance(&resume);

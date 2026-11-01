@@ -1,5 +1,6 @@
 #include "AppState.h"
 
+#include <QColor>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -88,6 +89,41 @@ void AppState::setScreenshotCustomPath(const QString &path)
     changed();
 }
 
+void AppState::setThemeMode(const QString &mode)
+{
+    if (mode == m_themeMode) return;
+    m_themeMode = mode;
+    changed();
+}
+
+void AppState::setAccentColor(const QString &color)
+{
+    if (color == m_accentColor) return;
+    m_accentColor = color;
+    changed();
+}
+
+void AppState::setBarStyle(const QString &style)
+{
+    if (style == m_barStyle) return;
+    m_barStyle = style;
+    changed();
+}
+
+void AppState::setFontFamily(const QString &family)
+{
+    if (family == m_fontFamily) return;
+    m_fontFamily = family;
+    changed();
+}
+
+void AppState::setGlassStrength(int strength)
+{
+    if (strength == m_glassStrength) return;
+    m_glassStrength = strength;
+    changed();
+}
+
 void AppState::setUpdateLastChecked(qint64 epochSeconds)
 {
     if (epochSeconds == m_updateLastChecked) return;
@@ -156,6 +192,16 @@ void AppState::load()
         m_screenshotFolder = screenshots.value("folder").toString();
     if (screenshots.value("custom").isString()) m_screenshotCustomPath = screenshots.value("custom").toString();
 
+    const QJsonObject look = s.value("appearance").toObject();
+    static const QRegularExpression themeMode("^(dark|light|system)$");
+    if (themeMode.match(look.value("mode").toString()).hasMatch()) m_themeMode = look.value("mode").toString();
+    if (QColor::isValidColorName(look.value("accent").toString())) m_accentColor = look.value("accent").toString();
+    static const QRegularExpression barStyle("^(island|full)$");
+    if (barStyle.match(look.value("bar").toString()).hasMatch()) m_barStyle = look.value("bar").toString();
+    if (look.value("font").isString()) m_fontFamily = look.value("font").toString();
+    const int glass = look.value("glass").toInt(-1);
+    if (glass >= 0 && glass <= 2) m_glassStrength = glass;
+
     const QJsonObject update = s.value("update").toObject();
     if (update.value("last_checked").isDouble()) m_updateLastChecked = update.value("last_checked").toInteger();
     if (update.value("seen_version").isString()) m_updateSeenVersion = update.value("seen_version").toString();
@@ -180,6 +226,8 @@ void AppState::save()
         {"mixer", QJsonObject{{"default_on", m_mixer.defaultOn}, {"gains", gains}, {"mono", monoIds}}},
         {"playback", QJsonObject{{"end", m_endMode}, {"speed_factor", m_speedFactor}, {"speed_step", m_speedStep}}},
         {"screenshots", QJsonObject{{"folder", m_screenshotFolder}, {"custom", m_screenshotCustomPath}}},
+        {"appearance", QJsonObject{{"mode", m_themeMode}, {"accent", m_accentColor}, {"bar", m_barStyle},
+                                   {"font", m_fontFamily}, {"glass", m_glassStrength}}},
         {"update", QJsonObject{{"last_checked", m_updateLastChecked}, {"seen_version", m_updateSeenVersion}}},
     };
 

@@ -69,7 +69,8 @@ Window {
         root.startup.process_ms = mpv.processAgeMs()
         mpv.command(["print-text", "STARTUP " + JSON.stringify(root.startup)])
         if (root.shotAt >= 0) shotTimer.start()
-        else root.unpauseOnSwap = true
+        else if ((mpv.observed("track-list") || []).some(t => t.type === "video")) root.unpauseOnSwap = true
+        else mpv.setProperty("pause", false) // no video frame to wait for: nothing may repaint the window
     }
 
     // Same switching order as v1's apply_audio(): lavfi-complex first, then aid.

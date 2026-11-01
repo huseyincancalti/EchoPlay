@@ -16,6 +16,8 @@ STAGE=installer/windows/v2/stage
 ISCC="${ISCC:-$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe}"
 [ -x "$ISCC" ] || { echo "Inno Setup not found: $ISCC (set ISCC=...)"; exit 3; }
 [ -x "$STAGE/EchoPlay.exe" ] || { echo "No staged app: run tools/package-v2.sh first"; exit 3; }
+cmake --build .out/build-v2-package --target setup_on_close > /dev/null
+CLOSE=.out/build-v2-package/setup_on_close.exe
 
 clean() { env -i PATH="/c/Windows/System32:/c/Windows" SYSTEMROOT='C:\Windows' SYSTEMDRIVE='C:' \
   USERNAME="$USERNAME" LOCALAPPDATA="$LOCALAPPDATA" APPDATA="$APPDATA" USERPROFILE="$USERPROFILE" "$@"; }
@@ -69,7 +71,13 @@ theRealEchoPlay() { # fingerprint of what is installed on this machine: must not
   reg query 'HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6E9F2C9C-6E61-4A8B-9A5B-2F1E0E6F4C2D}_is1' //v DisplayVersion 2>/dev/null || true
   reg query 'HKCU\Software\Classes\Applications\EchoPlay.exe\shell\open\command' 2>/dev/null || true
 }
-closeWithUpdate() { clean "$APP/EchoPlay.exe" --smoke --setup-on-close "$SETUPW" > /dev/null; } # the real close path, no window
+closeWithUpdate() { "$CLOSE" "$SETUPW"; } # what EchoPlay does last when it closes with an update waiting
+installingLock() { [ "$(powershell.exe -NoProfile -Command "\$m=\$null; [Threading.Mutex]::TryOpenExisting('EchoPlayInstalling',[ref]\$m)" 2>/dev/null | tr -d '\r')" = True ]; }
+noInstallingLock() { ! installingLock; }
+seesInstallingLock() { # up to a minute
+  local start; start=$(now)
+  until installingLock; do [ $(($(now) - start)) -lt 60000 ] || return 1; done
+}
 
 killTestApp
 rm -rf "$APP" "$OUT/logs"
@@ -139,6 +147,15 @@ report "  the files: $(sameAsStage && echo 'all replaced' || echo 'NOT all repla
 killTestApp
 wait "$unguarded" 2>/dev/null || true
 clean "$SETUP" //VERYSILENT //SUPPRESSMSGBOXES //NORESTART || true # back to a whole install
+
+report "a setup EchoPlay did not start: its lock shows while it installs (a wizard before that holds nothing back)"
+oldVersion
+clean "$SETUP" //VERYSILENT //SUPPRESSMSGBOXES //NORESTART &
+direct=$!
+check "the lock shows" seesInstallingLock
+wait "$direct" || true
+check "it goes with the setup" noInstallingLock
+check "the setup replaced what was old" sameAsStage
 
 report "Install now reopens EchoPlay"
 oldVersion

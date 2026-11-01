@@ -26,6 +26,9 @@ target_link_libraries(tst_updatecheck PRIVATE Qt6::Network)
 echoplay_test(updater ../src/Updater.h ../src/Updater.cpp)
 target_link_libraries(tst_updater PRIVATE Qt6::Network)
 echoplay_test(setuplock ../src/SetupLock.h ../src/SetupLock.cpp)
+add_executable(setup_on_close setup_on_close.cpp ../src/SetupLock.h ../src/SetupLock.cpp)
+target_include_directories(setup_on_close PRIVATE ../src)
+target_link_libraries(setup_on_close PRIVATE Qt6::Core)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
 echoplay_test(mediafiles ../src/MediaFiles.h ../src/MediaFiles.cpp)
 echoplay_test(errorreport ../src/ErrorReport.h ../src/ErrorReport.cpp)
@@ -83,7 +86,7 @@ set_tests_properties(silencecheck PROPERTIES FIXTURES_REQUIRED silencecheck-clip
 # window, so it is labeled e2e: tools/e2e.sh runs it, tools/check.sh (headless) leaves it out.
 qt_add_executable(tst_e2e tst_e2e.cpp)
 set_target_properties(tst_e2e PROPERTIES WIN32_EXECUTABLE OFF)
-target_link_libraries(tst_e2e PRIVATE echoplay_lib echoplay_libplugin Qt6::Test)
+target_link_libraries(tst_e2e PRIVATE echoplay_lib echoplay_libplugin Qt6::Test Qt6::Network)
 add_test(NAME e2e COMMAND tst_e2e)
 set_tests_properties(e2e PROPERTIES LABELS e2e)
 

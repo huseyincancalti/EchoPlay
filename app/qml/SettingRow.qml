@@ -43,10 +43,11 @@ Item {
             objectName: "settingDescription"
             visible: row.description !== ""
             width: parent.width
-            wrapMode: Text.WordWrap
+            // A folder path has no spaces: it may break after a separator (a zero-width space), and anywhere as a last resort.
+            wrapMode: Text.Wrap
             lineHeight: 18
             lineHeightMode: Text.FixedHeight
-            text: row.description
+            text: row.description.replace(/[\\/]/g, "$&​")
             color: row.descriptionColor
             font.pixelSize: Theme.tokens.type.small
         }

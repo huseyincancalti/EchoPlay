@@ -42,7 +42,7 @@ void Updater::download(const QString &url, const QString &sha256, const QString 
 
     // The version comes from a release tag and ends up in a file name: plain characters only.
     static const QRegularExpression plain("^[\\w.+-]+$");
-    if (!plain.match(version).hasMatch()) {
+    if (sha256.isEmpty() || !plain.match(version).hasMatch()) {
         fail();
         return;
     }
@@ -62,12 +62,6 @@ void Updater::download(const QString &url, const QString &sha256, const QString 
     connect(m_reply, &QNetworkReply::readyRead, this, [this] {
         if (!store()) fail();
     });
-    connect(m_reply, &QNetworkReply::downloadProgress, this, [this](qint64, qint64 total) {
-        if (total > 0 && total != m_total) {
-            m_total = total;
-            emit changed();
-        }
-    });
     connect(m_reply, &QNetworkReply::finished, this, &Updater::finish);
     setState("downloading");
 }
@@ -78,6 +72,14 @@ void Updater::cancel()
     discard();
     m_onClose = false;
     setState("idle");
+}
+
+void Updater::removeOldSetups()
+{
+    if (m_state != QLatin1String("idle")) return;
+    QDir dir(m_dir);
+    const QStringList old = dir.entryList({"EchoPlay-Setup-*.exe", "EchoPlay-Setup-*.exe.part"}, QDir::Files);
+    for (const QString &name : old) dir.remove(name);
 }
 
 void Updater::setState(const QString &state)
@@ -96,6 +98,8 @@ bool Updater::store()
     if (m_file->write(chunk) != chunk.size()) return false;
     m_hash.addData(chunk);
     m_received += chunk.size();
+    // From the header: downloadProgress may stay away for the first 100 ms or longer, and "1 / 0 MB" would show until then.
+    m_total = m_reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
     emit changed();
     return true;
 }
@@ -103,7 +107,7 @@ bool Updater::store()
 void Updater::finish()
 {
     if (!store() || m_reply->error() != QNetworkReply::NoError || m_received == 0
-        || (!m_sha256.isEmpty() && QString::fromLatin1(m_hash.result().toHex()) != m_sha256)) {
+        || QString::fromLatin1(m_hash.result().toHex()) != m_sha256) {
         fail();
         return;
     }

@@ -51,7 +51,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; A running EchoPlay holds its files: ask to close it, as any update of a running app needs.
 CloseApplications=yes
-; While this mutex exists a new EchoPlay leaves at once and comes back when it is gone (app/src/SetupLock.cpp).
+; One setup at a time. The lock a new EchoPlay looks at is CurStepChanged's, below.
 SetupMutex=EchoPlaySetup
 
 [Languages]
@@ -122,6 +122,13 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--after-setup"; Flags: nowait; C
 function IsAppUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:ECHOPLAYUPDATE|0}') = '1';
+end;
+
+// While this mutex exists a new EchoPlay leaves at once and comes back when it is gone (app/src/SetupLock.cpp). From
+// here, not from the start: a wizard may stay open for as long as someone likes, with EchoPlay opening as usual.
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then CreateMutex('EchoPlayInstalling');
 end;
 
 [Messages]

@@ -5,6 +5,8 @@
 #include <QQuickImageProvider>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QtQml/qqmlextensionplugin.h>
 #include <atomic>
 #include <clocale>
@@ -28,6 +30,12 @@ Q_IMPORT_QML_PLUGIN(EchoPlayPlugin)
 namespace {
 
 const QString Mix = "[aid1]volume=1.00[ev1];[aid2]volume=1.00[ev2];[ev1][ev2]amix=inputs=2:normalize=0[ao]";
+
+// A release with a setup. The asset does not exist, so a download of it comes to nothing.
+// A plain string: moc reads a raw one as ordinary quotes, and the // of a URL then hides the rest of the file.
+const char NextRelease[] = "{\"tag_name\": \"v99.0.0\", \"body\": \"Notes of the next version\", \"assets\": [{\"name\": \"EchoPlay-Setup.exe\","
+    " \"digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\","
+    " \"browser_download_url\": \"https://github.com/huseyincancalti/EchoPlay/releases/download/v99.0.0/EchoPlay-Setup.exe\"}]}";
 
 // Real input still reaches the test window when it opens under the maintainer's cursor or takes the focus:
 // a scroll there turned the volume down 13 steps before the test pressed a key. The test sends no wheel
@@ -118,6 +126,15 @@ struct Launch
         for (QQuickItem *child : children)
             if (QQuickItem *found = searchVisible(child, objectName)) return found;
         return nullptr;
+    }
+    static QList<QQuickItem *> searchAllVisible(QQuickItem *from, const char *objectName)
+    {
+        QList<QQuickItem *> found;
+        if (!from->isVisible()) return found;
+        if (from->objectName() == QLatin1String(objectName)) found << from;
+        const QList<QQuickItem *> children = from->childItems();
+        for (QQuickItem *child : children) found << searchAllVisible(child, objectName);
+        return found;
     }
     // Clicks the middle of a named item, as a user does: the event goes to the window, not to the item.
     bool click(const char *objectName)
@@ -400,6 +417,20 @@ private slots:
     }
 
     // No file on the command line: the start screen right away, and a dropped file plays.
+    // A new version with nothing open: the card in the corner of the start screen. Not answered, so nothing downloads.
+    void updateCardOnStartScreen()
+    {
+        const QString state = QDir(m_path).filePath("start-update");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, QString(), QDir(m_path).filePath("start-update.log"), "2.0.0");
+        QVERIFY(app.mpv);
+        QTRY_VERIFY(app.item("startScreen"));
+        app.services.updates.handleReply(NextRelease);
+        QTRY_VERIFY(app.item("updateNotice"));
+        QVERIFY(app.item("updateInstall"));
+        app.shot("update-start");
+    }
+
     void startScreen()
     {
         const QString state = QDir(m_path).filePath("start");
@@ -521,6 +552,10 @@ private slots:
         for (const char *tab : {"playback", "picture", "appearance", "language", "screenshots", "shortcuts", "about"}) {
             QVERIFY2(app.click(QByteArray("settingsTab-") + tab), tab);
             app.shot(QString("settings-") + tab);
+            // No words run out of their row: this test's own screenshot folder is a long path with no spaces.
+            const QList<QQuickItem *> words = Launch::searchAllVisible(app.window->contentItem(), "settingDescription");
+            for (QQuickItem *text : words)
+                QVERIFY2(text->property("contentWidth").toDouble() <= text->width(), qPrintable(text->property("text").toString()));
         }
 
         // The arrow step from Playback reaches the keys; a dropdown's list; the language changes everything.
@@ -665,19 +700,24 @@ private slots:
             QTRY_VERIFY(app.item("resumeCard"));
             app.wake();
             app.shot("resume");
+            // The chrome goes and the card stays: the glass behind it keeps following the video.
+            QTRY_VERIFY(!app.item("controlBar")->isVisible());
+            QVERIFY(app.item("resumeCard"));
+            QVERIFY(app.item("glassBackdrop")->property("active").toBool());
             QVERIFY(app.click("resumeButton"));
             QTRY_VERIFY(app.number("time-pos") >= 25);
             QTRY_VERIFY(!app.item("resumeCard"));
 
-            // A release with a setup: Install on close. The asset does not exist, so the quiet download comes to nothing.
-            // A plain string: moc reads a raw one as ordinary quotes, and the // of a URL then hides the rest of the file.
-            app.services.updates.handleReply("{\"tag_name\": \"v99.0.0\", \"body\": \"Notes of the next version\", \"assets\": [{\"name\": \"EchoPlay-Setup.exe\","
-                " \"browser_download_url\": \"https://github.com/huseyincancalti/EchoPlay/releases/download/v99.0.0/EchoPlay-Setup.exe\"}]}");
+            // A release with a setup: Install on close.
+            app.services.updates.handleReply(NextRelease);
             QTRY_VERIFY(app.item("updateNotice"));
             QVERIFY(app.item("updateClose"));
             QCOMPARE(app.item("updateLater")->property("text").toString(), app.services.i18n.strings().value("install_on_close").toString());
             app.wake();
             app.shot("update");
+            QTRY_VERIFY(!app.item("controlBar")->isVisible()); // this card outlasts the chrome too
+            QVERIFY(app.item("updateNotice"));
+            QVERIFY(app.item("glassBackdrop")->property("active").toBool());
             QSignalSpy installStarted(&app.services.updater, &Updater::changed);
             QVERIFY(app.click("updateLater"));
             QTRY_VERIFY(!app.item("updateNotice"));
@@ -690,11 +730,13 @@ private slots:
                 "**No more stutter when picture quality switches tiers.** Auto mode's live switching used to freeze for a second or two the first time it happened in a session.\n\n"
                 "**Your folder stays your folder.** A subfolder next to the video you opened no longer joins the playlist.\n\n"
                 "- The mixer remembers more\n- Install on close\n- [Everything else](https://example.com)\n\n"
-                "**When video ends actually sticks now.** Picking Play next, Repeat or Stop at end used to revert on the next file.");
+                "**When video ends actually sticks now.** Picking Play next, Repeat or Stop at end used to revert on the next file.\n\n"
+                "**Full Changelog**: https://github.com/huseyincancalti/EchoPlay/compare/v1.4.0...v2.0.0"); // as GitHub writes it
             emit app.services.updates.changed();
             QTRY_VERIFY(app.item("whatsNewCard"));
             app.wake();
             app.shot("whats-new");
+            QVERIFY(app.item("whatsNewText")->property("contentWidth").toDouble() <= app.item("whatsNewText")->width());
             QVERIFY(app.click("whatsNewClose"));
             QTRY_VERIFY(!app.item("whatsNewCard"));
             QCOMPARE(app.services.updates.whatsNew(), QString());
@@ -706,6 +748,34 @@ private slots:
             app.item("whatsNewCard")->setProperty("closeAfter", 200);
             QTRY_VERIFY(!app.item("whatsNewCard"));
             QCOMPARE(app.services.updates.whatsNew(), QString());
+
+            // About while the quiet download runs, and once it waits for the close. From a server in this test; never started.
+            app.services.updater.cancel();
+            const QByteArray setup(3 * 1048576, 'x');
+            QTcpServer server;
+            QVERIFY(server.listen(QHostAddress::LocalHost));
+            QTcpSocket *download = nullptr;
+            connect(&server, &QTcpServer::newConnection, this, [&] {
+                download = server.nextPendingConnection();
+                connect(download, &QTcpSocket::readyRead, this, [&] {
+                    download->readAll();
+                    download->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(setup.size()) + "\r\n\r\n" + setup.left(1048576));
+                }, Qt::SingleShotConnection);
+            });
+            app.services.updater.installOnClose(QString("http://127.0.0.1:%1/setup").arg(server.serverPort()),
+                                                QString::fromLatin1(QCryptographicHash::hash(setup, QCryptographicHash::Sha256).toHex()), "99.0.0");
+            QVERIFY(QMetaObject::invokeMethod(app.item("controlBar")->parentItem(), "openSettings"));
+            QTRY_VERIFY(app.item("settingsOverlay"));
+            QVERIFY(app.click("settingsTab-about"));
+            QTRY_COMPARE(app.services.updater.received(), qint64(1048576));
+            QCOMPARE(app.services.updater.total(), qint64(setup.size())); // known from the first bytes, or the text says "1 / 0 MB"
+            app.shot("about-quiet-download");
+            download->write(setup.mid(1048576));
+            QTRY_COMPARE(app.services.updater.state(), QString("ready"));
+            app.shot("about-waiting-for-close");
+            QVERIFY(QFile::remove(app.services.updater.setupOnClose()));
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("settingsOverlay"));
 
             app.services.player.setResumeMode("always");
             app.mpv->command({"seek", 30, "absolute"});

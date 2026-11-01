@@ -43,14 +43,17 @@ public:
     // The setup main.cpp starts after the app has closed; empty when none is waiting.
     QString setupOnClose() const { return m_state == QLatin1String("ready") ? m_setupPath : QString(); }
 
-    // sha256 is lowercase hex; empty skips the check. Does nothing while downloading or installing. When the setup
-    // is already waiting for the app to close, starts it now.
+    // sha256 is lowercase hex; without one nothing is downloaded, as the setup runs without a click. Does nothing while
+    // downloading or installing. When the setup is already waiting for the app to close, starts it now.
     Q_INVOKABLE void install(const QString &url, const QString &sha256, const QString &version);
     // Nobody is watching this one: a failure goes back to idle without a word, and the next run asks again. Does
     // nothing while downloading, waiting or installing.
     Q_INVOKABLE void installOnClose(const QString &url, const QString &sha256, const QString &version);
     // Downloading -> idle, the partial file removed.
     Q_INVOKABLE void cancel();
+    // What earlier updates left: a setup is still running when it reopens EchoPlay, so it cannot remove itself. One still
+    // in use stays until the next start.
+    void removeOldSetups();
 
     static Updater *create(QQmlEngine *, QJSEngine *)
     {

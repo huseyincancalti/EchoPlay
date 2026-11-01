@@ -127,14 +127,15 @@ private slots:
         }
     }
 
-    void missingOrOddDigestLeavesTheHashEmpty()
+    void missingOrOddDigestGivesNoSetup()
     {
         AppState state(m_path);
         UpdateCheck check(&state, "2.0.0");
         for (const char *digest : {"", "md5:" "0123456789abcdef0123456789abcdef", "sha256:", "sha256:xyz", "sha256:0123"}) {
             check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", digest));
-            QCOMPARE(check.setupUrl(), Download + "EchoPlay-Setup.exe");
+            QVERIFY(check.setupUrl().isEmpty());
             QVERIFY(check.setupSha256().isEmpty());
+            QVERIFY(check.updateAvailable()); // the card still tells, and leads to the release page
         }
     }
 

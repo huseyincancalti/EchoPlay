@@ -44,6 +44,15 @@ private slots:
         QVERIFY(!SingleInstance(uniqueName()).sendToRunning("clip.mp4", 1));
     }
 
+    void closingInstanceTakesNothing()
+    {
+        const QString name = uniqueName();
+        SingleInstance running(name);
+        QVERIFY(running.listen());
+        running.stopListening();
+        QVERIFY(!send(name, "clip.mp4", 1));
+    }
+
     void listeningInstanceReceivesFileAndTimeExactly()
     {
         const QString name = uniqueName();

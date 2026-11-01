@@ -27,7 +27,7 @@ Item {
         visible: !panel.backdrop
         anchors.fill: parent
         radius: panel.radius
-        color: Qt.alpha(panel.fill, panel.fillOpacity)
+        color: panel.fill // solid: with no blur, the start screen's dashed frame would show through
         border.width: 1
         border.color: panel.borderColor
     }

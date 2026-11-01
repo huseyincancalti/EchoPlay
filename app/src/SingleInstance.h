@@ -22,6 +22,8 @@ public:
     bool sendToRunning(const QString &file, qint64 sentAtEpochMs);
     // Become the running instance. Call it only after sendToRunning returned false.
     bool listen();
+    // The app is closing: the next launch must not hand its file to this process, it would be lost.
+    void stopListening() { m_server.close(); }
 
 signals:
     void fileRequested(const QString &file, qint64 sentAtEpochMs);

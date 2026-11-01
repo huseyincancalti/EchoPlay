@@ -75,11 +75,9 @@ int main(int argc, char *argv[])
     QCommandLineOption thumbScrub("thumb-scrub", "Request a seek-bar preview every 50 ms while playing, like a pointer on the seek bar.");
     QCommandLineOption tierCycle("tier-cycle", "Switch the picture tier every 2 s while playing (Ultra, Low, Normal, ...).");
     QCommandLineOption afterSetupOpt("after-setup", "The setup's lock does not apply (installer/windows/v2/EchoPlay.iss, SetupLock.cpp).");
-    QCommandLineOption setupOnCloseOpt("setup-on-close", "Start this setup after closing, as an update installed on close does (tools/setup-live.sh).", "path");
-    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub, tierCycle, afterSetupOpt, setupOnCloseOpt});
+    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub, tierCycle, afterSetupOpt});
     cli.addHelpOption();
     cli.process(app);
-    setupOnClose.path = cli.value(setupOnCloseOpt); // with --smoke: the whole close path, no window
     if (cli.isSet(smokeOpt)) return smoke();
     // Absolute: a running instance resolves paths against its own working folder, and resume positions are
     // keyed by path. URLs pass unchanged.
@@ -103,7 +101,10 @@ int main(int argc, char *argv[])
     // 4 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay
     // offline (comparable measurements).
     if (!cli.isSet(bench) && cli.value(shotAt).toDouble() < 0)
-        QTimer::singleShot(4000, &services.updates, &UpdateCheck::start);
+        QTimer::singleShot(4000, &services.updates, [&services] {
+            services.updater.removeOldSetups();
+            services.updates.start();
+        });
 
     QQmlApplicationEngine engine;
     const qint64 tEngine = MpvItem::processAgeMsNow();
@@ -125,6 +126,10 @@ int main(int argc, char *argv[])
                      Qt::QueuedConnection);
     engine.loadFromModule("EchoPlay", "Main");
     const int code = app.exec();
-    if (setupOnClose.path.isEmpty()) setupOnClose.path = services.updater.setupOnClose();
+    // Closing takes a moment. A clip opened during it goes nowhere near this process: it comes back after the setup, or
+    // with none waiting it starts on its own. The lock first, or it could slip between the two.
+    setupOnClose.path = services.updater.setupOnClose();
+    if (!setupOnClose.path.isEmpty()) SetupLock::hold();
+    if (instance) instance->stopListening();
     return code;
 }

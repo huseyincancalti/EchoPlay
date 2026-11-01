@@ -501,6 +501,7 @@ Window {
         target: Updater
         function onQuitRequested() { root.close() } // the setup is running and replaces the files
     }
+    readonly property bool cardShown: updateNotice.active || whatsNew.active // they outlast the chrome: PlayerUi's glass stays live
     Loader { // bottom right, above the bar when there is one; not over settings, whose About has it too
         id: updateNotice
         readonly property var player: ui.item

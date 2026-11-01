@@ -27,7 +27,7 @@ class UpdateCheck : public QObject
     Q_PROPERTY(QDateTime lastChecked READ lastChecked NOTIFY changed) // invalid when never checked
     Q_PROPERTY(QString releasesUrl READ releasesUrl CONSTANT)
     Q_PROPERTY(QString setupUrl READ setupUrl NOTIFY changed)       // empty: the release has no usable setup
-    Q_PROPERTY(QString setupSha256 READ setupSha256 NOTIFY changed) // lowercase hex; empty: GitHub gave no digest
+    Q_PROPERTY(QString setupSha256 READ setupSha256 NOTIFY changed) // lowercase hex; there is no setupUrl without it
     Q_PROPERTY(QString whatsNew READ whatsNew NOTIFY changed) // this version's release notes, until closed; else empty
 
 public:

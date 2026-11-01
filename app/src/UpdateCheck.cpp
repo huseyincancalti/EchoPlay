@@ -124,8 +124,8 @@ void UpdateCheck::closeWhatsNew()
     emit changed();
 }
 
-// The setup is the asset named exactly EchoPlay-Setup.exe. A foreign download host or a missing or odd
-// digest leaves the matching field empty; nothing from an earlier reply stays.
+// The setup is the asset named exactly EchoPlay-Setup.exe. It runs without a click, so a foreign download host or a
+// missing or odd digest means no setup: the card leads to the release page. Nothing from an earlier reply stays.
 void UpdateCheck::readSetup(const QJsonArray &assets)
 {
     m_setupUrl.clear();
@@ -135,10 +135,11 @@ void UpdateCheck::readSetup(const QJsonArray &assets)
         if (asset.value("name").toString() != SetupAssetName) continue;
         const QString url = asset.value("browser_download_url").toString();
         if (!url.startsWith(SetupUrlPrefix)) return;
-        m_setupUrl = url;
         static const QRegularExpression digest("^sha256:([0-9a-fA-F]{64})$");
         const QRegularExpressionMatch m = digest.match(asset.value("digest").toString());
-        if (m.hasMatch()) m_setupSha256 = m.captured(1).toLower();
+        if (!m.hasMatch()) return;
+        m_setupUrl = url;
+        m_setupSha256 = m.captured(1).toLower();
         return;
     }
 }

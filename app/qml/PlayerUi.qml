@@ -146,9 +146,10 @@ Item {
 
     GlassBackdrop {
         id: glassBackdrop
+        objectName: "glassBackdrop"
         anchors.fill: parent
         source: ui.mpv
-        active: ui.chromeUp || flash.shown
+        active: ui.chromeUp || flash.shown || resumeLoader.active || ui.window.cardShown
     }
     MouseArea { // the video itself
         anchors.fill: parent

@@ -117,17 +117,30 @@ private slots:
         QCOMPARE(quit.count(), 1);
     }
 
-    void emptyShaIsAccepted()
+    void noShaDownloadsNothing()
     {
         m_server.routes["/setup"] = {200, m_body};
         QStringList launched;
         Updater updater(m_downloads, [&](const QString &path) { launched << path; return true; });
-        QSignalSpy quit(&updater, &Updater::quitRequested);
 
         updater.install(m_server.url("/setup"), QString(), "2.1.0");
-        QVERIFY(quit.wait(10000));
-        QCOMPARE(launched.size(), 1);
-        QCOMPARE(readFile(launched.at(0)), m_body);
+        QCOMPARE(updater.state(), QString("failed"));
+        updater.installOnClose(m_server.url("/setup"), QString(), "2.1.0");
+        QCOMPARE(updater.state(), QString("idle"));
+        QVERIFY(launched.isEmpty());
+        QVERIFY(files().isEmpty());
+    }
+
+    void oldSetupsAreRemovedAndNothingElse()
+    {
+        QDir().mkpath(m_downloads);
+        for (const char *name : {"EchoPlay-Setup-1.9.0.exe", "EchoPlay-Setup-2.0.0.exe.part", "EchoPlay-Setup.exe", "other.txt"}) {
+            QFile f(m_downloads + "/" + name);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+        }
+        Updater updater(m_downloads, [](const QString &) { return true; });
+        updater.removeOldSetups();
+        QCOMPARE(files(), QStringList({"EchoPlay-Setup.exe", "other.txt"}));
     }
 
     void redirectIsFollowed()
@@ -172,7 +185,7 @@ private slots:
         m_server.routes["/empty"] = {200, {}};
         Updater updater(m_downloads, [](const QString &) { return true; });
 
-        updater.install(m_server.url("/empty"), QString(), "2.1.0");
+        updater.install(m_server.url("/empty"), sha256(QByteArray()), "2.1.0");
         QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("failed"), 10000);
         QVERIFY(files().isEmpty());
     }
@@ -181,7 +194,7 @@ private slots:
     {
         Updater updater(m_downloads, [](const QString &) { return true; });
         for (const char *version : {"", "..\\evil", "../evil", "a b"}) {
-            updater.install(m_server.url("/setup"), QString(), version);
+            updater.install(m_server.url("/setup"), sha256(m_body), version);
             QCOMPARE(updater.state(), QString("failed"));
         }
         QVERIFY(!QDir(m_downloads).exists());
@@ -237,7 +250,7 @@ private slots:
         Updater updater(m_downloads, [](const QString &) { return true; });
         QSignalSpy quit(&updater, &Updater::quitRequested);
 
-        updater.install(m_server.url("/missing"), QString(), "2.1.0");
+        updater.install(m_server.url("/missing"), sha256(m_body), "2.1.0");
         QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("failed"), 10000);
 
         updater.install(m_server.url("/setup"), sha256(m_body), "2.1.0");

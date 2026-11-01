@@ -6,12 +6,14 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <string>
+#include <vector>
 
 namespace {
 
-constexpr wchar_t SetupMutex[] = L"EchoPlaySetup"; // SetupMutex in installer/windows/v2/EchoPlay.iss
-// The one startSetup holds. It cannot be the same one: Inno Setup quits without a word when its mutex already exists.
+constexpr wchar_t InstallingMutex[] = L"EchoPlayInstalling"; // CurStepChanged in installer/windows/v2/EchoPlay.iss
+// The one hold takes. It cannot be the setup's own SetupMutex: Inno Setup quits without a word when that already exists.
 constexpr wchar_t StartMutex[] = L"EchoPlaySetupStarting";
+HANDLE held = nullptr; // hold's, until startSetup hands it on
 
 // This process's arguments for its next start, past the lock whatever happens (a setup that hangs).
 std::wstring ownArguments()
@@ -32,14 +34,29 @@ std::wstring systemFile(const wchar_t *name)
     return std::wstring(dir) + L"\\" + name; // full path: Explorer starts EchoPlay in the clip's folder
 }
 
-bool start(const std::wstring &program, std::wstring command, BOOL inheritHandles, DWORD flags)
+// inherit: the one handle the new process gets, none when null. Anything else of EchoPlay's that happens to be
+// inheritable would stay open for as long as the setup runs.
+bool start(const std::wstring &program, std::wstring command, DWORD flags, HANDLE inherit = nullptr)
 {
-    STARTUPINFOW info{};
-    info.cb = sizeof info;
+    STARTUPINFOEXW info{};
+    info.StartupInfo.cb = sizeof info;
+    std::vector<char> list;
+    if (inherit) {
+        SIZE_T size = 0;
+        InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+        list.resize(size);
+        info.lpAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(list.data());
+        if (!InitializeProcThreadAttributeList(info.lpAttributeList, 1, 0, &size)
+            || !UpdateProcThreadAttribute(info.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &inherit, sizeof inherit,
+                                          nullptr, nullptr))
+            return false;
+        flags |= EXTENDED_STARTUPINFO_PRESENT;
+    }
     PROCESS_INFORMATION process{};
-    if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, inheritHandles, flags, nullptr, nullptr,
-                        &info, &process))
-        return false;
+    const BOOL started = CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, inherit != nullptr, flags, nullptr,
+                                        nullptr, &info.StartupInfo, &process);
+    if (inherit) DeleteProcThreadAttributeList(info.lpAttributeList);
+    if (!started) return false;
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
     return true;
@@ -69,7 +86,7 @@ std::wstring SetupLock::quoteArgument(const std::wstring &arg)
 
 bool SetupLock::isHeld()
 {
-    for (const wchar_t *name : {SetupMutex, StartMutex}) {
+    for (const wchar_t *name : {InstallingMutex, StartMutex}) {
         if (HANDLE lock = OpenMutexW(SYNCHRONIZE, FALSE, name)) {
             CloseHandle(lock);
             return true;
@@ -85,26 +102,37 @@ bool SetupLock::comeBackLater()
     // Handed over in variables: a & or % in a file name stays part of the name.
     SetEnvironmentVariableW(L"ECHOPLAY_EXE", exe);
     SetEnvironmentVariableW(L"ECHOPLAY_ARGS", ownArguments().c_str());
+    // A hidden process cannot bring a window to the front. This launch, just started by the user, may pass that on, and
+    // it ends at their next click or key: a clip does not jump over what they went on to.
+    AllowSetForegroundWindow(ASFW_ANY);
     // PowerShell watches the mutexes, because an EchoPlay started just to look would hold the very files the setup is
-    // replacing. Three minutes at most: a setup that hangs must not lose the clip.
-    const std::wstring script = std::wstring(L"$t=[DateTime]::Now.AddMinutes(3);do{Start-Sleep -Milliseconds 200;$h=$false;foreach($n in '")
-        + SetupMutex + L"','" + StartMutex
-        + L"'){$m=$null;if([Threading.Mutex]::TryOpenExisting($n,[ref]$m)){$m.Close();$h=$true}}}while($h -and [DateTime]::Now -lt $t);"
-          L"$i=New-Object Diagnostics.ProcessStartInfo $env:ECHOPLAY_EXE,$env:ECHOPLAY_ARGS;$i.UseShellExecute=$false;[void][Diagnostics.Process]::Start($i)";
+    // replacing. Three minutes at most: a setup that hangs must not lose the clip. A locked-down PowerShell (Constrained
+    // Language Mode) refuses the mutex call but not Start-Process: 30 s is longer than the setup takes.
+    const std::wstring script = std::wstring(L"try{$t=[DateTime]::Now.AddMinutes(3);do{Start-Sleep -Milliseconds 200;$h=$false;foreach($n in '")
+        + InstallingMutex + L"','" + StartMutex
+        + L"'){$m=$null;if([Threading.Mutex]::TryOpenExisting($n,[ref]$m)){$m.Close();$h=$true}}}while($h -and [DateTime]::Now -lt $t)}catch{Start-Sleep 30};"
+          L"Start-Process -FilePath $env:ECHOPLAY_EXE -ArgumentList $env:ECHOPLAY_ARGS";
     return start(systemFile(L"WindowsPowerShell\\v1.0\\powershell.exe"),
-                 L"powershell.exe -NoProfile -NonInteractive -Command \"" + script + L"\"", FALSE, CREATE_NO_WINDOW);
+                 L"powershell.exe -NoProfile -NonInteractive -Command \"" + script + L"\"", CREATE_NO_WINDOW);
+}
+
+void SetupLock::hold()
+{
+    if (held) return;
+    SECURITY_ATTRIBUTES inheritable{sizeof inheritable, nullptr, TRUE};
+    held = CreateMutexW(&inheritable, FALSE, StartMutex);
 }
 
 bool SetupLock::startSetup(const QString &path, bool reopen)
 {
     if (GetSystemMetrics(SM_SHUTTINGDOWN)) return false;
-    SECURITY_ATTRIBUTES inheritable{sizeof inheritable, nullptr, TRUE};
-    HANDLE lock = CreateMutexW(&inheritable, FALSE, StartMutex); // the setup inherits it and holds it to its end
+    hold(); // the setup inherits it and holds it to its end
     const std::wstring setup = QDir::toNativeSeparators(path).toStdWString();
     std::wstring command = quoteArgument(setup) + L" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART";
     if (reopen) command += L" /ECHOPLAYUPDATE=1"; // installer/windows/v2/EchoPlay.iss
-    const bool started = start(setup, command, TRUE, 0);
-    if (lock) CloseHandle(lock);
+    const bool started = start(setup, command, 0, held);
+    if (held) CloseHandle(held);
+    held = nullptr;
     return started;
 }
 
@@ -112,6 +140,7 @@ bool SetupLock::startSetup(const QString &path, bool reopen)
 
 bool SetupLock::isHeld() { return false; }
 bool SetupLock::comeBackLater() { return false; }
+void SetupLock::hold() {}
 bool SetupLock::startSetup(const QString &, bool) { return false; }
 
 #endif

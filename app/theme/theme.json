@@ -17,6 +17,7 @@
     "fill": "#111012", "bar": 0.78, "popover": 0.84, "strengthStep": 0.12, "border": "#1AFFFFFF", "hairline": "#14FFFFFF",
     "text": "#F4F2EF", "textMuted": "#BDB7B0",
     "control": "#1AFFFFFF", "controlSubtle": "#14FFFFFF", "track": "#33FFFFFF", "trackOff": "#38FFFFFF",
+    "trackSoft": "#2EFFFFFF", "trackHover": "#57FFFFFF", "mark": "#73FFFFFF", "line": "#D9FFFFFF",
     "success": "#5CCB8A", "warning": "#F2B441", "danger": "#F06A5D"
   },
   "accent": "#FF7D26",

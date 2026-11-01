@@ -1,16 +1,26 @@
 {
   "lang_name": "English",
-  "mixer": "Audio Sources",
-  "tracks_on": "%1/%2 on",
-  "all_on": "Enable all",
+
+  "play": "Play",
+  "pause": "Pause",
   "mute": "Mute",
-  "silent": "Silent",
-  "silent_warning": "Audio is off - enable it under Settings > Audio Sources",
-  "mono_short": "Mono",
-  "stereo_short": "Stereo",
-  "gain_down": "Lower volume",
-  "gain_up": "Raise volume",
-  "language": "Language",
-  "open_lang": "Open language folder (add a translation)",
-  "track_n": "Track %1"
+  "subtitles": "Subtitles",
+  "playlist": "Playlist",
+  "quick_settings": "Quick settings",
+  "full_screen": "Full screen",
+
+  "audio_tracks": "Audio tracks",
+  "tracks_in_clip": "%1 in this clip",
+  "track_n": "Track %1",
+  "track_sub": "Track %1 · Ctrl+%1",
+  "track_silent": "%1 is silent in this clip",
+  "microphone": "Microphone",
+  "mic": "Mic",
+  "no_sound": "No sound",
+  "all_tracks": "All %1 tracks",
+  "n_of_m": "%1 of %2",
+  "mono": "Mono",
+  "stereo": "Stereo",
+  "all_on": "All on",
+  "mute_all": "Mute all"
 }

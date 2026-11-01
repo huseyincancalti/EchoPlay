@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QQuickRhiItem>
+#include <QSet>
 #include <QVariant>
 #include <QtQml/qqmlregistration.h>
 
@@ -29,7 +30,8 @@ public:
     // falling back to software decoding. UI code reads observed() values instead.
     Q_INVOKABLE QVariant getProperty(const QString &name) const;
     Q_INVOKABLE void setProperty(const QString &name, const QVariant &value);
-    Q_INVOKABLE void observeProperty(const QString &name); // propertyChanged now and on every change
+    // propertyChanged now and on every change. A name already observed just keeps going: read observed() for its value.
+    Q_INVOKABLE void observeProperty(const QString &name);
     // The last value of an observed property; never blocks.
     Q_INVOKABLE QVariant observed(const QString &name) const { return m_observed.value(name); }
     Q_INVOKABLE qint64 processAgeMs() const { return processAgeMsNow(); }
@@ -61,6 +63,7 @@ private:
 
     mpv_handle *m_mpv = nullptr;
     bool m_keepingAwake = false;
+    QSet<QString> m_observedNames;
     QVariantMap m_observed;
     QVariantMap m_marks;
 };

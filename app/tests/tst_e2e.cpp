@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QQuickItem>
 #include <QQmlApplicationEngine>
 #include <QQuickImageProvider>
 #include <QQuickWindow>
@@ -88,6 +89,37 @@ struct Launch
     }
     double number(const char *name) const { return mpv->observed(name).toDouble(); }
     void key(Qt::Key k, Qt::KeyboardModifiers mods = Qt::NoModifier) { QTest::keyClick(window, k, mods); }
+    // By the visual tree: a Repeater's items are not QObject children of the window.
+    static QQuickItem *search(QQuickItem *from, const char *objectName)
+    {
+        if (from->objectName() == QLatin1String(objectName)) return from;
+        const QList<QQuickItem *> children = from->childItems();
+        for (QQuickItem *child : children)
+            if (QQuickItem *found = search(child, objectName)) return found;
+        return nullptr;
+    }
+    QQuickItem *item(const char *objectName) const { return search(window->contentItem(), objectName); }
+    // Clicks the middle of a named item, as a user does: the event goes to the window, not to the item.
+    bool click(const char *objectName)
+    {
+        QQuickItem *target = item(objectName);
+        if (!target || !target->isVisible()) return false;
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                          target->mapToScene(QPointF(target->width() / 2, target->height() / 2)).toPoint());
+        return true;
+    }
+    // ECHOPLAY_E2E_SHOTS=<dir>: the window as a PNG per state, to compare by eye with the design boards.
+    void shot(const QString &name)
+    {
+        const QString dir = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS");
+        if (dir.isEmpty()) return;
+        QTest::qWait(350); // fades end
+        QDir().mkpath(dir);
+        window->grabWindow().save(QDir(dir).filePath(name + ".png"));
+    }
+    // The pointer moves over the window: the chrome comes up. It stays up for a second after that.
+    void wake() { QTest::mouseMove(window, QPoint(window->width() / 2 + (m_wiggle ^= 1), window->height() / 2)); }
+    int m_wiggle = 0;
 
     ~Launch()
     {
@@ -169,10 +201,57 @@ private slots:
             QCOMPARE(QDir::fromNativeSeparators(app.services.silence.file()), m_clip);
             QVERIFY(app.services.silence.silent().isEmpty());
 
-            // Volume (Down x3) and its memory.
+            // The chrome: it comes up with the pointer and hides after a second without movement.
+            QTRY_VERIFY(app.item("controlBar"));
+            app.wake();
+            QTRY_VERIFY(app.item("controlBar")->isVisible());
+            app.shot("bar");
+            QTRY_VERIFY_WITH_TIMEOUT(!app.item("controlBar")->isVisible(), 3000);
+            app.shot("idle");
+
+            // The mixer: the chip opens it, a switch in a row changes what mpv plays.
+            app.wake();
+            QTRY_VERIFY(app.item("mixerChip")->isVisible());
+            QVERIFY(app.click("mixerChip"));
+            QTRY_VERIFY(app.item("mixerPopover"));
+            app.shot("mixer");
+            const QString beforeRows = app.prop("aid"); // 2: the mic alone, from the keys above
+            QCOMPARE(beforeRows, QString("2"));
+            QQuickItem *row1 = app.item("mixerRow-1");
+            QVERIFY(row1);
+            QQuickItem *switch1 = Launch::search(row1, "trackSwitch");
+            QVERIFY(switch1);
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier,
+                              switch1->mapToScene(QPointF(switch1->width() / 2, switch1->height() / 2)).toPoint());
+            QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
+            QVERIFY(app.click("muteAllButton")); // the chip says "No sound"
+            QTRY_COMPARE(app.prop("aid"), QString("no"));
+            QTRY_COMPARE(app.prop("lavfi-complex"), QString());
+            app.shot("mixer-none");
+            QVERIFY(app.click("allOnButton"));
+            QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
+            app.key(Qt::Key_Escape); // the popover closes first
+            QTRY_VERIFY(!app.item("mixerPopover"));
+            QCOMPARE(app.window->visibility(), QWindow::Windowed);
+            app.key(Qt::Key_1, Qt::ControlModifier); // game off again: the state the checks below expect
+            QTRY_COMPARE(app.prop("aid"), QString("2"));
+
+            // Volume (Down x3) and its memory, with the flash at the top.
             for (int i = 0; i < 3; ++i) app.key(Qt::Key_Down);
             QTRY_COMPARE(app.number("volume"), 85.0);
             QTRY_COMPARE(app.services.state.volume(), 85.0);
+            QTRY_VERIFY(app.item("volumeFlash")->isVisible());
+            app.shot("flash");
+            app.mpv->setProperty("volume", 245);
+            QTRY_COMPARE(app.number("volume"), 245.0);
+            app.key(Qt::Key_Up);
+            QTRY_COMPARE(app.number("volume"), 250.0);
+            app.shot("flash-boost");
+            app.wake();
+            QTRY_VERIFY(app.item("controlBar")->isVisible());
+            app.shot("bar-boost");
+            app.mpv->setProperty("volume", 85);
+            QTRY_COMPARE(app.number("volume"), 85.0);
 
             // Pause, speed, seek.
             QVERIFY(app.mpv->keepingAwake()); // playing: the display does not sleep

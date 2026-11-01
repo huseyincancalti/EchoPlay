@@ -1,12 +1,15 @@
 import QtQuick
-import QtQuick.Effects
 import EchoPlay
 
-// Spike: video through libmpv inside the scene, with blurred glass panels sampling it live.
+// The window, mpv's setup and the startup sequence. Everything over the video is PlayerUi.qml, loaded once the
+// first frame plays, so it costs the first frame nothing.
 Window {
     id: root
     width: 1280
     height: 720
+    minimumWidth: 640
+    minimumHeight: 360
+    flags: Qt.Window | Qt.FramelessWindowHint // WindowChrome gives Windows its frame back
     visible: false // shown once mpv opens the file (MpvItem's onCompleted)
     color: "black"
     title: mediaTitle || "EchoPlay"
@@ -115,6 +118,7 @@ Window {
             // playlist replaces the opened entry, and loadfile options do not carry over to it.
             setOption("vid", "no")
             start()
+            chrome.attach(root)
             observeProperty("track-list")
             // The file opens (demuxer, audio device: WASAPI alone took ~190 ms) while Qt creates the window, the
             // D3D11 device and the first frame (~600 ms before; measured 2026-10-31), instead of after them.
@@ -249,37 +253,62 @@ Window {
         }
     }
 
-    // v1's default keys (main.lua KEY_ACTIONS) and the mpv defaults v1 users rely on. Rebinding comes with
-    // the settings UI.
-    // Application-wide (EchoPlay has one window): a key works whichever item has focus, and the end-to-end
-    // test's synthetic keys arrive even while another app holds the OS focus.
-    component Key: Shortcut { context: Qt.ApplicationShortcut }
+    WindowChrome { id: chrome }
+    // For PlayerUi below: inside it, the names mpv and chrome are its own properties.
+    readonly property MpvItem player: mpv
+    readonly property WindowChrome windowChrome: chrome
+
+    // v1's default keys (main.lua KEY_ACTIONS) and the mpv defaults v1 users rely on. Settings > Shortcuts rebinds
+    // them by id (PlayerSettings.shortcuts holds only what the user changed).
+    readonly property var actions: [
+        {id: "pause", key: "Space", run: () => mpv.command(["cycle", "pause"])},
+        {id: "mute", key: "M", run: () => mpv.command(["cycle", "mute"])},
+        {id: "volume_up", key: "Up", run: () => root.changeVolume(5)},
+        {id: "volume_down", key: "Down", run: () => root.changeVolume(-5)},
+        {id: "seek_forward", key: "Right", run: () => root.seekBy(PlayerSettings.seekStep)},
+        {id: "seek_back", key: "Left", run: () => root.seekBy(-PlayerSettings.seekStep)},
+        {id: "track_1", key: "Ctrl+1", run: () => MixerController.toggle(1)},
+        {id: "track_2", key: "Ctrl+2", run: () => MixerController.toggle(2)},
+        {id: "track_3", key: "Ctrl+3", run: () => MixerController.toggle(3)},
+        {id: "fixed_speed", key: "G", run: () => mpv.setProperty("speed", PlayerSettings.toggledSpeed(mpv.observed("speed") || 1))},
+        {id: "speed_down", key: "S", run: () => mpv.command(["add", "speed", -PlayerSettings.speedStep])},
+        {id: "speed_up", key: "D", run: () => mpv.command(["add", "speed", PlayerSettings.speedStep])},
+        {id: "screenshot", key: "F1", run: () => mpv.command(["screenshot"])},
+        {id: "screenshot_video", key: "Shift+S", run: () => mpv.command(["screenshot", "video"])},
+        {id: "screenshot_window", key: "Ctrl+S", run: () => mpv.command(["screenshot", "window"])},
+        {id: "next", key: ">", run: () => mpv.command(["playlist-next"])},
+        {id: "previous", key: "<", run: () => mpv.command(["playlist-prev"])},
+        {id: "fullscreen", key: "F", run: () => root.toggleFullScreen()},
+    ]
     function toggleFullScreen() {
         root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
     }
-    Key { sequence: "Space"; onActivated: mpv.command(["cycle", "pause"]) }
-    Key { sequence: "M"; onActivated: mpv.command(["cycle", "mute"]) }
-    Key { sequence: "Up"; onActivated: mpv.command(["add", "volume", 5]) }
-    Key { sequence: "Down"; onActivated: mpv.command(["add", "volume", -5]) }
-    Key { sequence: "Right"; onActivated: mpv.command(["seek", PlayerSettings.seekStep]) }
-    Key { sequence: "Left"; onActivated: mpv.command(["seek", -PlayerSettings.seekStep]) }
-    Key { sequence: "Ctrl+1"; onActivated: MixerController.toggle(1) }
-    Key { sequence: "Ctrl+2"; onActivated: MixerController.toggle(2) }
-    Key { sequence: "Ctrl+3"; onActivated: MixerController.toggle(3) }
-    Key { sequence: "G"; onActivated: mpv.setProperty("speed", PlayerSettings.toggledSpeed(mpv.observed("speed") || 1)) }
-    Key { sequence: "S"; onActivated: mpv.command(["add", "speed", -PlayerSettings.speedStep]) }
-    Key { sequence: "D"; onActivated: mpv.command(["add", "speed", PlayerSettings.speedStep]) }
-    Key { sequence: "F1"; onActivated: mpv.command(["screenshot"]) }
-    Key { sequence: "Shift+S"; onActivated: mpv.command(["screenshot", "video"]) }
-    Key { sequence: "Ctrl+S"; onActivated: mpv.command(["screenshot", "window"]) }
-    Key { sequence: ">"; onActivated: mpv.command(["playlist-next"]) }
-    Key { sequence: "<"; onActivated: mpv.command(["playlist-prev"]) }
-    Key { sequence: "F"; onActivated: root.toggleFullScreen() }
-    Key { sequence: "Esc"; onActivated: if (root.visibility === Window.FullScreen) root.visibility = Window.Windowed }
-    MouseArea {
-        anchors.fill: parent
-        onDoubleClicked: root.toggleFullScreen()
-        onWheel: wheel => mpv.command(["add", "volume", wheel.angleDelta.y > 0 ? 5 : -5])
+    function changeVolume(step) {
+        if (ui.item) ui.item.flashVolume()
+        mpv.command(["add", "volume", step])
+    }
+    function seekBy(seconds) {
+        if (ui.item) ui.item.sweepArrows(seconds > 0)
+        mpv.command(["seek", seconds])
+    }
+    // Application-wide (EchoPlay has one window): a key works whichever item has focus, and the end-to-end
+    // test's synthetic keys arrive even while another app holds the OS focus.
+    Instantiator {
+        model: root.actions
+        delegate: Shortcut {
+            required property var modelData
+            context: Qt.ApplicationShortcut
+            sequence: PlayerSettings.shortcuts[modelData.id] || modelData.key
+            onActivated: modelData.run()
+        }
+    }
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Esc"
+        onActivated: {
+            if (ui.item && ui.item.closeTop()) return
+            if (root.visibility === Window.FullScreen) root.visibility = Window.Windowed
+        }
     }
 
     // Bench only: log when dropped frames happen (the mpv log has no per-drop line at -v), and keep a
@@ -350,45 +379,19 @@ Window {
         onTriggered: root.contentItem.grabToImage(r => { r.saveToFile(root.shotOut); Qt.quit() })
     }
 
-    component Glass: Item {
-        id: glass
-        property int blurMax: 64
-        visible: root.glass
-        ShaderEffectSource {
-            id: behind
-            anchors.fill: parent
-            visible: false
-            live: true
-            sourceItem: mpv
-            sourceRect: Qt.rect(glass.x, glass.y, glass.width, glass.height)
+    // Bench with glass: a bar and a popover stay open, the worst case. --no-glass stays bare, for shot-compare.
+    Loader {
+        id: ui
+        anchors.fill: parent
+        active: root.restarted && (!root.measuring || root.glass)
+        asynchronous: true // the video is playing by now: never stall it
+        sourceComponent: PlayerUi {
+            mpv: root.player
+            window: root
+            chrome: root.windowChrome
+            mediaTitle: root.mediaTitle
+            forceChrome: root.measuring
         }
-        MultiEffect {
-            anchors.fill: parent
-            source: behind
-            blurEnabled: true
-            blur: 1.0
-            blurMax: glass.blurMax
-        }
-        Rectangle {
-            anchors.fill: parent
-            radius: 16
-            color: "#59141210"
-            border.color: "#29ffffff"
-        }
-    }
-
-    // Control bar and a popover-sized panel: the two glass surfaces v2 shows most.
-    Glass {
-        anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 24 }
-        height: 76
-        // MultiEffect left this 76 px strip completely unblurred at blurMax 64 (checked in a screenshot).
-        // MVP: blur the whole frame once and let each panel crop its region, instead of per-panel blurs.
-        blurMax: 24
-    }
-    Glass {
-        width: 420
-        height: 260
-        anchors { right: parent.right; bottom: parent.bottom; rightMargin: 120; bottomMargin: 120 }
     }
 
     Timer {

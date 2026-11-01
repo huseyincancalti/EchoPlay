@@ -203,6 +203,8 @@ void MpvItem::setProperty(const QString &name, const QVariant &value)
 
 void MpvItem::observeProperty(const QString &name)
 {
+    if (m_observedNames.contains(name)) return; // mpv would send every change twice
+    m_observedNames.insert(name);
     mpv_observe_property(m_mpv, 0, name.toUtf8().constData(), MPV_FORMAT_NODE);
 }
 

@@ -17,11 +17,13 @@ class MixerController : public QObject
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY tracksChanged) // [{id, name, codec, enabled, gain, mono}]
+    Q_PROPERTY(double gainMax READ gainMax CONSTANT)
 
 public:
     explicit MixerController(AppState *state, QObject *parent = nullptr);
 
     QVariantList tracks() const;
+    double gainMax() const { return Mixer::GainMax; }
 
     // mpv's start-file: forget the previous file's tracks and drop its filter graph, which names track ids
     // the next file may not have.

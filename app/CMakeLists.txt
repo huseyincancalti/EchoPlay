@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 0.0.0-dev (a dev build) never runs the update check.
 set(ECHOPLAY_VERSION "0.0.0-dev" CACHE STRING "Release version without the v; the release build sets it")
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS Quick Gui GuiPrivate Network Test)
+find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Gui GuiPrivate Network Test ShaderTools)
 qt_standard_project_setup(REQUIRES 6.7)
 
 # libmpv dev package: include/mpv/*.h, libmpv.dll.a, libmpv-2.dll (tools/setup-dev.sh fetches it).
@@ -23,15 +23,22 @@ qt_add_qml_module(echoplay_lib
     URI EchoPlay
     VERSION 1.0
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/EchoPlay" # qmldir path must match the URI (qmllint, tooling)
-    QML_FILES qml/Main.qml qml/Icons.js qml/Icon.qml qml/Label.qml
+    QML_FILES qml/Main.qml qml/Icons.js qml/Format.js qml/Icon.qml qml/Label.qml qml/FocusRing.qml qml/IconButton.qml
+              qml/TextButton.qml qml/ToggleSwitch.qml qml/Segmented.qml qml/TrackSlider.qml qml/GlassBackdrop.qml
+              qml/GlassPanel.qml qml/RoundedImage.qml qml/Popover.qml qml/PlayerUi.qml qml/TitleBar.qml qml/ControlBar.qml
+              qml/SeekBar.qml qml/VolumeSlider.qml qml/VolumeFlash.qml qml/ArrowSweep.qml qml/MixerPopover.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/ResumeStore.h src/ResumeStore.cpp
             src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp
             src/PictureQuality.h src/PictureQuality.cpp src/Thumbnailer.h src/Thumbnailer.cpp
             src/SilenceCheck.h src/SilenceCheck.cpp src/PlayerSettings.h src/PlayerSettings.cpp
-            src/Services.h src/Services.cpp
+            src/Services.h src/Services.cpp src/WindowChrome.h src/WindowChrome.cpp
 )
+qt_add_shaders(echoplay_lib "shaders" PREFIX "/shaders" BASE "${CMAKE_CURRENT_SOURCE_DIR}/shaders" FILES shaders/glass.frag)
+if(WIN32)
+    target_link_libraries(echoplay_lib PRIVATE dwmapi)
+endif()
 qt_add_executable(echoplay src/main.cpp)
 # EchoPlay.exe, as v1's: "Open with", Task Manager and the installer's registry entries use this name.
 set_target_properties(echoplay PROPERTIES OUTPUT_NAME EchoPlay)
@@ -74,6 +81,7 @@ qt_add_resources(echoplay_lib theme PREFIX "/theme" BASE "${CMAKE_CURRENT_SOURCE
 # Fonts: the bundled UI fonts and the icon font (tools/make-fonts.sh). Theme loads only the chosen one.
 qt_add_resources(echoplay_lib fonts PREFIX "/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/fonts" FILES
                  fonts/Geist.ttf fonts/Manrope.ttf fonts/PlusJakartaSans.ttf fonts/Icons.ttf fonts/IconsFilled.ttf)
+qt_add_resources(echoplay_lib images PREFIX "/images" BASE "${CMAKE_CURRENT_SOURCE_DIR}/images" FILES images/logo.png)
 add_custom_command(TARGET echoplay POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "$<TARGET_FILE_DIR:echoplay>")
 

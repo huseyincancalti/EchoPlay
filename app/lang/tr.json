@@ -1,16 +1,26 @@
 {
   "lang_name": "Türkçe",
-  "mixer": "Ses Kaynakları",
-  "tracks_on": "%1/%2 açık",
+
+  "play": "Oynat",
+  "pause": "Duraklat",
+  "mute": "Sessize al",
+  "subtitles": "Altyazılar",
+  "playlist": "Oynatma listesi",
+  "quick_settings": "Hızlı ayarlar",
+  "full_screen": "Tam ekran",
+
+  "audio_tracks": "Ses izleri",
+  "tracks_in_clip": "Bu klipte %1 iz",
+  "track_n": "İz %1",
+  "track_sub": "İz %1 · Ctrl+%1",
+  "track_silent": "%1 bu klipte sessiz",
+  "microphone": "Mikrofon",
+  "mic": "Mik",
+  "no_sound": "Ses yok",
+  "all_tracks": "%1 izin hepsi",
+  "n_of_m": "%2 izden %1 tanesi",
+  "mono": "Mono",
+  "stereo": "Stereo",
   "all_on": "Hepsini aç",
-  "mute": "Sustur",
-  "silent": "Sessiz",
-  "silent_warning": "Ses kapalı - Ayarlar > Ses Kaynakları'ndan açabilirsiniz",
-  "mono_short": "Mono",
-  "stereo_short": "Stereo",
-  "gain_down": "Sesi azalt",
-  "gain_up": "Sesi artır",
-  "language": "Dil",
-  "open_lang": "Dil klasörünü aç (çeviri ekle)",
-  "track_n": "Ses %1"
+  "mute_all": "Hepsini kapat"
 }

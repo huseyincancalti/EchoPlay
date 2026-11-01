@@ -107,6 +107,7 @@ private slots:
         QStringList paths = {
             "glass.fill", "glass.bar", "glass.popover", "glass.strengthStep", "glass.border", "glass.hairline",
             "glass.text", "glass.textMuted", "glass.control", "glass.controlSubtle", "glass.track", "glass.trackOff",
+            "glass.trackSoft", "glass.trackHover", "glass.mark", "glass.line",
             "glass.success", "glass.warning", "glass.danger",
             "accent", "onAccent.dark", "onAccent.light",
             "radius.sm", "radius.md", "radius.lg", "radius.xl", "radius.pill", "blur.panel", "blur.overlay",

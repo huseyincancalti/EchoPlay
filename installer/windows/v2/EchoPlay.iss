@@ -17,14 +17,22 @@
 #define MyAppExeName "EchoPlay.exe"
 
 [Setup]
+#ifdef TestDir
+; tools/setup-live.sh: the same setup installing into a test folder: its own AppId, no uninstall entry, no shortcuts,
+; no registry and no v1 cleanup, so it cannot touch the EchoPlay installed on the machine.
+AppId={{B7A3F1D4-2C51-4E0A-9F3B-7D1C5A6E8F20}
+DefaultDirName={#TestDir}
+Uninstallable=no
+#else
 AppId={{6E9F2C9C-6E61-4A8B-9A5B-2F1E0E6F4C2D}
+DefaultDirName={localappdata}\Programs\EchoPlay
+#endif
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}/releases
-DefaultDirName={localappdata}\Programs\EchoPlay
 DefaultGroupName=EchoPlay
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -43,11 +51,14 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; A running EchoPlay holds its files: ask to close it, as any update of a running app needs.
 CloseApplications=yes
+; While this mutex exists a new EchoPlay leaves at once and comes back when it is gone (app/src/SetupLock.cpp).
+SetupMutex=EchoPlaySetup
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 
+#ifndef TestDir
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
@@ -55,6 +66,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; v1 leftovers: its mpv copy for thumbfast, and its whole mpv config (scripts, uosc, state, watch_later).
 Type: files; Name: "{app}\mpv.exe"
 Type: filesandordirs; Name: "{app}\portable_config"
+#endif
 
 [Files]
 ; The staged app: EchoPlay.exe, Qt and MinGW runtime, QML modules, libmpv, lang\, theme.json.
@@ -64,6 +76,7 @@ Source: "..\..\..\app\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreve
 Source: "..\..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
+#ifndef TestDir
 [Icons]
 Name: "{group}\EchoPlay"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\logo.ico"
 Name: "{group}\{cm:UninstallProgram,EchoPlay}"; Filename: "{uninstallexe}"
@@ -96,11 +109,14 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".aac"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".wma"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".wv"; ValueData: ""
+#endif
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch EchoPlay"; Flags: postinstall nowait skipifsilent unchecked
-; An update started from inside EchoPlay (Updater passes /ECHOPLAYUPDATE=1) reopens it, on the start screen.
-Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsAppUpdate
+; --after-setup: this setup's own lock does not apply, the files are in place.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--after-setup"; Description: "Launch EchoPlay"; Flags: postinstall nowait skipifsilent unchecked
+; An update started with Install from inside EchoPlay (/ECHOPLAYUPDATE=1) reopens it, on the start screen. One that
+; installs when EchoPlay closes does not: it was closed on purpose.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--after-setup"; Flags: nowait; Check: IsAppUpdate
 
 [Code]
 function IsAppUpdate: Boolean;

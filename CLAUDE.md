@@ -48,6 +48,8 @@ no quiet screen (its input goes to the test window only): run it after every v2 
 - No third-party Claude Code skill/agent frameworks; the engines above are the maintainer's own CLIs.
   Exception approved by the maintainer (2026-10-29): `ffmpeg-skill` (kajisho5, MIT, installed for Claude,
   Codex and Cursor) for ad-hoc video work. Repo scripts in `tools/` call ffmpeg directly, never the skill.
+  Exception approved by the maintainer (2026-11-01): `rea` (morluto, MIT) for competitor analysis. NVIDIA App's and
+  PotPlayer's licences forbid decompiling: no decompiler on a closed product without the maintainer saying so.
 
 ## Hard rules
 - Never fork or patch mpv/libmpv, uosc, thumbfast or memo source. v2 links upstream libmpv; v1 ships the
@@ -78,6 +80,7 @@ bash tools/e2e.sh                       # the real player window, driven by synt
 ECHOPLAY_E2E_SHOTS="$(pwd)/.out/shots" bash tools/e2e.sh   # the same, with a PNG per state to compare with the design boards
 bash tools/window-live.sh               # resize edges, Aero Snap, snap layouts with the REAL mouse and keyboard (ask first)
 [VERSION=2.0.0] bash tools/package-v2.sh   # Windows installer: stage (checked without dev PATH) + Inno Setup
+bash tools/setup-live.sh                # the real setup in a test install: update on close, a clip opened during it, Install now
 bash tools/make-clips.sh <recording> [start] [len]   # test clips in .out/clips: 1080p cut + 4K60 upscale, all tracks
 RUNS=3 TOGGLE=1 bash tools/bench.sh <seconds> <videos>  # v1 engine vs v2: startup, dropped frames, live mixer
 bash tools/shot-compare.sh <video> <seconds>         # same paused frame from v1 and v2, SSIM/PSNR

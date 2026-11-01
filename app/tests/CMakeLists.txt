@@ -25,6 +25,7 @@ echoplay_test(updatecheck ../src/UpdateCheck.h ../src/UpdateCheck.cpp ../src/App
 target_link_libraries(tst_updatecheck PRIVATE Qt6::Network)
 echoplay_test(updater ../src/Updater.h ../src/Updater.cpp)
 target_link_libraries(tst_updater PRIVATE Qt6::Network)
+echoplay_test(setuplock ../src/SetupLock.h ../src/SetupLock.cpp)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
 echoplay_test(mediafiles ../src/MediaFiles.h ../src/MediaFiles.cpp)
 echoplay_test(errorreport ../src/ErrorReport.h ../src/ErrorReport.cpp)

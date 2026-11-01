@@ -17,6 +17,17 @@ QJsonObject entriesOf(const QString &path)
     return QJsonDocument::fromJson(f.readAll()).object().value("entries").toObject();
 }
 
+QByteArray contentOf(const QString &path)
+{
+    QFile f(path);
+    return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+}
+
+QString hashOf(const QString &plain)
+{
+    return QString::fromLatin1(QCryptographicHash::hash(plain.toUtf8(), QCryptographicHash::Sha256).toHex());
+}
+
 } // namespace
 
 class TestResumeStore : public QObject
@@ -128,10 +139,38 @@ private slots:
 
         const QJsonObject saved = entriesOf(m_path);
         QCOMPARE(saved.size(), 300);
-        for (int i = 0; i < 5; ++i) QVERIFY(!saved.contains(QString("f%1.mp4").arg(i)));
-        QVERIFY(saved.contains("f5.mp4"));
-        QVERIFY(saved.contains("f304.mp4"));
+        for (int i = 0; i < 5; ++i) QVERIFY(!saved.contains(hashOf(QString("f%1.mp4").arg(i))));
+        QVERIFY(saved.contains(hashOf("f5.mp4")));
+        QVERIFY(saved.contains(hashOf("f304.mp4")));
         QCOMPARE(s.position("f0.mp4"), -1.0);
+    }
+
+    void theFileHoldsNoFileNames()
+    {
+        {
+            ResumeStore s(m_path);
+            s.update("C:\\Videos\\secret clip.mp4", 84, 276);
+            s.update("https://example.com/secret.mp4", 30, 276);
+        }
+        const QByteArray saved = contentOf(m_path);
+        QVERIFY(!saved.isEmpty());
+        QVERIFY(!saved.contains("secret"));
+        QVERIFY(!saved.contains("Videos"));
+        QVERIFY(!saved.contains("example"));
+        ResumeStore s(m_path);
+        QCOMPARE(s.position("C:/Videos/secret clip.mp4"), 84.0);
+        QCOMPARE(s.position("https://example.com/secret.mp4"), 30.0);
+    }
+
+    void pathsFromAnOlderBuildTurnIntoHashes()
+    {
+        write(m_path, R"({"schema": 1, "entries": {"C:/Videos/old clip.mp4": {"pos": 84, "dur": 276, "at": 1761930000}}})");
+        {
+            ResumeStore s(m_path);
+            QCOMPARE(s.position("C:\\Videos\\old clip.mp4"), 84.0);
+        } // nothing changed by hand, and it still saves: the path must not stay on disk
+        QVERIFY(!contentOf(m_path).contains("old clip"));
+        QCOMPARE(ResumeStore(m_path).position("C:/Videos/old clip.mp4"), 84.0);
     }
 
     void damagedFileGivesAnEmptyStore()

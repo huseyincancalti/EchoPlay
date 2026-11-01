@@ -138,6 +138,63 @@ private slots:
         }
     }
 
+    void notesWaitForTheVersionTheyBelongTo()
+    {
+        AppState state(m_path);
+        const QByteArray reply = QJsonDocument(QJsonObject{{"tag_name", "v2.1.0"}, {"body", "  Better mixer  "}}).toJson();
+        {
+            UpdateCheck old(&state, "2.0.0");
+            old.handleReply(reply);
+            QCOMPARE(old.whatsNew(), QString()); // an offer, nothing to tell yet
+            state.save();
+        }
+        AppState restarted(m_path); // the new version's first start: no check has run, maybe no network
+        UpdateCheck updated(&restarted, "2.1.0");
+        QCOMPARE(updated.whatsNew(), QString("Better mixer"));
+
+        QSignalSpy changed(&updated, &UpdateCheck::changed);
+        updated.closeWhatsNew();
+        QCOMPARE(updated.whatsNew(), QString());
+        QCOMPARE(changed.count(), 1);
+        restarted.save();
+        AppState again(m_path);
+        QCOMPARE(UpdateCheck(&again, "2.1.0").whatsNew(), QString()); // once
+    }
+
+    void theHeadingOnTopGoes()
+    {
+        AppState state(m_path);
+        UpdateCheck old(&state, "2.0.0");
+        old.handleReply(QJsonDocument(QJsonObject{{"tag_name", "v2.1.0"},
+                                                  {"body", "## What's new in v2.1.0\r\n\r\n**Better** mixer\n\n## Fixed\n\nA bug"}}).toJson());
+        QCOMPARE(UpdateCheck(&state, "2.1.0").whatsNew(), QString("**Better** mixer\n\n## Fixed\n\nA bug"));
+    }
+
+    void aReleaseWithoutNotesHasNoCard()
+    {
+        AppState state(m_path);
+        UpdateCheck old(&state, "2.0.0");
+        old.handleReply(R"({"tag_name": "v2.1.0"})");
+        QCOMPARE(UpdateCheck(&state, "2.1.0").whatsNew(), QString());
+    }
+
+    void longNotesAreCut()
+    {
+        AppState state(m_path);
+        UpdateCheck old(&state, "2.0.0");
+        old.handleReply(QJsonDocument(QJsonObject{{"tag_name", "v2.1.0"}, {"body", QString(100000, 'x')}}).toJson());
+        QCOMPARE(UpdateCheck(&state, "2.1.0").whatsNew().size(), 4000);
+    }
+
+    void aSameOrOlderTagLeavesTheNotesAlone()
+    {
+        AppState state(m_path);
+        state.setReleaseNotes("2.1.0", "Better mixer");
+        UpdateCheck updated(&state, "2.1.0");
+        updated.handleReply(R"({"tag_name": "v2.1.0", "body": "Other"})");
+        QCOMPARE(updated.whatsNew(), QString("Better mixer"));
+    }
+
     void laterReplyReplacesTheSetup()
     {
         AppState state(m_path);

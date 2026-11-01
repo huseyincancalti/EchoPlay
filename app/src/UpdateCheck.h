@@ -28,6 +28,7 @@ class UpdateCheck : public QObject
     Q_PROPERTY(QString releasesUrl READ releasesUrl CONSTANT)
     Q_PROPERTY(QString setupUrl READ setupUrl NOTIFY changed)       // empty: the release has no usable setup
     Q_PROPERTY(QString setupSha256 READ setupSha256 NOTIFY changed) // lowercase hex; empty: GitHub gave no digest
+    Q_PROPERTY(QString whatsNew READ whatsNew NOTIFY changed) // this version's release notes, until closed; else empty
 
 public:
     UpdateCheck(AppState *state, const QString &currentVersion, QObject *parent = nullptr);
@@ -40,7 +41,10 @@ public:
     QString releasesUrl() const;
     QString setupUrl() const { return m_setupUrl; }
     QString setupSha256() const { return m_setupSha256; }
+    QString whatsNew() const;
 
+    // The card after an update is done with: it never comes back for this version.
+    Q_INVOKABLE void closeWhatsNew();
     // major.minor.patch, numeric; anything unparsable is never newer.
     static bool isNewer(const QString &a, const QString &b);
     // Called 4 s after launch (main.cpp): checks, unless this is a dev build.

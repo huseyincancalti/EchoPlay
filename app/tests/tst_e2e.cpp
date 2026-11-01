@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QCryptographicHash>
 #include <QQuickItem>
 #include <QQmlApplicationEngine>
 #include <QQuickImageProvider>
@@ -382,8 +383,11 @@ private slots:
         QCOMPARE(state.value("screenshots").toObject().value("folder").toString(), QString("video_folder"));
         QFile resume(QDir(m_path).filePath("resume.json"));
         QVERIFY(resume.open(QIODevice::ReadOnly));
-        const QJsonObject entry =
-            QJsonDocument::fromJson(resume.readAll()).object().value("entries").toObject().value(QDir::cleanPath(QDir::fromNativeSeparators(m_clip))).toObject();
+        const QByteArray saved = resume.readAll();
+        QVERIFY2(!saved.contains(QFileInfo(m_clip).baseName().toUtf8()), "resume.json holds a file name");
+        const QString key = QString::fromLatin1(QCryptographicHash::hash(QDir::cleanPath(QDir::fromNativeSeparators(m_clip)).toUtf8(),
+                                                                         QCryptographicHash::Sha256).toHex());
+        const QJsonObject entry = QJsonDocument::fromJson(saved).object().value("entries").toObject().value(key).toObject();
         QVERIFY2(entry.value("pos").toDouble() >= 25 && entry.value("pos").toDouble() < 30, "resume.json lacks 0:25");
     }
 
@@ -657,12 +661,42 @@ private slots:
             QTRY_VERIFY(app.number("time-pos") >= 25);
             QTRY_VERIFY(!app.item("resumeCard"));
 
-            app.services.updates.handleReply(R"({"tag_name": "v2.1.0", "assets": []})");
+            // A release with a setup: Install on close. The asset does not exist, so the quiet download comes to nothing.
+            // A plain string: moc reads a raw one as ordinary quotes, and the // of a URL then hides the rest of the file.
+            app.services.updates.handleReply("{\"tag_name\": \"v99.0.0\", \"body\": \"Notes of the next version\", \"assets\": [{\"name\": \"EchoPlay-Setup.exe\","
+                " \"browser_download_url\": \"https://github.com/huseyincancalti/EchoPlay/releases/download/v99.0.0/EchoPlay-Setup.exe\"}]}");
             QTRY_VERIFY(app.item("updateNotice"));
+            QVERIFY(app.item("updateClose"));
+            QCOMPARE(app.item("updateLater")->property("text").toString(), app.services.i18n.strings().value("install_on_close").toString());
             app.wake();
             app.shot("update");
             QVERIFY(app.click("updateLater"));
             QTRY_VERIFY(!app.item("updateNotice"));
+            QVERIFY(app.services.updater.onClose() || app.services.updater.state() == "idle"); // downloading, or already failed
+            QCOMPARE(app.services.state.notesVersion(), QString("99.0.0")); // kept for when that version runs
+            QVERIFY(!app.item("whatsNewCard")); // this version is not that one
+
+            // After an update: this version's notes, once. The cross ends them.
+            app.services.state.setReleaseNotes(app.services.updates.currentVersion(),
+                "**No more stutter when picture quality switches tiers.** Auto mode's live switching used to freeze for a second or two the first time it happened in a session.\n\n"
+                "**Your folder stays your folder.** A subfolder next to the video you opened no longer joins the playlist.\n\n"
+                "- The mixer remembers more\n- Install on close\n- [Everything else](https://example.com)\n\n"
+                "**When video ends actually sticks now.** Picking Play next, Repeat or Stop at end used to revert on the next file.");
+            emit app.services.updates.changed();
+            QTRY_VERIFY(app.item("whatsNewCard"));
+            app.wake();
+            app.shot("whats-new");
+            QVERIFY(app.click("whatsNewClose"));
+            QTRY_VERIFY(!app.item("whatsNewCard"));
+            QCOMPARE(app.services.updates.whatsNew(), QString());
+
+            // Over a clip it also ends by itself, for good, unless the pointer rests on it.
+            app.services.state.setReleaseNotes(app.services.updates.currentVersion(), "Short notes");
+            emit app.services.updates.changed();
+            QTRY_VERIFY(app.item("whatsNewCard"));
+            app.item("whatsNewCard")->setProperty("closeAfter", 200);
+            QTRY_VERIFY(!app.item("whatsNewCard"));
+            QCOMPARE(app.services.updates.whatsNew(), QString());
 
             app.services.player.setResumeMode("always");
             app.mpv->command({"seek", 30, "absolute"});

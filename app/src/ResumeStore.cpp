@@ -1,11 +1,13 @@
 #include "ResumeStore.h"
 
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <algorithm>
 #include <vector>
@@ -16,9 +18,11 @@ constexpr double MinResumePos = 15;  // seconds; before this there is nothing wo
 constexpr double FinishedMargin = 20; // seconds from the end; after this the file counts as watched
 
 // One key per file: Explorer hands over C:\Videos\a.mp4, a second launch C:/Videos/a.mp4. URLs stay as they are.
+// A hash, so resume.json is no list of what someone watched.
 QString key(const QString &path)
 {
-    return path.contains("://") ? path : QDir::cleanPath(QDir::fromNativeSeparators(path));
+    const QString plain = path.contains("://") ? path : QDir::cleanPath(QDir::fromNativeSeparators(path));
+    return QString::fromLatin1(QCryptographicHash::hash(plain.toUtf8(), QCryptographicHash::Sha256).toHex());
 }
 
 } // namespace
@@ -70,18 +74,22 @@ void ResumeStore::load()
         return;
     }
     const QJsonObject entries = doc.object().value("entries").toObject();
+    static const QRegularExpression hashed("^[0-9a-f]{64}$");
     for (auto it = entries.begin(); it != entries.end(); ++it) {
+        // A key that is no hash is a path from an older build: it goes on the next save.
+        const bool isHash = hashed.match(it.key()).hasMatch();
+        if (!isHash) m_dirty = true;
         const QJsonObject e = it.value().toObject();
         if (!e.value("pos").isDouble() || !e.value("dur").isDouble() || !e.value("at").isDouble()) continue;
         const Entry entry{e.value("pos").toDouble(), e.value("dur").toDouble(), e.value("at").toInteger()};
-        if (entry.pos >= 0 && entry.dur > 0) m_entries.insert(key(it.key()), entry);
+        if (entry.pos >= 0 && entry.dur > 0) m_entries.insert(isHash ? it.key() : key(it.key()), entry);
     }
 }
 
 void ResumeStore::save()
 {
     if (m_entries.size() > MaxEntries) {
-        std::vector<std::pair<qint64, QString>> byAge; // (at, path); the path breaks ties, so the cut is stable
+        std::vector<std::pair<qint64, QString>> byAge; // (at, key); the key breaks ties, so the cut is stable
         byAge.reserve(m_entries.size());
         for (auto it = m_entries.cbegin(); it != m_entries.cend(); ++it) byAge.emplace_back(it->at, it.key());
         std::sort(byAge.begin(), byAge.end());

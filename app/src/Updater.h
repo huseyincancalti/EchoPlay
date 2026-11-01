@@ -15,7 +15,10 @@ class QNetworkReply;
 // Installs a new EchoPlay from inside the app: downloads the setup the update check found
 // (UpdateCheck.setupUrl), checks its SHA-256, starts it silently and asks the app to quit so the setup can
 // replace the files. The setup starts the new EchoPlay when it is done (installer/windows/v2/EchoPlay.iss).
-// state is "idle", "downloading", "installing" or "failed"; a failed one can start over with install().
+// installOnClose downloads the same way without a word and waits: main.cpp starts the setup once the app has
+// closed, and EchoPlay stays closed.
+// state is "idle", "downloading", "ready" (waiting for the app to close), "installing" or "failed"; a failed one can
+// start over with install().
 class Updater : public QObject
 {
     Q_OBJECT
@@ -24,6 +27,7 @@ class Updater : public QObject
     Q_PROPERTY(QString state READ state NOTIFY changed)
     Q_PROPERTY(qint64 received READ received NOTIFY changed)
     Q_PROPERTY(qint64 total READ total NOTIFY changed) // 0 while unknown
+    Q_PROPERTY(bool onClose READ onClose NOTIFY changed) // this download installs when the app closes
 
 public:
     // downloadDir gets the setup file; launch starts it and says whether it did (injected, so the tests
@@ -35,9 +39,16 @@ public:
     QString state() const { return m_state; }
     qint64 received() const { return m_received; }
     qint64 total() const { return m_total; }
+    bool onClose() const { return m_onClose; }
+    // The setup main.cpp starts after the app has closed; empty when none is waiting.
+    QString setupOnClose() const { return m_state == QLatin1String("ready") ? m_setupPath : QString(); }
 
-    // sha256 is lowercase hex; empty skips the check. Does nothing while downloading or installing.
+    // sha256 is lowercase hex; empty skips the check. Does nothing while downloading or installing. When the setup
+    // is already waiting for the app to close, starts it now.
     Q_INVOKABLE void install(const QString &url, const QString &sha256, const QString &version);
+    // Nobody is watching this one: a failure goes back to idle without a word, and the next run asks again. Does
+    // nothing while downloading, waiting or installing.
+    Q_INVOKABLE void installOnClose(const QString &url, const QString &sha256, const QString &version);
     // Downloading -> idle, the partial file removed.
     Q_INVOKABLE void cancel();
 
@@ -54,8 +65,10 @@ signals:
 
 private:
     void setState(const QString &state);
+    void download(const QString &url, const QString &sha256, const QString &version);
     bool store();
     void finish();
+    void launch();
     void fail();
     void discard();
 
@@ -71,4 +84,5 @@ private:
     QString m_setupPath;
     qint64 m_received = 0;
     qint64 m_total = 0;
+    bool m_onClose = false;
 };

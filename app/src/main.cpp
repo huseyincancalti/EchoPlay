@@ -11,8 +11,11 @@
 #include <memory>
 #include <mpv/client.h>
 #include <QtQml/qqmlextensionplugin.h>
+#include <algorithm>
+#include <cstring>
 #include "MpvItem.h"
 #include "Services.h"
+#include "SetupLock.h"
 #include "SingleInstance.h"
 
 Q_IMPORT_QML_PLUGIN(EchoPlayPlugin) // the player's QML module is a static library (app/CMakeLists.txt)
@@ -32,8 +35,24 @@ static int smoke()
     return 0;
 }
 
+// Started last of all, when everything has saved its state and let go of mpv: an update installed on close.
+struct SetupOnClose
+{
+    QString path;
+    ~SetupOnClose()
+    {
+        if (!path.isEmpty()) SetupLock::startSetup(path, false);
+    }
+};
+
 int main(int argc, char *argv[])
 {
+    // --after-setup: the setup starting EchoPlay when the files are in place but its lock is still there, or a launch
+    // coming back from comeBackLater.
+    const bool afterSetup = std::any_of(argv + 1, argv + argc, [](const char *a) { return !strcmp(a, "--after-setup"); });
+    if (!afterSetup && SetupLock::isHeld() && SetupLock::comeBackLater()) return 0;
+
+    SetupOnClose setupOnClose;
     const qint64 tMain = MpvItem::processAgeMsNow();
     // MpvItem renders through libmpv's D3D11 render API on Qt's device. OpenGL was ~750 ms slower to start:
     // the NVIDIA OpenGL driver init alone took that long before the first frame (measured 2026-10-31).
@@ -55,9 +74,12 @@ int main(int argc, char *argv[])
     QCommandLineOption shotOut("shot-out", "Screenshot path for --shot-at.", "path");
     QCommandLineOption thumbScrub("thumb-scrub", "Request a seek-bar preview every 50 ms while playing, like a pointer on the seek bar.");
     QCommandLineOption tierCycle("tier-cycle", "Switch the picture tier every 2 s while playing (Ultra, Low, Normal, ...).");
-    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub, tierCycle});
+    QCommandLineOption afterSetupOpt("after-setup", "The setup's lock does not apply (installer/windows/v2/EchoPlay.iss, SetupLock.cpp).");
+    QCommandLineOption setupOnCloseOpt("setup-on-close", "Start this setup after closing, as an update installed on close does (tools/setup-live.sh).", "path");
+    cli.addOptions({bench, noGlass, mix, logFile, smokeOpt, mixToggle, shotAt, shotOut, thumbScrub, tierCycle, afterSetupOpt, setupOnCloseOpt});
     cli.addHelpOption();
     cli.process(app);
+    setupOnClose.path = cli.value(setupOnCloseOpt); // with --smoke: the whole close path, no window
     if (cli.isSet(smokeOpt)) return smoke();
     // Absolute: a running instance resolves paths against its own working folder, and resume positions are
     // keyed by path. URLs pass unchanged.
@@ -102,5 +124,7 @@ int main(int argc, char *argv[])
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
                      Qt::QueuedConnection);
     engine.loadFromModule("EchoPlay", "Main");
-    return app.exec();
+    const int code = app.exec();
+    if (setupOnClose.path.isEmpty()) setupOnClose.path = services.updater.setupOnClose();
+    return code;
 }

@@ -9,7 +9,7 @@
 
 // Where the user stopped watching each file. Playback always starts at 0:00; when a file has a saved
 // spot, the UI asks "Resume from 1:24?". Lives in its own resume.json, not state.json: it grows with every
-// file watched. Keyed by path, with / and \ treated alike. Loaded once in the constructor; an unreadable or
+// file watched. Keyed by a hash of the path (no file names on disk), with / and \ treated alike. Loaded once in the constructor; an unreadable or
 // damaged file, or a bad entry, is skipped.
 class ResumeStore : public QObject
 {

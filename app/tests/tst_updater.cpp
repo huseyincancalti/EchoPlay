@@ -246,6 +246,118 @@ private slots:
         QCOMPARE(readFile(m_downloads + "/EchoPlay-Setup-2.1.0.exe"), m_body);
     }
 
+    void installOnCloseDownloadsAndWaits()
+    {
+        m_server.routes["/setup"] = {200, m_body};
+        int launches = 0;
+        Updater updater(m_downloads, [&](const QString &) { ++launches; return true; });
+        QSignalSpy quit(&updater, &Updater::quitRequested);
+        QVERIFY(updater.setupOnClose().isEmpty());
+
+        updater.installOnClose(m_server.url("/setup"), sha256(m_body), "2.1.0");
+        QCOMPARE(updater.state(), QString("downloading"));
+        QVERIFY(updater.onClose());
+        QVERIFY(updater.setupOnClose().isEmpty()); // not until it is all here
+        QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("ready"), 10000);
+
+        const QString setup = m_downloads + "/EchoPlay-Setup-2.1.0.exe";
+        QCOMPARE(updater.setupOnClose(), setup);
+        QCOMPARE(readFile(setup), m_body);
+        QCOMPARE(files(), QStringList{"EchoPlay-Setup-2.1.0.exe"});
+        QCOMPARE(launches, 0); // main.cpp starts it, after the app has closed
+        QCOMPARE(quit.count(), 0);
+    }
+
+    void installAfterReadyStartsWithoutDownloadingAgain()
+    {
+        m_server.routes["/setup"] = {200, m_body};
+        QStringList launched;
+        Updater updater(m_downloads, [&](const QString &path) { launched << path; return true; });
+        QSignalSpy quit(&updater, &Updater::quitRequested);
+        updater.installOnClose(m_server.url("/setup"), sha256(m_body), "2.1.0");
+        QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("ready"), 10000);
+
+        m_server.routes.remove("/setup"); // a new download would fail
+        updater.install(m_server.url("/setup"), sha256(m_body), "2.1.0");
+        QCOMPARE(updater.state(), QString("installing"));
+        QCOMPARE(launched, QStringList{m_downloads + "/EchoPlay-Setup-2.1.0.exe"});
+        QCOMPARE(quit.count(), 1);
+        QVERIFY(updater.setupOnClose().isEmpty()); // started once, not again at the close
+    }
+
+    void aSetupThatWillNotStartAfterReadySaysSo()
+    {
+        m_server.routes["/setup"] = {200, m_body};
+        Updater updater(m_downloads, [](const QString &) { return false; });
+        updater.installOnClose(m_server.url("/setup"), sha256(m_body), "2.1.0");
+        QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("ready"), 10000);
+
+        updater.install(m_server.url("/setup"), sha256(m_body), "2.1.0");
+        QCOMPARE(updater.state(), QString("failed")); // the user asked for this one: not a silent failure
+        QVERIFY(files().isEmpty());
+    }
+
+    void installOnCloseFailsWithoutAWord()
+    {
+        int launches = 0;
+        Updater updater(m_downloads, [&](const QString &) { ++launches; return true; });
+
+        updater.installOnClose(m_server.url("/missing"), sha256(m_body), "2.1.0");
+        QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("idle"), 10000);
+        QVERIFY(!updater.onClose());
+        QVERIFY(updater.setupOnClose().isEmpty());
+        QVERIFY(files().isEmpty());
+        QCOMPARE(launches, 0);
+    }
+
+    void aWrongHashLeavesNothingForTheClose()
+    {
+        m_server.routes["/setup"] = {200, m_body};
+        Updater updater(m_downloads, [](const QString &) { return true; });
+        updater.installOnClose(m_server.url("/setup"), sha256("something else"), "2.1.0");
+        QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("idle"), 10000);
+        QVERIFY(updater.setupOnClose().isEmpty());
+        QVERIFY(files().isEmpty());
+    }
+
+    void installOnCloseDoesNothingWhileBusy()
+    {
+        m_server.routes["/setup"] = {200, m_body};
+        m_server.routes["/slow"] = {200, m_body, {}, true};
+        Updater updater(m_downloads, [](const QString &) { return true; });
+
+        updater.install(m_server.url("/slow"), sha256(m_body), "2.1.0");
+        QTRY_VERIFY_WITH_TIMEOUT(updater.received() > 0, 10000);
+        updater.installOnClose(m_server.url("/setup"), sha256(m_body), "9.9.9");
+        QVERIFY(!updater.onClose()); // the one the user asked for stays what it was
+        QCOMPARE(files(), QStringList{"EchoPlay-Setup-2.1.0.exe.part"});
+        updater.cancel();
+
+        updater.installOnClose(m_server.url("/setup"), sha256(m_body), "2.1.0");
+        QTRY_COMPARE_WITH_TIMEOUT(updater.state(), QString("ready"), 10000);
+        updater.installOnClose(m_server.url("/missing"), sha256(m_body), "2.1.0");
+        QCOMPARE(updater.state(), QString("ready"));
+    }
+
+    void cancelOrClosingMidDownloadLeavesNothingForTheClose()
+    {
+        m_server.routes["/slow"] = {200, m_body, {}, true};
+        {
+            Updater updater(m_downloads, [](const QString &) { return true; });
+            updater.installOnClose(m_server.url("/slow"), sha256(m_body), "2.1.0");
+            QTRY_VERIFY_WITH_TIMEOUT(updater.received() > 0, 10000);
+            updater.cancel();
+            QCOMPARE(updater.state(), QString("idle"));
+            QVERIFY(!updater.onClose());
+            QVERIFY(files().isEmpty());
+
+            updater.installOnClose(m_server.url("/slow"), sha256(m_body), "2.1.0");
+            QTRY_VERIFY_WITH_TIMEOUT(updater.received() > 0, 10000);
+            QVERIFY(updater.setupOnClose().isEmpty()); // the app closes now: nothing to start
+        }
+        QVERIFY(files().isEmpty());
+    }
+
 private:
     // What is in this test's download folder (empty when it does not exist).
     QStringList files() const { return QDir(m_downloads).entryList(QDir::Files | QDir::NoDotAndDotDot); }

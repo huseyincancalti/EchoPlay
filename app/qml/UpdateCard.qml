@@ -52,7 +52,7 @@ Rectangle {
             wrapMode: Text.WordWrap
             text: card.failed ? card.strings.update_failed_try
                  : card.downloading ? card.ui.downloadText()
-                 : card.ready ? card.strings.update_restart
+                 : card.ready ? (Updater.state === "ready" ? card.strings.update_on_close : card.strings.update_restart)
                  : card.strings.last_checked.arg(Qt.formatDateTime(UpdateCheck.lastChecked, "yyyy-MM-dd HH:mm"))
             color: card.colors.textMuted
             font.pixelSize: Theme.tokens.type.small

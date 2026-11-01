@@ -20,6 +20,21 @@ Updater::~Updater()
 void Updater::install(const QString &url, const QString &sha256, const QString &version)
 {
     if (m_state == "downloading" || m_state == "installing") return;
+    const bool waiting = m_state == "ready";
+    m_onClose = false;
+    if (waiting) launch();
+    else download(url, sha256, version);
+}
+
+void Updater::installOnClose(const QString &url, const QString &sha256, const QString &version)
+{
+    if (m_state == "downloading" || m_state == "installing" || m_state == "ready") return;
+    m_onClose = true;
+    download(url, sha256, version);
+}
+
+void Updater::download(const QString &url, const QString &sha256, const QString &version)
+{
     m_received = 0;
     m_total = 0;
     m_sha256 = sha256;
@@ -61,6 +76,7 @@ void Updater::cancel()
 {
     if (m_state != "downloading") return;
     discard();
+    m_onClose = false;
     setState("idle");
 }
 
@@ -100,6 +116,12 @@ void Updater::finish()
     m_file.reset();
     std::exchange(m_reply, nullptr)->deleteLater();
 
+    if (m_onClose) setState("ready");
+    else launch();
+}
+
+void Updater::launch()
+{
     setState("installing");
     if (m_launch(m_setupPath)) {
         emit quitRequested();
@@ -112,7 +134,8 @@ void Updater::finish()
 void Updater::fail()
 {
     discard();
-    setState("failed");
+    const bool quiet = std::exchange(m_onClose, false);
+    setState(quiet ? "idle" : "failed");
 }
 
 // Stops the transfer and removes the partial file.

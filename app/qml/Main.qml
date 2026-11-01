@@ -47,7 +47,7 @@ Window {
     property bool resumePending: false
     property var resumeOffer: null    // {at, savedAt}: "Resume from 1:24?" is open
     property bool keepOldSpot: false  // it was asked and Start over was not chosen: only a new spot worth saving replaces the old
-    property bool updateDismissed: false // Later, or 15 s: for this run
+    property bool updateDismissed: false // Install on close, the cross or 15 s: for this run
     // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
     // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
     readonly property bool measuring: benchSeconds > 0 || shotAt >= 0 || mix || mixToggle || thumbScrub || tierCycle
@@ -509,6 +509,15 @@ Window {
         x: parent.width - chrome.inset - (item ? item.width : 0) - 16
         y: (item && player ? chrome.inset + player.bar.y - item.height - 12 : parent.height - chrome.inset - (item ? item.height : 0) - 16)
         onActiveChanged: if (active) setSource("UpdateNotice.qml", {window: root, backdrop: Qt.binding(() => player ? player.backdrop : null)})
+    }
+    Loader { // after an update: what changed, in the same corner
+        id: whatsNew
+        readonly property var player: ui.item
+        active: !root.measuring && !root.fileError && !updateNotice.active && !(player && player.settingsOpen)
+                && UpdateCheck.whatsNew !== ""
+        x: parent.width - chrome.inset - (item ? item.width : 0) - 16
+        y: (item && player ? chrome.inset + player.bar.y - item.height - 12 : parent.height - chrome.inset - (item ? item.height : 0) - 16)
+        onActiveChanged: if (active) setSource("WhatsNewCard.qml", {player: Qt.binding(() => player), backdrop: Qt.binding(() => player ? player.backdrop : null)})
     }
     Toast {
         id: toast

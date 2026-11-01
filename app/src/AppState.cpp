@@ -194,6 +194,14 @@ void AppState::setUpdateLastChecked(qint64 epochSeconds)
     changed();
 }
 
+void AppState::setReleaseNotes(const QString &version, const QString &text)
+{
+    if (version == m_notesVersion && text == m_notesText) return;
+    m_notesVersion = version;
+    m_notesText = text;
+    changed();
+}
+
 void AppState::changed()
 {
     m_saveTimer.start();
@@ -282,6 +290,8 @@ void AppState::load()
 
     const QJsonObject update = s.value("update").toObject();
     if (update.value("last_checked").isDouble()) m_updateLastChecked = update.value("last_checked").toInteger();
+    m_notesVersion = update.value("notes_version").toString();
+    m_notesText = update.value("notes").toString();
 }
 
 void AppState::save()
@@ -311,7 +321,7 @@ void AppState::save()
         {"screenshots", QJsonObject{{"folder", m_screenshotFolder}, {"custom", m_screenshotCustomPath}}},
         {"appearance", QJsonObject{{"mode", m_themeMode}, {"accent", m_accentColor}, {"bar", m_barStyle},
                                    {"font", m_fontFamily}, {"glass", m_glassStrength}}},
-        {"update", QJsonObject{{"last_checked", m_updateLastChecked}}},
+        {"update", QJsonObject{{"last_checked", m_updateLastChecked}, {"notes_version", m_notesVersion}, {"notes", m_notesText}}},
     };
 
     QDir().mkpath(QFileInfo(m_path).absolutePath());

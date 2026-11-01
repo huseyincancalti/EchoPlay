@@ -68,7 +68,8 @@ Item {
     function downloadText() {
         if (Updater.state === "installing") return I18n.strings.update_restart
         const mb = bytes => Math.round(bytes / 1048576)
-        return I18n.strings.download_progress.arg(mb(Updater.received)).arg(mb(Updater.total))
+        const progress = Updater.onClose ? I18n.strings.download_progress_close : I18n.strings.download_progress
+        return progress.arg(mb(Updater.received)).arg(mb(Updater.total))
     }
     function seekTo(seconds, exact) {
         position = seconds

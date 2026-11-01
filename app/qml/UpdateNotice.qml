@@ -1,8 +1,9 @@
 import QtQuick
 import EchoPlay
 
-// A new version: bottom right, above the bar. Every start while one exists; Later or 15 s hides it for this run. While
-// it downloads, or after a failure, it stays until the user answers.
+// A new version: bottom right, above the bar. Every start while one exists. Install now, or it installs when EchoPlay
+// closes: Install on close, the cross and 15 s all mean that. While it downloads after Install, or after a failure, it
+// stays until the user answers.
 Popover {
     id: notice
 
@@ -22,11 +23,15 @@ Popover {
         if (UpdateCheck.setupUrl) Updater.install(UpdateCheck.setupUrl, UpdateCheck.setupSha256, UpdateCheck.latestVersion)
         else Qt.openUrlExternally(UpdateCheck.releasesUrl) // the release has no setup EchoPlay can use
     }
+    function later() {
+        if (UpdateCheck.setupUrl) Updater.installOnClose(UpdateCheck.setupUrl, UpdateCheck.setupSha256, UpdateCheck.latestVersion)
+        notice.window.updateDismissed = true
+    }
 
     Timer {
         running: !notice.downloading && !notice.failed
         interval: 15000
-        onTriggered: notice.window.updateDismissed = true
+        onTriggered: notice.later()
     }
     Column {
         id: column
@@ -51,7 +56,7 @@ Popover {
                 width: column.width - 48
                 spacing: 2
                 Label {
-                    width: parent.width
+                    width: parent.width - 20 // clear of the cross
                     wrapMode: Text.WordWrap
                     text: notice.failed ? notice.strings.update_failed
                          : notice.downloading ? notice.strings.downloading.arg(UpdateCheck.latestVersion)
@@ -106,8 +111,8 @@ Popover {
                 visible: !notice.downloading
                 objectName: "updateLater"
                 style: "plain"
-                text: notice.strings.later
-                onClicked: notice.window.updateDismissed = true
+                text: UpdateCheck.setupUrl ? notice.strings.install_on_close : notice.strings.later
+                onClicked: notice.later()
             }
             TextButton {
                 visible: Updater.state === "downloading"
@@ -115,5 +120,17 @@ Popover {
                 onClicked: Updater.cancel()
             }
         }
+    }
+    IconButton {
+        visible: !notice.downloading
+        objectName: "updateClose"
+        x: notice.width - width - 6
+        y: 6
+        width: 28
+        height: 28
+        iconSize: 18
+        icon: "close"
+        tip: notice.strings.close
+        onClicked: notice.later()
     }
 }

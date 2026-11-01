@@ -15,6 +15,7 @@ namespace {
 
 constexpr auto DevVersion = "0.0.0-dev";
 constexpr auto SetupAssetName = "EchoPlay-Setup.exe";
+constexpr int MaxNotes = 4000; // characters kept in state.json: a small card, not an archive
 // The only place a setup is downloaded from: this repo's releases.
 constexpr auto SetupUrlPrefix = "https://github.com/huseyincancalti/EchoPlay/releases/download/";
 
@@ -98,8 +99,27 @@ void UpdateCheck::handleReply(const QByteArray &json)
     m_latest = latest;
     m_updateAvailable = isNewer(latest, m_current);
     readSetup(release.value("assets").toArray());
+    if (m_updateAvailable) {
+        // Saved now: the new version shows them on its first start, which may have no network. The card has its own
+        // title, so a heading on top ("## What's new in v2.1.0") goes.
+        static const QRegularExpression heading("^#[^\n]*");
+        QString notes = release.value("body").toString().trimmed();
+        notes.remove(heading);
+        m_state->setReleaseNotes(latest, notes.trimmed().left(MaxNotes));
+    }
     emit changed();
     if (m_updateAvailable) emit newVersionFound(latest);
+}
+
+QString UpdateCheck::whatsNew() const
+{
+    return m_state->notesVersion() == m_current ? m_state->notesText() : QString();
+}
+
+void UpdateCheck::closeWhatsNew()
+{
+    m_state->setReleaseNotes(QString(), QString());
+    emit changed();
 }
 
 // The setup is the asset named exactly EchoPlay-Setup.exe. A foreign download host or a missing or odd

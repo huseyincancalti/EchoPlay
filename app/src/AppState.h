@@ -77,6 +77,10 @@ public:
     // The update check: when it last ran.
     qint64 updateLastChecked() const { return m_updateLastChecked; } // seconds since the epoch; 0 = never
     void setUpdateLastChecked(qint64 epochSeconds);
+    // The notes of the newest release found, for the card once the app runs that version (UpdateCheck).
+    QString notesVersion() const { return m_notesVersion; }
+    QString notesText() const { return m_notesText; }
+    void setReleaseNotes(const QString &version, const QString &text);
 
     // Writes now. A change schedules this a moment later instead: a dragged slider changes a value
     // many times per second, and one write is enough.
@@ -124,4 +128,6 @@ private:
     QString m_fontFamily;
     int m_glassStrength = 1;
     qint64 m_updateLastChecked = 0;
+    QString m_notesVersion;
+    QString m_notesText;
 };

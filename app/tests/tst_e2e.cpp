@@ -371,6 +371,83 @@ private slots:
         QVERIFY2(entry.value("pos").toDouble() >= 25 && entry.value("pos").toDouble() < 30, "resume.json lacks 0:25");
     }
 
+    // No file on the command line: the start screen right away, and a dropped file plays.
+    void startScreen()
+    {
+        const QString state = QDir(m_path).filePath("start");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, QString(), QDir(m_path).filePath("start.log"));
+        QVERIFY(app.mpv);
+        QTRY_VERIFY(app.window->isVisible());
+        QTRY_VERIFY(app.item("startScreen"));
+        QVERIFY(app.item("startScreen")->isVisible());
+        QVERIFY(app.item("openFileButton"));
+        QVERIFY(app.item("openFolderButton"));
+        QVERIFY(!app.item("controlBar"));
+        app.shot("start");
+
+        app.services.theme.setMode("light");
+        app.shot("start-light");
+        app.services.theme.setMode("dark");
+
+#ifdef Q_OS_WIN
+        // ECHOPLAY_E2E_DIALOGS=1: Windows' open dialogs really appear. Off by default, they take the focus from whoever
+        // sits at the PC, and tools/e2e.sh runs after every change.
+        if (qEnvironmentVariableIsSet("ECHOPLAY_E2E_DIALOGS")) {
+            const auto openDialog = [] {
+                HWND found = nullptr;
+                EnumWindows([](HWND w, LPARAM out) {
+                    DWORD pid = 0;
+                    GetWindowThreadProcessId(w, &pid);
+                    wchar_t name[16] = {};
+                    GetClassNameW(w, name, 16);
+                    if (pid != GetCurrentProcessId() || !IsWindowVisible(w) || wcscmp(name, L"#32770") != 0) return TRUE;
+                    *reinterpret_cast<HWND *>(out) = w;
+                    return FALSE;
+                }, LPARAM(&found));
+                return found;
+            };
+            for (const char *pick : {"pickFile", "pickFolder"}) {
+                QVERIFY(QMetaObject::invokeMethod(app.window, pick));
+                QTRY_VERIFY2(openDialog(), pick);
+                PostMessageW(openDialog(), WM_CLOSE, 0, 0);
+                QTRY_VERIFY(!openDialog());
+            }
+        }
+#endif
+
+        // With nothing open, keys do nothing: a pause here would still hold when the file opens.
+        app.key(Qt::Key_Space);
+        QTest::qWait(100);
+        QVERIFY(!app.mpv->observed("pause").toBool());
+
+        QMimeData mime;
+        mime.setUrls({QUrl::fromLocalFile(m_clip)});
+        const QPoint center(app.window->width() / 2, app.window->height() / 2);
+        QDragEnterEvent enter(center, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(app.window, &enter);
+        QTRY_VERIFY(app.item("dropOverlay"));
+        app.shot("drop");
+        QDropEvent dropped(QPointF(center), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(app.window, &dropped);
+        QVERIFY2(app.playing(), "the dropped clip did not start playing");
+        QTRY_VERIFY(!app.item("dropOverlay"));
+        QTRY_VERIFY(!app.item("startScreen"));
+        QTRY_VERIFY(app.item("controlBar"));
+        QTRY_COMPARE(app.window->title(), QFileInfo(m_clip).fileName());
+
+        // A file dropped over a playing video replaces it.
+        const QString second = QFileInfo(m_clip).absolutePath() + "/edge/video-only.mp4";
+        QVERIFY(QFileInfo::exists(second));
+        mime.setUrls({QUrl::fromLocalFile(second)});
+        QDragEnterEvent enterAgain(center, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(app.window, &enterAgain);
+        QTRY_VERIFY(app.item("dropOverlay"));
+        QDropEvent droppedAgain(QPointF(center), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(app.window, &droppedAgain);
+        QTRY_COMPARE(app.window->title(), QString("video-only.mp4"));
+    }
+
 #ifdef Q_OS_WIN
     // The frameless window as Windows sees it. Messages go to this window only, so no real input is needed.
     void windowFrame()

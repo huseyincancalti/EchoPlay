@@ -27,6 +27,7 @@ qt_add_qml_module(echoplay_lib
               qml/TextButton.qml qml/ToggleSwitch.qml qml/Segmented.qml qml/TrackSlider.qml qml/GlassBackdrop.qml
               qml/GlassPanel.qml qml/RoundedImage.qml qml/Popover.qml qml/PlayerUi.qml qml/TitleBar.qml qml/ControlBar.qml
               qml/SeekBar.qml qml/VolumeSlider.qml qml/VolumeFlash.qml qml/ArrowSweep.qml qml/MixerPopover.qml
+              qml/StartScreen.qml qml/DashedFrame.qml qml/DropOverlay.qml qml/OpenDialogs.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/Updater.h src/Updater.cpp
@@ -34,7 +35,7 @@ qt_add_qml_module(echoplay_lib
             src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp
             src/PictureQuality.h src/PictureQuality.cpp src/Thumbnailer.h src/Thumbnailer.cpp
             src/SilenceCheck.h src/SilenceCheck.cpp src/PlayerSettings.h src/PlayerSettings.cpp
-            src/Services.h src/Services.cpp src/WindowChrome.h src/WindowChrome.cpp
+            src/Services.h src/Services.cpp src/WindowChrome.h src/WindowChrome.cpp src/MediaFiles.h src/MediaFiles.cpp
 )
 qt_add_shaders(echoplay_lib "shaders" PREFIX "/shaders" BASE "${CMAKE_CURRENT_SOURCE_DIR}/shaders" FILES shaders/glass.frag)
 if(WIN32)

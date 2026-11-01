@@ -28,14 +28,20 @@ GlassPanel {
         height: 1
         color: bar.followsMode ? Theme.colors.hairline : Theme.tokens.glass.hairline
     }
-    Image {
+    Rectangle { // the logo's waves are white: on a light title bar they need the dark tile
         x: 12
         anchors.verticalCenter: parent.verticalCenter
         width: 22
         height: 22
-        source: "qrc:/images/logo.png"
-        sourceSize: Qt.size(44, 44)
-        smooth: true
+        radius: 6
+        color: bar.followsMode && !Theme.dark ? Theme.tokens.glass.fill : "transparent"
+        Image {
+            anchors.fill: parent
+            anchors.margins: bar.followsMode && !Theme.dark ? 3 : 0
+            source: "qrc:/images/logo.png"
+            sourceSize: Qt.size(44, 44)
+            smooth: true
+        }
     }
     Label {
         x: 44

@@ -22,5 +22,14 @@
   "mono": "Mono",
   "stereo": "Stereo",
   "all_on": "Hepsini aç",
-  "mute_all": "Hepsini kapat"
+  "mute_all": "Hepsini kapat",
+
+  "start_title": "Klibi buraya bırak",
+  "start_body": "Ya da aç. EchoPlay; ShadowPlay, NVIDIA App ve OBS kayıtlarındaki tüm ses izlerini bulur.",
+  "open_file": "Dosya aç",
+  "open_folder": "Klasör aç",
+  "videos": "Videolar",
+  "all_files": "Tüm dosyalar",
+  "drop_title": "Oynatmak için bırak",
+  "drop_note": "Klasöründeki diğer klipler oynatma listesine katılır."
 }

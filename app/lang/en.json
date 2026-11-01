@@ -22,5 +22,14 @@
   "mono": "Mono",
   "stereo": "Stereo",
   "all_on": "All on",
-  "mute_all": "Mute all"
+  "mute_all": "Mute all",
+
+  "start_title": "Drop a clip here",
+  "start_body": "Or open one. EchoPlay finds every audio track in ShadowPlay, NVIDIA App and OBS recordings.",
+  "open_file": "Open file",
+  "open_folder": "Open folder",
+  "videos": "Videos",
+  "all_files": "All files",
+  "drop_title": "Drop to play",
+  "drop_note": "The other clips in its folder join the playlist."
 }

@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Effects
 import EchoPlay
 
-// A rounded glass surface: the blurred video behind it (GlassBackdrop), the theme's fill and a 1 px border.
+// A rounded glass surface: the blurred video behind it (GlassBackdrop), the theme's fill and a 1 px border. With no
+// backdrop (nothing plays behind it) a plain surface.
 // Move the panel itself, not a parent: its part of the backdrop follows its own geometry.
 Item {
     id: panel
@@ -22,7 +23,16 @@ Item {
         radius: panel.radius
         color: Qt.rgba(0, 0, 0, Theme.tokens.shadow.opacity)
     }
+    Rectangle {
+        visible: !panel.backdrop
+        anchors.fill: parent
+        radius: panel.radius
+        color: Qt.alpha(panel.fill, panel.fillOpacity)
+        border.width: 1
+        border.color: panel.borderColor
+    }
     ShaderEffect {
+        visible: !!panel.backdrop
         anchors.fill: parent
         fragmentShader: "qrc:/shaders/glass.frag.qsb"
         property var backdrop: panel.backdrop ? panel.backdrop.texture : null

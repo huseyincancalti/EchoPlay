@@ -51,8 +51,7 @@ Window {
         function onFileRequested(file, sentMs) {
             if (file) {
                 root.handOverSentMs = sentMs
-                if (root.videoOn) mpv.command(["loadfile", file, "replace"])
-                else { root.file = file; root.earlyRestart = root.endedEarly = false; root.openFile(file) }
+                root.openPath(file)
             }
             root.show()
             root.raise()
@@ -66,6 +65,19 @@ Window {
         const start = root.shotAt >= 0 ? "start=" + root.shotAt + "," : ""
         mpv.command(["loadfile", file, "replace", -1, start + "pause=yes"])
     }
+    // Every way of opening after the first start: the start screen, a drop, a second launch's hand-over.
+    function openPath(path) {
+        root.file = path
+        root.earlyRestart = root.endedEarly = root.videoRetried = false
+        if (root.videoOn) mpv.command(["loadfile", path, "replace"])
+        else root.openFile(path)
+    }
+    function openUrl(url) {
+        const path = MediaFiles.pathToOpen(url)
+        if (path) root.openPath(path)
+    }
+    function pickFile() { dialogs.active = true; dialogs.item.pickFile() }
+    function pickFolder() { dialogs.active = true; dialogs.item.pickFolder() }
     function firstRestart() {
         if (root.restarted) return
         root.restarted = true
@@ -296,6 +308,7 @@ Window {
         delegate: Shortcut {
             required property var modelData
             context: Qt.ApplicationShortcut
+            enabled: root.restarted // with nothing open, a key would only change what the next file opens with
             sequence: PlayerSettings.shortcuts[modelData.id] || modelData.key
             onActivated: modelData.run()
         }
@@ -391,6 +404,42 @@ Window {
             mediaTitle: root.mediaTitle
             forceChrome: root.measuring
         }
+    }
+
+    // Nothing open. Loaded by name, here and below, so a launch with a file never loads these or their imports.
+    Loader {
+        id: startScreen
+        anchors.fill: parent
+        anchors.margins: chrome.inset
+        active: !root.restarted
+        Component.onCompleted: if (!root.file && !root.measuring) setSource("StartScreen.qml", {chrome: chrome, window: root})
+    }
+    Loader {
+        id: dialogs
+        active: false
+        source: "OpenDialogs.qml"
+    }
+    Connections {
+        target: dialogs.item
+        function onChosen(url) { root.openUrl(url) }
+    }
+    DropArea {
+        id: drop
+        property string dragged
+        anchors.fill: parent
+        enabled: !root.measuring
+        keys: ["text/uri-list"]
+        onEntered: drag => dragged = MediaFiles.displayName(drag.urls[0])
+        onDropped: event => {
+            root.openUrl(event.urls[0])
+            event.accept(Qt.CopyAction)
+        }
+    }
+    Loader {
+        anchors.fill: parent
+        anchors.margins: chrome.inset
+        active: drop.containsDrag
+        onActiveChanged: if (active) setSource("DropOverlay.qml", {name: Qt.binding(() => drop.dragged), overVideo: root.restarted})
     }
 
     Timer {

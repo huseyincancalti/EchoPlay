@@ -188,7 +188,10 @@ GlassPanel {
             icon: "playlist_play"
             background: bar.ui.playlistOpen ? bar.glass.control : "transparent"
             tip: I18n.strings.playlist
-            onClicked: bar.ui.playlistOpen = !bar.ui.playlistOpen
+            onClicked: {
+                bar.ui.playlistOpen = !bar.ui.playlistOpen
+                if (bar.ui.playlistOpen) bar.ui.popover = "" // both live at the bar's right end
+            }
         }
         IconButton {
             id: gear

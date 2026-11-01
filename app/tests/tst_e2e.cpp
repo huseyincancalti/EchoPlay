@@ -677,6 +677,45 @@ private slots:
         }
     }
 
+    // The clips of the opened file's folder: thumbnails and track counts arrive, a click plays one.
+    void playlist()
+    {
+        const QString state = QDir(m_path).filePath("playlist");
+        const QString clips = QDir(m_path).filePath("clips");
+        QVERIFY(QDir().mkpath(state));
+        QVERIFY(QDir().mkpath(clips));
+        const QString edge = QFileInfo(m_clip).absolutePath() + "/edge/video-only.mp4";
+        QFile::copy(m_clip, clips + "/clip 1.mp4");
+        QFile::copy(edge, clips + "/clip 2.mp4");
+        QFile::copy(m_clip, clips + "/clip 10.mp4");
+        Launch app(state, clips + "/clip 1.mp4", QDir(m_path).filePath("playlist.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+        app.wake();
+        QTRY_VERIFY(app.item("playlistButton")->isVisible());
+        QVERIFY(app.click("playlistButton"));
+        QTRY_VERIFY(app.item("playlistPanel"));
+        QTRY_VERIFY(app.item("playlistRow-2"));
+        // Natural order, from mpv: 1, 2, 10. The rows on screen get read in the background.
+        const auto info = [&](const char *name) { // mpv's playlist has the native path
+            return app.services.clipInfo.info(QDir::toNativeSeparators(clips + "/" + name));
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(!info("clip 10.mp4").isEmpty(), 10000);
+        QCOMPARE(info("clip 1.mp4").value("audioTracks").toInt(), 2);
+        QCOMPARE(info("clip 2.mp4").value("audioTracks").toInt(), 0);
+        QTest::qWait(100);
+        app.shot("playlist");
+        QVERIFY(app.click("playlistRow-1"));
+        QTRY_COMPARE(app.window->title(), QString("clip 2.mp4"));
+        // The mixer's popover and the panel share the bar's right end: one closes the other.
+        app.wake();
+        QVERIFY(app.click("mixerChip"));
+        QTRY_VERIFY(!app.item("playlistPanel"));
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("mixerPopover"));
+    }
+
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.
     void looks()
     {

@@ -47,6 +47,7 @@ Item {
 
     function togglePopover(name) {
         popover = popover === name ? "" : name
+        if (popover !== "") playlistOpen = false // both live at the bar's right end
         if (name === "mixer") PlayerSettings.firstRunHintDone = true
     }
     function toggleFullScreen() { chrome.toggleFullScreen() }
@@ -258,6 +259,17 @@ Item {
             ui: player
             pointerX: controlBar.subtitlesCenter - x - parent.x
             height: implicitHeight
+        }
+    }
+
+    Loader {
+        x: ui.width - 360 - Theme.tokens.bar.inset
+        y: ui.fullScreen ? Theme.tokens.bar.inset : 56
+        active: ui.playlistOpen
+        sourceComponent: PlaylistPanel {
+            ui: player
+            width: 360
+            height: controlBar.y - 12 - parent.y
         }
     }
 

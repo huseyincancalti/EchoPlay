@@ -39,6 +39,26 @@ add_test(NAME thumbnailer-clip COMMAND "${FFMPEG}" -y -v error -f lavfi
          -i "color=c=black:s=640x360:r=30:d=40,format=yuv420p,geq=lum='16+5*floor(T)':cb=128:cr=128"
          -c:v libx264 -preset ultrafast -qp 0 -g 60 "${THUMB_CLIP}")
 set_tests_properties(thumbnailer-clip PROPERTIES FIXTURES_SETUP thumbnailer-clip)
+# ClipInfo reads two 10 s clips ffmpeg makes first, a keyframe every 0.4 s: black for the first 0.4 s, then
+# gray, so a picture taken at the start (not at 10 %) is black. One has two audio tracks, one has only video.
+# (A keyframe seek may land one keyframe before the time asked for, so the keyframes are dense.)
+set(CLIPINFO_TWO "${CMAKE_CURRENT_BINARY_DIR}/clipinfo-two.mp4")
+set(CLIPINFO_VIDEO "${CMAKE_CURRENT_BINARY_DIR}/clipinfo-video.mp4")
+set(CLIPINFO_AUDIO "${CMAKE_CURRENT_BINARY_DIR}/clipinfo-audio.m4a")
+add_test(NAME clipinfo-clips COMMAND "${FFMPEG}" -y -v error -f lavfi
+         -i "color=c=black:s=640x360:r=30:d=10,format=yuv420p,geq=lum='if(lt(T,0.4),16,150)':cb=128:cr=128"
+         -f lavfi -i sine=frequency=440:duration=10 -f lavfi -i sine=frequency=880:duration=10
+         -map 0:v -map 1:a -map 2:a -c:v libx264 -preset ultrafast -g 12 -c:a aac "${CLIPINFO_TWO}"
+         -map 0:v -c:v libx264 -preset ultrafast -g 12 "${CLIPINFO_VIDEO}"
+         -map 1:a -c:a aac "${CLIPINFO_AUDIO}")
+set_tests_properties(clipinfo-clips PROPERTIES FIXTURES_SETUP clipinfo-clips)
+echoplay_test(clipinfo ../src/ClipInfo.h ../src/ClipInfo.cpp)
+target_include_directories(tst_clipinfo PRIVATE "${MPV_INCLUDE}")
+target_link_libraries(tst_clipinfo PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
+target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
+                           ECHOPLAY_CLIPINFO_VIDEO="${CLIPINFO_VIDEO}" ECHOPLAY_CLIPINFO_AUDIO="${CLIPINFO_AUDIO}")
+set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED clipinfo-clips)
+
 echoplay_test(thumbnailer ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
 target_include_directories(tst_thumbnailer PRIVATE "${MPV_INCLUDE}")
 target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")

@@ -20,6 +20,7 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
                                                              "/ECHOPLAYUPDATE=1"});
               }),
       thumbnails(nullptr),
+      clipInfo(nullptr),
       silence(nullptr)
 {
     i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
@@ -36,5 +37,6 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
     UpdateCheck::setInstance(&updates);
     Updater::setInstance(&updater);
     Thumbnailer::setInstance(&thumbnails);
+    ClipInfo::setInstance(&clipInfo);
     SilenceCheck::setInstance(&silence);
 }

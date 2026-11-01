@@ -2,6 +2,7 @@
 
 #include <QString>
 #include "AppState.h"
+#include "ClipInfo.h"
 #include "I18n.h"
 #include "MixerController.h"
 #include "PictureQuality.h"
@@ -31,5 +32,6 @@ struct Services
     UpdateCheck updates;
     Updater updater;
     Thumbnailer thumbnails;
+    ClipInfo clipInfo;
     SilenceCheck silence;
 };

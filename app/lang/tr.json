@@ -210,5 +210,14 @@
   "copy_details": "Ayrıntıları kopyala",
   "copied": "Kopyalandı",
   "report_problem": "Sorun bildir",
-  "sends_nothing": "EchoPlay kendisi hiçbir şey göndermez."
+  "sends_nothing": "EchoPlay kendisi hiçbir şey göndermez.",
+
+  "in_this_folder": "Bu klasörde",
+  "close_playlist": "Oynatma listesini kapat",
+  "clips_count": "%1 klip",
+  "clip_count_one": "1 klip",
+  "playing": "Oynuyor",
+  "tracks_count": "%1 iz",
+  "track_count_one": "1 iz",
+  "no_audio": "Ses yok"
 }

@@ -210,5 +210,14 @@
   "copy_details": "Copy details",
   "copied": "Copied",
   "report_problem": "Report a problem",
-  "sends_nothing": "EchoPlay sends nothing itself."
+  "sends_nothing": "EchoPlay sends nothing itself.",
+
+  "in_this_folder": "In this folder",
+  "close_playlist": "Close playlist",
+  "clips_count": "%1 clips",
+  "clip_count_one": "1 clip",
+  "playing": "Playing",
+  "tracks_count": "%1 tracks",
+  "track_count_one": "1 track",
+  "no_audio": "No audio"
 }

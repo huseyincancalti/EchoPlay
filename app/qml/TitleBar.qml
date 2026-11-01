@@ -81,7 +81,7 @@ GlassPanel {
         CaptionButton {
             objectName: "minimizeButton"
             icon: "remove"
-            onClicked: bar.window.showMinimized()
+            onClicked: bar.chrome.minimize()
         }
         CaptionButton { // Windows owns this one's input (snap layouts): WindowChrome's hit test and hover
             icon: bar.window.visibility === Window.Maximized ? "filter_none" : "crop_square"

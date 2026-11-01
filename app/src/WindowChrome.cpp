@@ -36,7 +36,74 @@ void WindowChrome::attach(QQuickWindow *window)
 void WindowChrome::toggleMaximized()
 {
     if (!m_window) return;
+#ifdef Q_OS_WIN
+    // Windows' own maximize, never QWindow::showMaximized: for a frameless window Qt only moves it over the work area,
+    // so Windows does not know it is maximized and the two ways get mixed up (the normal size was lost).
+    const HWND hwnd = HWND(m_handle);
+    ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+#else
     m_window->visibility() == QWindow::Maximized ? m_window->showNormal() : m_window->showMaximized();
+#endif
+}
+
+void WindowChrome::minimize()
+{
+    if (!m_window) return;
+#ifdef Q_OS_WIN
+    // Windows' own again: QWindow::showMinimized clears WPF_RESTORETOMAXIMIZED, a maximized window came back normal.
+    ShowWindow(HWND(m_handle), SW_MINIMIZE);
+#else
+    m_window->showMinimized();
+#endif
+}
+
+void WindowChrome::toggleFullScreen()
+{
+    if (!m_window) return;
+#ifdef Q_OS_WIN
+    const HWND hwnd = HWND(m_handle);
+    WINDOWPLACEMENT placement{};
+    placement.length = sizeof(placement);
+#endif
+    if (m_window->visibility() != QWindow::FullScreen) {
+#ifdef Q_OS_WIN
+        m_maximizedBefore = IsZoomed(hwnd) && GetWindowPlacement(hwnd, &placement);
+        if (m_maximizedBefore) {
+            const RECT &r = placement.rcNormalPosition;
+            m_restoreRect = QRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+        }
+#endif
+        m_window->showFullScreen();
+        return;
+    }
+    m_window->showNormal(); // Qt puts the frame back
+#ifdef Q_OS_WIN
+    // Qt's own way back to maximized would be the imitation above, and the normal size is gone from Windows by now.
+    if (m_maximizedBefore && GetWindowPlacement(hwnd, &placement)) {
+        placement.showCmd = SW_SHOWMAXIMIZED;
+        placement.rcNormalPosition = {m_restoreRect.left(), m_restoreRect.top(), m_restoreRect.left() + m_restoreRect.width(),
+                                      m_restoreRect.top() + m_restoreRect.height()};
+        SetWindowPlacement(hwnd, &placement);
+    }
+#endif
+}
+
+void WindowChrome::updateInset()
+{
+#ifdef Q_OS_WIN
+    // Maximized, Windows places the frame off the screen whatever WM_GETMINMAXINFO says (measured: -9,-9 1878x1098 on
+    // a 1860x1080 work area, at 125%), and to Qt a frameless window's geometry is that whole rectangle.
+    const HWND hwnd = HWND(m_handle);
+    qreal inset = 0;
+    MONITORINFO monitor{};
+    monitor.cbSize = sizeof(monitor);
+    RECT r;
+    if (IsZoomed(hwnd) && GetWindowRect(hwnd, &r) && GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitor))
+        inset = qMax(0L, monitor.rcWork.left - r.left) / m_window->devicePixelRatio();
+    if (inset == m_inset) return;
+    m_inset = inset;
+    emit insetChanged();
+#endif
 }
 
 void WindowChrome::setMaximizeHovered(bool hovered)
@@ -55,12 +122,14 @@ bool WindowChrome::nativeEventFilter(const QByteArray &eventType, void *message,
 
     switch (msg->message) {
     case WM_NCCALCSIZE:
-        // The client area is the whole window. Maximized, Windows places the frame off the screen, and Qt's size
-        // limit for a frameless window already keeps it to the work area.
+        // The client area is the whole window.
         if (msg->wParam) {
             *result = 0;
             return true;
         }
+        return false;
+    case WM_SIZE:
+        updateInset();
         return false;
     case WM_NCHITTEST: {
         const bool windowed = m_window->visibility() == QWindow::Windowed;
@@ -71,8 +140,9 @@ bool WindowChrome::nativeEventFilter(const QByteArray &eventType, void *message,
         RECT r;
         GetWindowRect(msg->hwnd, &r);
         const qreal ratio = m_window->devicePixelRatio();
-        const int x = GET_X_LPARAM(msg->lParam) - r.left, y = GET_Y_LPARAM(msg->lParam) - r.top;
-        const int w = r.right - r.left, h = r.bottom - r.top;
+        const int inset = qRound(m_inset * ratio);
+        const int x = GET_X_LPARAM(msg->lParam) - r.left - inset, y = GET_Y_LPARAM(msg->lParam) - r.top - inset;
+        const int w = r.right - r.left - 2 * inset, h = r.bottom - r.top - 2 * inset;
         if (windowed) {
             const int edge = qRound(6 * ratio);
             const bool left = x < edge, right = x >= w - edge, top = y < edge, bottom = y >= h - edge;
@@ -106,14 +176,13 @@ bool WindowChrome::nativeEventFilter(const QByteArray &eventType, void *message,
     case WM_MOUSEMOVE:
         setMaximizeHovered(false);
         return false;
+    // Input messages reach this filter from Qt's event dispatcher, which passes no result: never write to it here.
     case WM_NCLBUTTONDOWN:
-        if (msg->wParam != HTMAXBUTTON) return false;
-        *result = 0; // Windows would draw its own old-style button over ours
-        return true;
+    case WM_NCLBUTTONDBLCLK:
+        return msg->wParam == HTMAXBUTTON; // Windows would draw its own old-style button over ours
     case WM_NCLBUTTONUP:
         if (msg->wParam != HTMAXBUTTON) return false;
         toggleMaximized();
-        *result = 0;
         return true;
     default:
         return false;

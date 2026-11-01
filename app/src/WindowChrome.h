@@ -17,6 +17,7 @@ class WindowChrome : public QObject, public QAbstractNativeEventFilter
     Q_PROPERTY(bool maximizeHovered READ maximizeHovered NOTIFY maximizeHoveredChanged)
     Q_PROPERTY(int captionHeight READ captionHeight CONSTANT) // in QML units
     Q_PROPERTY(int buttonWidth READ buttonWidth CONSTANT)     // one caption button, in QML units
+    Q_PROPERTY(qreal inset READ inset NOTIFY insetChanged)    // how much of each side is off the screen, in QML units
 
 public:
     explicit WindowChrome(QObject *parent = nullptr);
@@ -25,21 +26,29 @@ public:
     bool maximizeHovered() const { return m_maximizeHovered; }
     int captionHeight() const { return 40; }
     int buttonWidth() const { return 46; }
+    qreal inset() const { return m_inset; }
 
     // Call before the window first shows, with flags Qt.Window | Qt.FramelessWindowHint.
     Q_INVOKABLE void attach(QQuickWindow *window);
     Q_INVOKABLE void toggleMaximized();
+    Q_INVOKABLE void minimize();
+    Q_INVOKABLE void toggleFullScreen(); // back to where it came from, maximized or not
 
     bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) override;
 
 signals:
     void maximizeHoveredChanged();
+    void insetChanged();
     void pointerMoved(); // over the caption: Windows reports those moves as non-client, so QML never sees them
 
 private:
     void setMaximizeHovered(bool hovered);
+    void updateInset();
 
     QPointer<QQuickWindow> m_window;
     quintptr m_handle = 0;
     bool m_maximizeHovered = false;
+    qreal m_inset = 0;
+    bool m_maximizedBefore = false; // before full screen
+    QRect m_restoreRect;            // then: where Windows restores the window to
 };

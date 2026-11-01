@@ -8,6 +8,10 @@
 #include <clocale>
 #include "MpvItem.h"
 #include "Services.h"
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 Q_IMPORT_QML_PLUGIN(EchoPlayPlugin)
 
@@ -117,6 +121,23 @@ struct Launch
         QDir().mkpath(dir);
         window->grabWindow().save(QDir(dir).filePath(name + ".png"));
     }
+#ifdef Q_OS_WIN
+    // The screen around the window, not the window: only this shows the shadow and the rounded corners Windows adds.
+    // On top for the moment of the grab, without taking the focus: otherwise this catches whatever else is open.
+    void desktopShot(const QString &name)
+    {
+        const QString dir = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS");
+        if (dir.isEmpty()) return;
+        const HWND hwnd = HWND(window->winId());
+        const UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
+        QTest::qWait(350);
+        QDir().mkpath(dir);
+        const QRect around = window->geometry().adjusted(-40, -40, 40, 40);
+        window->screen()->grabWindow(0, around.x(), around.y(), around.width(), around.height()).save(QDir(dir).filePath(name + ".png"));
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+    }
+#endif
     // The pointer moves over the window: the chrome comes up. It stays up for a second after that.
     void wake() { QTest::mouseMove(window, QPoint(window->width() / 2 + (m_wiggle ^= 1), window->height() / 2)); }
     int m_wiggle = 0;
@@ -349,6 +370,140 @@ private slots:
             QJsonDocument::fromJson(resume.readAll()).object().value("entries").toObject().value(QDir::cleanPath(QDir::fromNativeSeparators(m_clip))).toObject();
         QVERIFY2(entry.value("pos").toDouble() >= 25 && entry.value("pos").toDouble() < 30, "resume.json lacks 0:25");
     }
+
+#ifdef Q_OS_WIN
+    // The frameless window as Windows sees it. Messages go to this window only, so no real input is needed.
+    void windowFrame()
+    {
+        const QString state = QDir(m_path).filePath("frame"); // its own: closing must not change what the second run reads
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, m_clip, QDir(m_path).filePath("frame.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        const HWND hwnd = HWND(app.window->winId());
+        const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        QVERIFY(style & WS_THICKFRAME);
+        QVERIFY(style & WS_CAPTION);
+        QVERIFY(style & WS_MAXIMIZEBOX);
+
+        // The picture on the screen, in physical pixels: maximized, part of the window itself is off the screen.
+        const auto pictureOnScreen = [&] {
+            RECT w;
+            GetWindowRect(hwnd, &w);
+            const qreal ratio = app.window->devicePixelRatio();
+            const QPointF at = app.mpv->mapToScene(QPointF(0, 0)) * ratio;
+            return QRect(w.left + qRound(at.x()), w.top + qRound(at.y()), qRound(app.mpv->width() * ratio), qRound(app.mpv->height() * ratio));
+        };
+        const auto workArea = [hwnd] {
+            MONITORINFO info{};
+            info.cbSize = sizeof(info);
+            GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &info);
+            return QRect(info.rcWork.left, info.rcWork.top, info.rcWork.right - info.rcWork.left, info.rcWork.bottom - info.rcWork.top);
+        };
+        // Hit test in physical pixels, relative to the client area's top left.
+        const auto hit = [&](int x, int y) {
+            const QPoint p = pictureOnScreen().topLeft() + QPoint(x, y);
+            return int(SendMessageW(hwnd, WM_NCHITTEST, 0, MAKELPARAM(p.x(), p.y())));
+        };
+
+        const auto checkHits = [&](bool edges) {
+            const qreal ratio = app.window->devicePixelRatio();
+            const QRect c = pictureOnScreen();
+            const int w = c.width(), h = c.height();
+            const int mid = h / 2, caption = qRound(20 * ratio);
+            const int button = qRound(46 * ratio);
+            QCOMPARE(hit(w / 2, caption), int(HTCAPTION));
+            QCOMPARE(hit(w / 2, mid), int(HTCLIENT));
+            QCOMPARE(hit(w - button / 2, caption), int(HTCLIENT));         // close
+            QCOMPARE(hit(w - button - button / 2, caption), int(HTMAXBUTTON)); // snap layouts
+            QCOMPARE(hit(w - 2 * button - button / 2, caption), int(HTCLIENT)); // minimize
+            QCOMPARE(hit(1, 1), edges ? int(HTTOPLEFT) : int(HTCAPTION));
+            QCOMPARE(hit(w - 2, h - 2), edges ? int(HTBOTTOMRIGHT) : int(HTCLIENT));
+            QCOMPARE(hit(1, mid), edges ? int(HTLEFT) : int(HTCLIENT));
+            QCOMPARE(hit(w - 2, mid), edges ? int(HTRIGHT) : int(HTCLIENT));
+            QCOMPARE(hit(w / 2, h - 2), edges ? int(HTBOTTOM) : int(HTCLIENT));
+            QCOMPARE(hit(w / 2, 1), edges ? int(HTTOP) : int(HTCAPTION));
+        };
+        checkHits(true);
+        if (QTest::currentTestFailed()) return;
+        const QRect normal = pictureOnScreen();
+        QVERIFY(normal.width() > 0);
+        app.desktopShot("frame-normal");
+
+        // Maximized is always Windows' own (caption double-click, Aero Snap, the button): exactly the work area on the
+        // screen, the taskbar free, nothing cut. Qt's imitation for frameless windows (showMaximized) is not used.
+        const auto checkMaximized = [&](const char *how) {
+            QTRY_COMPARE(app.window->visibility(), QWindow::Maximized);
+            QTRY_VERIFY(IsZoomed(hwnd));
+            QTRY_COMPARE(pictureOnScreen(), workArea());
+            qInfo("%s: picture %d,%d %dx%d", how, pictureOnScreen().x(), pictureOnScreen().y(), pictureOnScreen().width(), pictureOnScreen().height());
+            checkHits(false);
+        };
+        const auto checkNormal = [&] {
+            QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
+            QTRY_COMPARE(pictureOnScreen(), normal);
+            checkHits(true);
+        };
+        SendMessageW(hwnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+        checkMaximized("SC_MAXIMIZE");
+        if (QTest::currentTestFailed()) return;
+        app.desktopShot("frame-maximized");
+        SendMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
+        checkNormal();
+        if (QTest::currentTestFailed()) return;
+
+        // The maximize button, as Windows reports a click on it: posted, since Qt runs its filters on input messages
+        // only from the queue, and DefWindowProc would wait for a real mouse release.
+        const auto clickMaximize = [hwnd] {
+            PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTMAXBUTTON, 0);
+            PostMessageW(hwnd, WM_NCLBUTTONUP, HTMAXBUTTON, 0);
+        };
+        clickMaximize();
+        checkMaximized("maximize button");
+        if (QTest::currentTestFailed()) return;
+
+        // Minimized from maximized (the title bar's button), and back as the taskbar does it.
+        app.wake();
+        QTRY_VERIFY(app.item("minimizeButton") && app.item("minimizeButton")->isVisible());
+        QVERIFY(app.click("minimizeButton"));
+        QTRY_COMPARE(app.window->visibility(), QWindow::Minimized);
+        SendMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
+        checkMaximized("back from minimized");
+        if (QTest::currentTestFailed()) return;
+
+        // Full screen from maximized returns to maximized, and the normal size is still there after that.
+        app.key(Qt::Key_F);
+        QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
+        app.key(Qt::Key_Escape);
+        checkMaximized("back from full screen");
+        if (QTest::currentTestFailed()) return;
+        clickMaximize();
+        checkNormal();
+        if (QTest::currentTestFailed()) return;
+
+        // Full screen from a normal window covers the whole monitor, has no edges or caption, and returns.
+        app.key(Qt::Key_F);
+        QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
+        MONITORINFO info{};
+        info.cbSize = sizeof(info);
+        GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &info);
+        const QRect monitor(info.rcMonitor.left, info.rcMonitor.top, info.rcMonitor.right - info.rcMonitor.left, info.rcMonitor.bottom - info.rcMonitor.top);
+        QTRY_COMPARE(pictureOnScreen(), monitor);
+        QCOMPARE(hit(1, 1), int(HTCLIENT));
+        QCOMPARE(hit(monitor.width() / 2, 10), int(HTCLIENT));
+        app.key(Qt::Key_Escape);
+        checkNormal();
+        if (QTest::currentTestFailed()) return;
+        QVERIFY(GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_THICKFRAME); // the frame came back with it
+
+        // Minimum size: Windows asks before it resizes.
+        MINMAXINFO limits{};
+        SendMessageW(hwnd, WM_GETMINMAXINFO, 0, LPARAM(&limits));
+        const qreal ratio = app.window->devicePixelRatio();
+        QVERIFY2(limits.ptMinTrackSize.x >= qRound(640 * ratio) && limits.ptMinTrackSize.y >= qRound(360 * ratio), "minimum size is not enforced");
+        app.window->close();
+    }
+#endif
 
     void secondRunRestoresMixerAndVolume()
     {

@@ -86,6 +86,7 @@ Window {
     MpvItem {
         id: mpv
         anchors.fill: parent
+        anchors.margins: chrome.inset // maximized, part of the window is off the screen
         Component.onCompleted: {
             root.startup.qml_ms = processAgeMs()
             Object.assign(root.startup, startupMarks())
@@ -278,11 +279,8 @@ Window {
         {id: "screenshot_window", key: "Ctrl+S", run: () => mpv.command(["screenshot", "window"])},
         {id: "next", key: ">", run: () => mpv.command(["playlist-next"])},
         {id: "previous", key: "<", run: () => mpv.command(["playlist-prev"])},
-        {id: "fullscreen", key: "F", run: () => root.toggleFullScreen()},
+        {id: "fullscreen", key: "F", run: () => chrome.toggleFullScreen()},
     ]
-    function toggleFullScreen() {
-        root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
-    }
     function changeVolume(step) {
         if (ui.item) ui.item.flashVolume()
         mpv.command(["add", "volume", step])
@@ -307,7 +305,7 @@ Window {
         sequence: "Esc"
         onActivated: {
             if (ui.item && ui.item.closeTop()) return
-            if (root.visibility === Window.FullScreen) root.visibility = Window.Windowed
+            if (root.visibility === Window.FullScreen) chrome.toggleFullScreen()
         }
     }
 
@@ -383,6 +381,7 @@ Window {
     Loader {
         id: ui
         anchors.fill: parent
+        anchors.margins: chrome.inset
         active: root.restarted && (!root.measuring || root.glass)
         asynchronous: true // the video is playing by now: never stall it
         sourceComponent: PlayerUi {

@@ -41,9 +41,7 @@ Item {
     function togglePopover(name) {
         popover = popover === name ? "" : name
     }
-    function toggleFullScreen() {
-        window.visibility = fullScreen ? Window.Windowed : Window.FullScreen
-    }
+    function toggleFullScreen() { chrome.toggleFullScreen() }
     function seekTo(seconds, exact) {
         position = seconds
         mpv.command(["seek", seconds, exact ? "absolute+exact" : "absolute+keyframes"])

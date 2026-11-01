@@ -19,12 +19,41 @@ namespace {
 
 const QString Mix = "[aid1]volume=1.00[ev1];[aid2]volume=1.00[ev2];[ev1][ev2]amix=inputs=2:normalize=0[ao]";
 
+// Real input still reaches the test window when it opens under the maintainer's cursor or takes the focus:
+// a scroll there turned the volume down 13 steps before the test pressed a key. The test sends no wheel
+// events, and its key events carry no native scan code, so real ones are dropped (and counted in the log).
+class RealInputFilter : public QObject
+{
+public:
+    int dropped = 0;
+
+protected:
+    bool eventFilter(QObject *, QEvent *e) override
+    {
+        switch (e->type()) {
+        case QEvent::Wheel:
+            break;
+        case QEvent::ShortcutOverride: // accepted below, so a real key fires no shortcut
+        case QEvent::KeyPress:
+        case QEvent::KeyRelease:
+            if (static_cast<QKeyEvent *>(e)->nativeScanCode() == 0) return false;
+            break;
+        default:
+            return false;
+        }
+        ++dropped;
+        e->accept();
+        return true;
+    }
+};
+
 // One start of the player, as main.cpp does it (without the single-instance pipe and the update check).
 struct Launch
 {
     Launch(const QString &configDir, const QString &clip, const QString &log)
         : services(configDir, QCoreApplication::applicationDirPath(), "0.0.0-dev")
     {
+        qApp->installEventFilter(&realInput);
         engine.setInitialProperties({{"file", clip}, {"benchSeconds", 0}, {"glass", true}, {"mix", false},
                                      {"logFile", log}, {"mixToggle", false}, {"thumbScrub", false}, {"tierCycle", false}, {"shotAt", -1.0},
                                      {"shotOut", QString()}, {"startup", QVariantMap{}},
@@ -60,6 +89,12 @@ struct Launch
     double number(const char *name) const { return mpv->observed(name).toDouble(); }
     void key(Qt::Key k, Qt::KeyboardModifiers mods = Qt::NoModifier) { QTest::keyClick(window, k, mods); }
 
+    ~Launch()
+    {
+        if (realInput.dropped) qInfo("ignored %d real wheel/key events", realInput.dropped);
+    }
+
+    RealInputFilter realInput;
     Services services; // destroyed after the engine: its destructors write pending state
     QQmlApplicationEngine engine;
     QQuickWindow *window = nullptr;

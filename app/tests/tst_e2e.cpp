@@ -5,7 +5,10 @@
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QtQml/qqmlextensionplugin.h>
+#include <atomic>
 #include <clocale>
+#include <functional>
+#include <thread>
 #include "MpvItem.h"
 #include "Services.h"
 #include "WindowChrome.h"
@@ -903,7 +906,8 @@ private slots:
 
 #ifdef Q_OS_WIN
     // The real mouse and keyboard, for what only Windows does with the frame. tools/window-live.sh only: it takes them
-    // from whoever sits at the PC.
+    // from whoever sits at the PC. The input comes from another thread: Windows' move and resize loops run inside the
+    // button press, on this thread, until the button is up. Every check runs and reports, so one run tells everything.
     void realWindowInput()
     {
         if (!qEnvironmentVariableIsSet("ECHOPLAY_E2E_REAL_INPUT")) QSKIP("takes the real mouse and keyboard: tools/window-live.sh");
@@ -914,8 +918,13 @@ private slots:
         QVERIFY2(app.playing(), "the clip did not start playing");
         QTRY_VERIFY(app.item("titleBar"));
         const HWND hwnd = HWND(app.window->winId());
+        const qreal ratio = app.window->devicePixelRatio();
         POINT pointerBefore;
         GetCursorPos(&pointerBefore);
+        const auto leaveInputClean = qScopeGuard([&] {
+            if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+            SetCursorPos(pointerBefore.x, pointerBefore.y);
+        });
 
         const auto rect = [hwnd] {
             RECT r;
@@ -928,109 +937,123 @@ private slots:
             GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &info);
             return QRect(info.rcWork.left, info.rcWork.top, info.rcWork.right - info.rcWork.left, info.rcWork.bottom - info.rcWork.top);
         };
+        const auto text = [](QRect r) { return QString("%1,%2 %3x%4").arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height()); };
+        QStringList failures;
+        const auto check = [&](const char *what, const std::function<bool()> &ok) {
+            const bool passed = QTest::qWaitFor(ok, 2500);
+            qInfo("%s %s (window %s, work area %s)", passed ? "ok  " : "FAIL", what, qPrintable(text(rect())), qPrintable(text(work())));
+            if (!passed) failures << what;
+        };
+
+        // What the other thread does. This thread stays in the event loop, also when a move loop runs inside it.
+        const auto fromOutside = [](const std::function<void()> &script) {
+            std::atomic<bool> done{false};
+            std::thread worker([&] {
+                script();
+                done = true;
+            });
+            while (!done) QTest::qWait(10);
+            worker.join();
+        };
         const auto moveTo = [](QPoint p) {
             SetCursorPos(p.x(), p.y());
-            QTest::qWait(40);
+            QThread::msleep(40);
         };
         const auto button = [](DWORD flag) {
             INPUT input{};
             input.type = INPUT_MOUSE;
             input.mi.dwFlags = flag;
             SendInput(1, &input, sizeof(input));
-            QTest::qWait(40);
+            QThread::msleep(40);
         };
         const auto drag = [&](QPoint from, QPoint to) {
-            moveTo(from);
-            button(MOUSEEVENTF_LEFTDOWN);
-            for (int i = 1; i <= 8; ++i) moveTo(from + (to - from) * i / 8);
-            QTest::qWait(250); // Aero Snap waits a moment at the screen's edge
-            button(MOUSEEVENTF_LEFTUP);
+            fromOutside([&] {
+                moveTo(from);
+                button(MOUSEEVENTF_LEFTDOWN);
+                for (int i = 1; i <= 8; ++i) moveTo(from + (to - from) * i / 8);
+                QThread::msleep(250); // Aero Snap waits a moment at the screen's edge
+                button(MOUSEEVENTF_LEFTUP);
+            });
             QTest::qWait(350);
         };
-        const auto keys = [](std::initializer_list<WORD> codes) {
-            for (WORD code : codes) keybd_event(BYTE(code), 0, 0, 0);
-            for (auto it = std::rbegin(codes); it != std::rend(codes); ++it) keybd_event(BYTE(*it), 0, KEYEVENTF_KEYUP, 0);
+        const auto click = [&](QPoint at, int times = 1) {
+            fromOutside([&] {
+                moveTo(at);
+                for (int i = 0; i < times; ++i) {
+                    button(MOUSEEVENTF_LEFTDOWN);
+                    button(MOUSEEVENTF_LEFTUP);
+                }
+            });
+            QTest::qWait(300);
+        };
+        const auto keys = [&](std::initializer_list<WORD> codes) {
+            fromOutside([&] {
+                for (WORD code : codes) keybd_event(BYTE(code), 0, 0, 0);
+                QThread::msleep(40);
+                for (auto it = std::rbegin(codes); it != std::rend(codes); ++it) keybd_event(BYTE(*it), 0, KEYEVENTF_KEYUP, 0);
+            });
             QTest::qWait(500);
         };
         const auto caption = [&] { return QPoint(rect().center().x() - 100, rect().top() + 18); };
-        const auto releaseEverything = qScopeGuard([&] { SetCursorPos(pointerBefore.x, pointerBefore.y); });
 
-        moveTo(caption());
-        button(MOUSEEVENTF_LEFTDOWN); // a click on the caption brings the window forward: Win+Left needs that
-        button(MOUSEEVENTF_LEFTUP);
-        QTest::qWait(300);
+        click(caption()); // brings the window forward: Win+Left needs that
 
-        // The resize edges. The window follows the pointer; Qt's content follows the window.
+        // The resize edges. The window follows the pointer; the picture follows the window.
         const QRect start = rect();
         drag(QPoint(start.right(), start.center().y()), QPoint(start.right() - 120, start.center().y()));
-        QTRY_VERIFY2(qAbs(rect().width() - (start.width() - 120)) <= 4, "the right edge did not resize");
-        QCOMPARE(rect().left(), start.left());
+        check("right edge resizes", [&] { return qAbs(rect().width() - (start.width() - 120)) <= 4 && rect().left() == start.left(); });
         const QRect narrower = rect();
         drag(QPoint(narrower.right(), narrower.bottom()), QPoint(narrower.right() - 40, narrower.bottom() - 60));
-        QTRY_VERIFY2(qAbs(rect().height() - (narrower.height() - 60)) <= 4, "the corner did not resize");
-        QTRY_COMPARE(qRound(app.mpv->width() * app.window->devicePixelRatio()), rect().width());
+        check("corner resizes", [&] { return qAbs(rect().height() - (narrower.height() - 60)) <= 4; });
+        check("the picture follows", [&] { return qRound(app.mpv->width() * ratio) == rect().width(); });
         const QRect smaller = rect();
         drag(QPoint(smaller.left(), smaller.center().y()), QPoint(smaller.left() + 3000, smaller.center().y())); // far past the minimum
-        const qreal ratio = app.window->devicePixelRatio();
-        QTRY_VERIFY2(rect().width() >= qRound(640 * ratio) - 1, "the minimum width did not hold");
+        check("the minimum width holds", [&] { return rect().width() >= qRound(640 * ratio) - 1 && rect().width() < smaller.width(); });
 
         // The caption moves it.
         const QRect before = rect();
         drag(caption(), caption() + QPoint(-30, 40));
-        QTRY_COMPARE(rect().topLeft(), before.topLeft() + QPoint(-30, 40));
-        QCOMPARE(rect().size(), before.size());
+        check("the caption moves it", [&] { return rect().topLeft() == before.topLeft() + QPoint(-30, 40) && rect().size() == before.size(); });
 
         // A double-click on the caption maximizes, and again restores.
-        const auto doubleClick = [&](QPoint at) {
-            moveTo(at);
-            button(MOUSEEVENTF_LEFTDOWN);
-            button(MOUSEEVENTF_LEFTUP);
-            button(MOUSEEVENTF_LEFTDOWN);
-            button(MOUSEEVENTF_LEFTUP);
-        };
-        doubleClick(caption());
-        QTRY_VERIFY(IsZoomed(hwnd));
-        QTRY_COMPARE(app.window->visibility(), QWindow::Maximized);
-        QTest::qWait(300);
-        doubleClick(QPoint(work().center().x() - 100, work().top() + 18));
-        QTRY_VERIFY(!IsZoomed(hwnd));
-        QTRY_COMPARE(rect().size(), before.size());
+        const QRect normal = rect();
+        click(caption(), 2);
+        check("double-click maximizes", [&] { return IsZoomed(hwnd) && app.window->visibility() == QWindow::Maximized; });
+        click(QPoint(work().center().x() - 100, work().top() + 18), 2);
+        check("double-click restores", [&] { return !IsZoomed(hwnd) && rect() == normal; });
 
         // Windows 11's snap layouts on the maximize button: the hover reaches our button, the flyout is for the eye.
-        const int buttonWidth = qRound(46 * ratio);
-        const QPoint maximize(rect().right() - buttonWidth - buttonWidth / 2, rect().top() + 18);
-        moveTo(maximize);
-        moveTo(maximize + QPoint(1, 0));
-        QTest::qWait(1200);
         WindowChrome *chrome = app.window->findChild<WindowChrome *>();
         QVERIFY(chrome);
-        QVERIFY2(chrome->maximizeHovered(), "the maximize button's hover did not arrive");
+        const int buttonWidth = qRound(46 * ratio);
+        const QPoint maximize(rect().right() - buttonWidth - buttonWidth / 2, rect().top() + 18);
+        fromOutside([&] {
+            moveTo(maximize);
+            moveTo(maximize + QPoint(1, 0));
+        });
+        check("the maximize button's hover arrives", [&] { return chrome->maximizeHovered(); });
+        QTest::qWait(1200);
         app.desktopShot("frame-snap-layouts");
-        button(MOUSEEVENTF_LEFTDOWN);
-        button(MOUSEEVENTF_LEFTUP);
-        QTRY_VERIFY2(IsZoomed(hwnd), "a click on the maximize button did not maximize");
+        click(maximize + QPoint(1, 0));
+        check("a click on the maximize button maximizes", [&] { return IsZoomed(hwnd); });
+        click(QPoint(work().right() - buttonWidth - buttonWidth / 2, work().top() + 18));
+        check("a click on it restores", [&] { return !IsZoomed(hwnd); });
+        fromOutside([&] { moveTo(work().center()); }); // away from the flyout
         QTest::qWait(300);
-        moveTo(QPoint(work().right() - buttonWidth - buttonWidth / 2, work().top() + 18));
-        moveTo(QPoint(work().right() - buttonWidth - buttonWidth / 2 + 1, work().top() + 18));
-        button(MOUSEEVENTF_LEFTDOWN);
-        button(MOUSEEVENTF_LEFTUP);
-        QTRY_VERIFY(!IsZoomed(hwnd));
-        moveTo(work().center()); // away from the flyout
 
         // Aero Snap: to the top edge maximizes, Win+Left takes the left half.
         drag(caption(), QPoint(work().center().x(), work().top()));
-        QTRY_VERIFY2(IsZoomed(hwnd), "a drag to the top edge did not maximize");
-        doubleClick(QPoint(work().center().x() - 100, work().top() + 18));
-        QTRY_VERIFY(!IsZoomed(hwnd));
-        QTest::qWait(300);
+        check("a drag to the top edge maximizes", [&] { return IsZoomed(hwnd); });
+        if (IsZoomed(hwnd)) click(QPoint(work().center().x() - 100, work().top() + 18), 2);
+        check("restored for Win+Left", [&] { return !IsZoomed(hwnd); });
         keys({VK_LWIN, VK_LEFT});
-        QTRY_VERIFY2(qAbs(rect().left() - work().left()) <= 12 && qAbs(rect().width() - work().width() / 2) <= 24,
-                     qPrintable(QString("Win+Left: %1,%2 %3x%4").arg(rect().x()).arg(rect().y()).arg(rect().width()).arg(rect().height())));
-        QVERIFY2(qAbs(rect().height() - work().height()) <= 24, "Win+Left: not the full height");
-        qInfo("Win+Left: %d,%d %dx%d of work area %dx%d", rect().x(), rect().y(), rect().width(), rect().height(), work().width(), work().height());
+        check("Win+Left takes the left half", [&] {
+            return qAbs(rect().left() - work().left()) <= 12 && qAbs(rect().width() - work().width() / 2) <= 24 && qAbs(rect().height() - work().height()) <= 24;
+        });
         keys({VK_ESCAPE}); // the snap assist Windows offers beside it
         app.desktopShot("frame-snapped-left");
         app.window->close();
+        QVERIFY2(failures.isEmpty(), qPrintable(failures.join(", ")));
     }
 #endif
 

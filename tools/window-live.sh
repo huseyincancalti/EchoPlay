@@ -11,8 +11,9 @@ cd "$(dirname "$0")/.." || exit 3
 clip=.out/e2e/two-tracks-60s.mp4
 [ -x .out/build-v2/tst_e2e.exe ] && [ -f "$clip" ] || { echo "run bash tools/check.sh v2 and bash tools/e2e.sh first"; exit 3; }
 mkdir -p .out/shots
+rm -f .out/e2e/window-live.txt
 ECHOPLAY_E2E_REAL_INPUT=1 ECHOPLAY_E2E_SHOTS="$(pwd)/.out/shots" ECHOPLAY_E2E_CLIP="$(pwd)/$clip" ECHOPLAY_E2E_DIR="$(pwd)/.out/e2e/run" \
-  .out/build-v2/tst_e2e.exe realWindowInput -o .out/e2e/window-live.txt,txt 2>/dev/null
+  timeout 80 .out/build-v2/tst_e2e.exe realWindowInput -o .out/e2e/window-live.txt,txt 2>/dev/null
 code=$?
 grep -E "^(PASS|FAIL!|SKIP|QINFO)|^ +(Actual|Expected|Loc)|^Totals" .out/e2e/window-live.txt
 [ $code -eq 0 ] && { echo "WINDOW-LIVE: passed"; exit 0; }

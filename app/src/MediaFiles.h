@@ -20,6 +20,7 @@ public:
     // A file: its path. A folder: its first video by natural sort (clip2 before clip10), "" when it has none. Not
     // a local file (a link): the URL as it is, mpv opens those too.
     Q_INVOKABLE static QString pathToOpen(const QUrl &url);
+    Q_INVOKABLE static QString localPath(const QUrl &url) { return url.toLocalFile(); }
     // File or folder name, for the drop overlay.
     Q_INVOKABLE static QString displayName(const QUrl &url);
 };

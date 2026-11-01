@@ -14,13 +14,14 @@
     "success": "#1F8A55", "warning": "#9A6200", "danger": "#C2362B"
   },
   "glass": {
-    "fill": "#111012", "scrim": "#9E0A090A", "bar": 0.78, "popover": 0.84, "strengthStep": 0.12, "border": "#1AFFFFFF", "hairline": "#14FFFFFF",
+    "fill": "#111012", "scrim": "#9E0A090A", "overlayScrim": "#4D000000", "bar": 0.78, "popover": 0.84, "strengthStep": 0.12, "border": "#1AFFFFFF", "hairline": "#14FFFFFF",
     "text": "#F4F2EF", "textMuted": "#BDB7B0",
     "control": "#1AFFFFFF", "controlSubtle": "#14FFFFFF", "track": "#33FFFFFF", "trackOff": "#38FFFFFF",
     "trackSoft": "#2EFFFFFF", "trackHover": "#57FFFFFF", "mark": "#73FFFFFF", "line": "#D9FFFFFF",
     "success": "#5CCB8A", "warning": "#F2B441", "danger": "#F06A5D"
   },
   "accent": "#FF7D26",
+  "swatches": ["#E5484D", "#E2588F", "#8E6CEF", "#3E7BFA", "#2FAE6B"],
   "onAccent": { "dark": "#1C0E04", "light": "#FFFFFF" },
   "radius": { "sm": 8, "md": 12, "lg": 18, "xl": 22, "pill": 999 },
   "blur": { "panel": 28, "overlay": 40 },

@@ -103,11 +103,22 @@ struct Launch
         return nullptr;
     }
     QQuickItem *item(const char *objectName) const { return search(window->contentItem(), objectName); }
+    // The one a user can reach: rows of other settings tabs exist too, hidden.
+    static QQuickItem *searchVisible(QQuickItem *from, const char *objectName)
+    {
+        if (!from->isVisible()) return nullptr;
+        if (from->objectName() == QLatin1String(objectName)) return from;
+        const QList<QQuickItem *> children = from->childItems();
+        for (QQuickItem *child : children)
+            if (QQuickItem *found = searchVisible(child, objectName)) return found;
+        return nullptr;
+    }
     // Clicks the middle of a named item, as a user does: the event goes to the window, not to the item.
     bool click(const char *objectName)
     {
-        QQuickItem *target = item(objectName);
-        if (!target || !target->isVisible()) return false;
+        QTest::qWait(60); // what the last click changed is laid out by the next frame
+        QQuickItem *target = searchVisible(window->contentItem(), objectName);
+        if (!target) return false;
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
                           target->mapToScene(QPointF(target->width() / 2, target->height() / 2)).toPoint());
         return true;
@@ -446,6 +457,129 @@ private slots:
         QDropEvent droppedAgain(QPointF(center), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
         QCoreApplication::sendEvent(app.window, &droppedAgain);
         QTRY_COMPARE(app.window->title(), QString("video-only.mp4"));
+    }
+
+    // The gear's popover and Settings, clicked through as a user does.
+    void popoversAndSettings()
+    {
+        const QString state = QDir(m_path).filePath("panels");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, m_clip, QDir(m_path).filePath("panels.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+        app.wake();
+        QTRY_VERIFY(app.item("gearButton") && app.item("gearButton")->isVisible());
+
+        QVERIFY(app.click("gearButton"));
+        QTRY_VERIFY(app.item("quickPopover"));
+        app.shot("quick");
+        QVERIFY(app.click("speedMore"));
+        QTRY_COMPARE(app.number("speed"), 1.1);
+        QVERIFY(app.click("speedLess"));
+        QTRY_COMPARE(app.number("speed"), 1.0);
+        QVERIFY(app.click("segment-low"));
+        QTRY_COMPARE(app.prop("scale"), QString("bilinear"));
+        QVERIFY(app.click("segment-auto"));
+        QTRY_COMPARE(app.services.quality.pref(), QString("auto"));
+        QVERIFY(app.click("segment-loop"));
+        QTRY_COMPARE(app.prop("loop-file"), QString("inf"));
+        QVERIFY(app.click("segment-stop"));
+        QTRY_COMPARE(app.prop("loop-file"), QString("no"));
+        QVERIFY(app.click("quickSubtitles")); // the clip has none: nothing opens
+        QTest::qWait(100);
+        QVERIFY(app.item("quickPopover"));
+        QVERIFY(!app.item("subtitlesPopover"));
+
+        QVERIFY(app.click("allSettings"));
+        QTRY_VERIFY(app.item("settingsOverlay"));
+        QVERIFY(!app.item("quickPopover"));
+        QTRY_VERIFY(!app.item("controlBar")->isVisible());
+        app.shot("settings-audio");
+        QVERIFY(app.click("loudnessSwitch"));
+        QTRY_COMPARE(app.mpv->observed("af").toList().size(), 0);
+        QVERIFY(app.click("loudnessSwitch"));
+        QTRY_COMPARE(app.mpv->observed("af").toList().size(), 1);
+
+        for (const char *tab : {"playback", "picture", "appearance", "language", "screenshots", "shortcuts", "about"}) {
+            QVERIFY2(app.click(QByteArray("settingsTab-") + tab), tab);
+            app.shot(QString("settings-") + tab);
+        }
+
+        // The arrow step from Playback reaches the keys; a dropdown's list; the language changes everything.
+        QVERIFY(app.click("settingsTab-playback"));
+        QVERIFY(app.click("segment-30"));
+        QTRY_COMPARE(app.services.player.seekStep(), 30);
+        QVERIFY(app.click("segment-10"));
+        QVERIFY(app.click("settingsTab-language"));
+        QVERIFY(app.click("languageList"));
+        QTRY_VERIFY(app.item("option-tr"));
+        app.shot("settings-list");
+        QVERIFY(app.click("option-tr"));
+        QTRY_COMPARE(app.services.i18n.language(), QString("tr"));
+        QTest::qWait(50);
+        app.shot("settings-tr");
+        QVERIFY(app.click("languageList"));
+        QTRY_VERIFY(app.item("option-en"));
+        app.key(Qt::Key_Escape); // the list closes first, settings stay
+        QTRY_VERIFY(!app.item("option-en"));
+        QVERIFY(app.item("settingsOverlay"));
+        QVERIFY(app.click("languageList"));
+        QTRY_VERIFY(app.item("option-en"));
+        QVERIFY(app.click("option-en"));
+        QTRY_COMPARE(app.services.i18n.language(), QString("en"));
+
+        // Search finds rows on any tab. Typing fires no shortcut (S would slow the video).
+        QVERIFY(app.click("settingsSearch"));
+        for (const char c : QByteArray("strength")) QTest::keyClick(app.window, c);
+        QTest::qWait(50);
+        app.shot("settings-search");
+        QCOMPARE(app.number("speed"), 1.0);
+        QTRY_COMPARE(app.item("settingsSearch")->property("text").toString(), QString("strength"));
+        app.key(Qt::Key_A, Qt::ControlModifier);
+        app.key(Qt::Key_Backspace);
+        QVERIFY(app.click("settingsTab-appearance")); // takes the focus off the field below
+
+        // Any color, then back to the theme's own.
+        QVERIFY(app.click("anyColor"));
+        QTRY_VERIFY(app.item("colorPicker"));
+        app.shot("settings-color");
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("colorPicker")->isVisible());
+        QVERIFY(app.click("swatch-#3E7BFA"));
+        QTRY_COMPARE(app.services.theme.accent(), QColor("#3E7BFA"));
+        QVERIFY(app.click("swatch-"));
+        QTRY_COMPARE(app.services.theme.accentChoice(), QString());
+
+        // A new key for an action; a key another action uses is refused; reset.
+        QVERIFY(app.click("settingsTab-shortcuts"));
+        QVERIFY(app.click("key-mute"));
+        QTest::qWait(50);
+        app.shot("settings-key");
+        app.key(Qt::Key_K);
+        QTRY_COMPARE(app.services.player.shortcuts().value("mute").toString(), QString("K"));
+        QVERIFY(app.click("key-mute"));
+        app.key(Qt::Key_Space); // the pause key: refused, and it pauses nothing
+        QTest::qWait(100);
+        QCOMPARE(app.services.player.shortcuts().value("mute").toString(), QString("K"));
+        QCOMPARE(app.prop("pause"), QString("no"));
+        app.key(Qt::Key_K); // works at once
+        QTRY_VERIFY(app.mpv->observed("mute").toBool() == false);
+        QVERIFY(app.click("resetShortcuts"));
+        QTRY_VERIFY(app.services.player.shortcuts().isEmpty());
+
+        // Light mode, and the panel in the smallest window.
+        app.services.theme.setMode("light");
+        QVERIFY(app.click("settingsTab-appearance"));
+        app.shot("settings-light");
+        app.services.theme.setMode("dark");
+        app.window->resize(app.window->minimumSize());
+        QTRY_COMPARE(app.window->width(), app.window->minimumWidth());
+        QVERIFY(app.click("settingsTab-audio"));
+        app.shot("settings-narrow");
+
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("settingsOverlay"));
     }
 
 #ifdef Q_OS_WIN

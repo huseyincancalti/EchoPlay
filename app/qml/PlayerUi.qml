@@ -36,18 +36,38 @@ Item {
     // "" or the open popover: "mixer", "quick", "subtitles".
     property string popover: forceChrome ? "mixer" : ""
     property bool playlistOpen: false
+    property bool settingsOpen: false
     property bool hintShown: false
+    readonly property string subtitleName: {
+        const selected = subtitleTracks.find(t => t.id === subtitleTrack)
+        return selected ? trackLabel(selected) : I18n.strings.off
+    }
 
     function togglePopover(name) {
         popover = popover === name ? "" : name
     }
     function toggleFullScreen() { chrome.toggleFullScreen() }
+    function trackLabel(track) { return track.title || track.lang || I18n.strings.track_n.arg(track.id) }
+    function openSettings() {
+        popover = ""
+        settingsOpen = true
+    }
+    function installUpdate() {
+        if (UpdateCheck.setupUrl) Updater.install(UpdateCheck.setupUrl, UpdateCheck.setupSha256, UpdateCheck.latestVersion)
+        else Qt.openUrlExternally(UpdateCheck.releasesUrl) // the release has no setup EchoPlay can use
+    }
+    function downloadText() {
+        if (Updater.state === "installing") return I18n.strings.update_restart
+        const mb = bytes => Math.round(bytes / 1048576)
+        return I18n.strings.download_progress.arg(mb(Updater.received)).arg(mb(Updater.total))
+    }
     function seekTo(seconds, exact) {
         position = seconds
         mpv.command(["seek", seconds, exact ? "absolute+exact" : "absolute+keyframes"])
     }
     // The top thing closes first. False: nothing was open.
     function closeTop() {
+        if (settings.item) return settings.item.closeTop()
         if (popover !== "") { popover = ""; return true }
         if (playlistOpen) { playlistOpen = false; return true }
         return false
@@ -88,7 +108,7 @@ Item {
     // control; then only a 2 px progress line remains, and a blank cursor.
     property bool pointerMoving: true
     readonly property bool overControls: controlBar.hovered || (titleBar.visible && titleBar.hovered)
-    readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || overControls
+    readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || settingsOpen || overControls
 
     function wake() {
         pointerMoving = true
@@ -148,6 +168,7 @@ Item {
     TitleBar {
         id: titleBar
         objectName: "titleBar"
+        z: 2 // above settings' dimming
         visible: opacity > 0 && !ui.fullScreen
         opacity: ui.chromeUp ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.tokens.motion.base } }
@@ -188,7 +209,7 @@ Item {
         ui: ui
         readonly property real inset: flush ? 0 : ui.fullScreen ? 24 : Theme.tokens.bar.inset
         visible: opacity > 0
-        opacity: ui.chromeUp ? 1 : 0
+        opacity: ui.chromeUp && !ui.settingsOpen ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.tokens.motion.base } }
         x: flush ? -1 : inset
         y: parent.height - height - inset + (flush ? 1 : 0)
@@ -215,6 +236,33 @@ Item {
             pointerX: controlBar.chipCenter - x - parent.x
             height: implicitHeight
         }
+    }
+    PopoverLoader {
+        name: "quick"
+        anchorX: controlBar.gearCenter
+        sourceComponent: QuickSettings {
+            ui: player
+            pointerX: controlBar.gearCenter - x - parent.x
+            height: implicitHeight
+        }
+    }
+    PopoverLoader {
+        name: "subtitles"
+        anchorX: controlBar.subtitlesCenter
+        sourceComponent: SubtitlesPopover {
+            ui: player
+            pointerX: controlBar.subtitlesCenter - x - parent.x
+            height: implicitHeight
+        }
+    }
+
+    Loader {
+        id: settings
+        z: 1
+        anchors.fill: parent
+        active: ui.settingsOpen
+        // By name, not by type: its parts import QtQuick.Shapes, and most launches never open settings.
+        onActiveChanged: if (active) setSource("SettingsOverlay.qml", {ui: ui})
     }
 
     VolumeFlash {

@@ -1,5 +1,6 @@
 #include "Theme.h"
 
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -72,9 +73,19 @@ const QStringList FontFilters = {"*.ttf", "*.otf"};
 } // namespace
 
 Theme::Theme(AppState *state, const QString &defaultsPath, const QString &userPath, const QString &fontsDir, QObject *parent)
-    : QObject(parent), m_state(state), m_userDir(QFileInfo(userPath).absolutePath()), m_fontsDir(fontsDir)
+    : QObject(parent), m_state(state), m_defaultsPath(defaultsPath), m_userPath(userPath),
+      m_userDir(QFileInfo(userPath).absolutePath()), m_fontsDir(fontsDir)
 {
     m_tokens = merged(readObject(defaultsPath, true), readObject(userPath, false)).toVariantMap();
+}
+
+void Theme::openThemeFile()
+{
+    if (!QFile::exists(m_userPath)) {
+        QFile::copy(m_defaultsPath, m_userPath);
+        QFile::setPermissions(m_userPath, QFile::permissions(m_userPath) | QFile::WriteOwner); // a resource's copy is read-only
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_userPath));
 }
 
 QString Theme::mode() const { return m_state->themeMode(); }

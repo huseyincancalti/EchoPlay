@@ -66,6 +66,8 @@ public:
     QVariantMap shortcuts() const;
     Q_INVOKABLE void setShortcut(const QString &action, const QString &key);
     Q_INVOKABLE void resetShortcuts();
+    // A pressed key as Shortcut's sequence reads it, "" for a modifier alone. A symbol's Shift is part of the symbol.
+    Q_INVOKABLE static QString keyName(int key, int modifiers);
 
     // The mpv properties for these settings while `videoPath` plays: loop-file, keep-open, screenshot-dir,
     // volume-max, af, audio-device.

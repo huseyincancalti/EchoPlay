@@ -6,18 +6,26 @@ import EchoPlay
 Item {
     id: dialogs
 
-    signal chosen(url url)
+    property var done: null // what to do with the chosen url
 
-    function pickFile() { file.open() }
-    function pickFolder() { folder.open() }
+    function pickVideo(callback) { pick(callback, [I18n.strings.videos + " (" + MediaFiles.videoGlobs + ")", I18n.strings.all_files + " (*)"]) }
+    function pickFont(callback) { pick(callback, [I18n.strings.fonts + " (*.ttf *.otf)"]) }
+    function pick(callback, filters) {
+        done = callback
+        file.nameFilters = filters
+        file.open()
+    }
+    function pickFolder(callback) {
+        done = callback
+        folder.open()
+    }
 
     FileDialog {
         id: file
-        nameFilters: [I18n.strings.videos + " (" + MediaFiles.videoGlobs + ")", I18n.strings.all_files + " (*)"]
-        onAccepted: dialogs.chosen(selectedFile)
+        onAccepted: dialogs.done(selectedFile)
     }
     FolderDialog {
         id: folder
-        onAccepted: dialogs.chosen(selectedFolder)
+        onAccepted: dialogs.done(selectedFolder)
     }
 }

@@ -76,8 +76,12 @@ Window {
         const path = MediaFiles.pathToOpen(url)
         if (path) root.openPath(path)
     }
-    function pickFile() { dialogs.active = true; dialogs.item.pickFile() }
-    function pickFolder() { dialogs.active = true; dialogs.item.pickFolder() }
+    function chooser() {
+        dialogs.active = true
+        return dialogs.item
+    }
+    function pickFile() { chooser().pickVideo(url => root.openUrl(url)) }
+    function pickFolder() { chooser().pickFolder(url => root.openUrl(url)) }
     function firstRestart() {
         if (root.restarted) return
         root.restarted = true
@@ -418,10 +422,6 @@ Window {
         id: dialogs
         active: false
         source: "OpenDialogs.qml"
-    }
-    Connections {
-        target: dialogs.item
-        function onChosen(url) { root.openUrl(url) }
     }
     DropArea {
         id: drop

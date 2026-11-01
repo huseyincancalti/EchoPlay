@@ -1,6 +1,7 @@
 #include "PlayerSettings.h"
 
 #include <QFileInfo>
+#include <QKeySequence>
 #include <QStandardPaths>
 #include <QStringList>
 #include "AppState.h"
@@ -137,6 +138,25 @@ void PlayerSettings::setShortcut(const QString &action, const QString &key)
     map.insert(action, key);
     m_state->setShortcuts(map);
     emit changed();
+}
+
+QString PlayerSettings::keyName(int key, int modifiers)
+{
+    switch (key) {
+    case Qt::Key_Shift:
+    case Qt::Key_Control:
+    case Qt::Key_Alt:
+    case Qt::Key_AltGr:
+    case Qt::Key_Meta:
+    case Qt::Key_unknown:
+        return {};
+    default:
+        break;
+    }
+    Qt::KeyboardModifiers mods(modifiers & ~Qt::KeypadModifier);
+    const bool letter = key >= Qt::Key_A && key <= Qt::Key_Z;
+    if (key >= Qt::Key_Space && key <= Qt::Key_AsciiTilde && !letter) mods &= ~Qt::ShiftModifier;
+    return QKeySequence(QKeyCombination(mods, Qt::Key(key))).toString(QKeySequence::PortableText);
 }
 
 void PlayerSettings::resetShortcuts()

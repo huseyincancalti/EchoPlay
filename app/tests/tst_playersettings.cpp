@@ -142,6 +142,17 @@ private slots:
         QCOMPARE(changed.count(), 1);
     }
 
+    void keyNames()
+    {
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_K, Qt::NoModifier), QString("K"));
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_S, Qt::ShiftModifier), QString("Shift+S"));
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_1, Qt::ControlModifier), QString("Ctrl+1"));
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_Greater, Qt::ShiftModifier), QString(">")); // as v1's default reads
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_Space, Qt::NoModifier), QString("Space"));
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_Up, Qt::KeypadModifier), QString("Up"));
+        QCOMPARE(PlayerSettings::keyName(Qt::Key_Control, Qt::ControlModifier), QString()); // the key comes next
+    }
+
     void savedAndLoaded()
     {
         m_settings->setEndMode("loop");

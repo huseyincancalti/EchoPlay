@@ -74,6 +74,8 @@ public:
     // Settings > Appearance > Load font: copies the file to fontsDir and returns its family, empty when it
     // is not a font.
     Q_INVOKABLE QString loadFontFile(const QUrl &file);
+    // Settings > Appearance: the user's theme file in their editor, created from the defaults when it is missing.
+    Q_INVOKABLE void openThemeFile();
 
     static Theme *create(QQmlEngine *, QJSEngine *)
     {
@@ -98,6 +100,8 @@ private:
     static inline Theme *s_instance = nullptr;
     AppState *m_state;
     QVariantMap m_tokens;
+    QString m_defaultsPath;
+    QString m_userPath;
     QString m_userDir;  // the folder of the user's theme.json: a font.file token is relative to it
     QString m_fontsDir;
     QStringList m_userFonts;

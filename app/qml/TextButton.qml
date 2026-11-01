@@ -8,6 +8,8 @@ Item {
     property string text
     property string icon
     property bool iconFilled: false
+    property bool iconAfter: false // after the text, as for "Open theme file"
+    property color borderColor: "transparent"
     property string style: "control"   // "primary", "control", "plain"
     property color textColor: Theme.tokens.glass.text
     property color controlColor: Theme.tokens.glass.control
@@ -31,6 +33,8 @@ Item {
         anchors.fill: parent
         radius: button.radius
         color: button.style === "primary" ? Theme.accent : button.style === "control" ? button.controlColor : "transparent"
+        border.width: 1
+        border.color: button.borderColor
     }
     Rectangle { // hover and press on any style
         anchors.fill: parent
@@ -44,6 +48,7 @@ Item {
         id: row
         anchors.centerIn: parent
         spacing: 6
+        layoutDirection: button.iconAfter ? Qt.RightToLeft : Qt.LeftToRight
         Icon {
             visible: button.icon !== ""
             anchors.verticalCenter: parent.verticalCenter

@@ -2,7 +2,8 @@ import QtQuick
 import EchoPlay
 import "Format.js" as Format
 
-// "Resume from 1:24?" while the clip already plays from the start. Unanswered, it goes after 15 s.
+// "Resume from 1:24?" while the clip already plays from the start. Unanswered, it goes after 10 s, or as soon as the
+// person does something else (Main.qml, PlayerUi.qml); the saved spot stays either way.
 Popover {
     id: card
 
@@ -19,7 +20,7 @@ Popover {
 
     Timer {
         running: true
-        interval: 15000
+        interval: 10000
         onTriggered: card.ui.window.resumeOffer = null
     }
     Column {
@@ -72,7 +73,10 @@ Popover {
                 objectName: "startOverButton"
                 icon: "replay"
                 text: card.strings.start_over
-                onClicked: card.ui.window.resumeOffer = null
+                onClicked: {
+                    card.ui.window.keepOldSpot = false
+                    card.ui.window.resumeOffer = null
+                }
             }
         }
     }

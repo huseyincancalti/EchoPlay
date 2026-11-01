@@ -25,8 +25,9 @@ public:
     ~ResumeStore() override;                                               // writes pending changes
 
     // Playback reached `pos` of `duration` seconds in `path`. Near the start (nothing to resume) or near
-    // the end (finished) drops the entry instead; an unknown duration is ignored.
-    Q_INVOKABLE void update(const QString &path, double pos, double duration);
+    // the end (finished) drops the entry instead; an unknown duration is ignored. With `keepOldSpot`, near
+    // the start leaves the entry alone: passing by "Resume from 1:24?" is no reason to lose 1:24.
+    Q_INVOKABLE void update(const QString &path, double pos, double duration, bool keepOldSpot = false);
     // The saved position in seconds, or -1 when there is none.
     Q_INVOKABLE double position(const QString &path) const;
     // When that position was saved, invalid when there is none: "You stopped here on Oct 30."

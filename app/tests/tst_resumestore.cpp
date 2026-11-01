@@ -52,6 +52,18 @@ private slots:
         QCOMPARE(s.position("a.mp4"), -1.0);
     }
 
+    void passingByTheQuestionKeepsTheOldSpot()
+    {
+        ResumeStore s(m_path);
+        s.update("a.mp4", 100, 276);
+        s.update("a.mp4", 12, 276, true); // too early to be worth saving
+        QCOMPARE(s.position("a.mp4"), 100.0);
+        s.update("a.mp4", 20, 276, true); // this one is
+        QCOMPARE(s.position("a.mp4"), 20.0);
+        s.update("a.mp4", 260, 276, true); // finished still forgets
+        QCOMPARE(s.position("a.mp4"), -1.0);
+    }
+
     void unknownDurationIsIgnored()
     {
         ResumeStore s(m_path);

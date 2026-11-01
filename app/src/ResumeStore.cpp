@@ -33,9 +33,10 @@ ResumeStore::~ResumeStore()
     if (m_dirty) save();
 }
 
-void ResumeStore::update(const QString &path, double pos, double duration)
+void ResumeStore::update(const QString &path, double pos, double duration, bool keepOldSpot)
 {
     if (duration <= 0) return;
+    if (keepOldSpot && pos < MinResumePos) return;
     if (pos < MinResumePos || pos > duration - FinishedMargin) {
         if (m_entries.remove(key(path))) m_dirty = true;
         return;

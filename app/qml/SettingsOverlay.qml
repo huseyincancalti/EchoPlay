@@ -251,6 +251,7 @@ Item {
             }
             Flickable {
                 id: rows
+                objectName: "settingsRows"
                 y: closeButton.height + 10
                 width: parent.width
                 height: parent.height - y

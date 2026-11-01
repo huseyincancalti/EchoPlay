@@ -46,6 +46,7 @@ Window {
     property var fileError: null      // {path, why}: the error screen shows
     property bool resumePending: false
     property var resumeOffer: null    // {at, savedAt}: "Resume from 1:24?" is open
+    property bool keepOldSpot: false  // it was asked and Start over was not chosen: only a new spot worth saving replaces the old
     property bool updateDismissed: false // Later, or 15 s: for this run
     // Bench and screenshot runs keep the spike's fixed setup. Everything that makes the dev build a usable
     // player (v1's mixer, mpv options, volume memory) stays out of them, so the numbers stay comparable.
@@ -117,7 +118,10 @@ Window {
         const at = ResumeStore.position(path)
         if (at <= 0 || PlayerSettings.resumeMode === "never") return
         if (PlayerSettings.resumeMode === "always") mpv.command(["seek", at, "absolute+exact"])
-        else root.resumeOffer = {at: at, savedAt: ResumeStore.savedAt(path)}
+        else {
+            root.keepOldSpot = true
+            root.resumeOffer = {at: at, savedAt: ResumeStore.savedAt(path)}
+        }
     }
     function firstRestart() {
         if (root.restarted) return
@@ -259,6 +263,7 @@ Window {
                 if (value) {
                     root.resumePending = true
                     root.resumeOffer = null
+                    root.keepOldSpot = false
                 }
                 Thumbnailer.file = value || ""
                 SilenceCheck.file = value || ""
@@ -297,7 +302,7 @@ Window {
     function rememberPosition() {
         if (root.measuring || !root.restarted || root.resumeOffer) return
         const path = mpv.observed("path") || ""
-        if (path === root.positionFile) ResumeStore.update(path, mpv.observed("time-pos") || 0, mpv.observed("duration") || 0)
+        if (path === root.positionFile) ResumeStore.update(path, mpv.observed("time-pos") || 0, mpv.observed("duration") || 0, root.keepOldSpot)
     }
     Timer {
         running: !root.measuring && root.restarted
@@ -351,6 +356,7 @@ Window {
         mpv.command(["add", "volume", step])
     }
     function seekBy(seconds) {
+        root.resumeOffer = null // a seek of their own: the question is over
         if (ui.item) ui.item.sweepArrows(seconds > 0)
         mpv.command(["seek", seconds])
     }
@@ -514,6 +520,16 @@ Window {
         anchors.margins: chrome.inset
         active: drop.containsDrag
         onActiveChanged: if (active) setSource("DropOverlay.qml", {name: Qt.binding(() => drop.dragged), overVideo: root.restarted})
+    }
+    // A click anywhere but on the resume card ends the question; the click itself still reaches what is under it.
+    MouseArea {
+        anchors.fill: parent
+        enabled: !!root.resumeOffer
+        onPressed: mouse => {
+            mouse.accepted = false
+            const card = ui.item ? ui.item.resumeCard : null
+            if (!card || !card.contains(mapToItem(card, mouse.x, mouse.y))) root.resumeOffer = null
+        }
     }
 
     Timer {

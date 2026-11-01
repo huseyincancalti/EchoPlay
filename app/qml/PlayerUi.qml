@@ -17,6 +17,7 @@ Item {
     readonly property var player: ui // for loaded parts: inside them, "ui" is their own property
     readonly property alias backdrop: glassBackdrop
     readonly property alias bar: controlBar
+    readonly property alias resumeCard: resumeLoader.item
 
     // mpv's state, as observed.
     property bool paused: false
@@ -37,6 +38,10 @@ Item {
     property string popover: forceChrome ? "mixer" : ""
     property bool playlistOpen: false
     property bool settingsOpen: false
+    // Opening anything, by mouse or by key, is doing something else: the resume question is over.
+    onPopoverChanged: if (popover !== "") window.resumeOffer = null
+    onPlaylistOpenChanged: if (playlistOpen) window.resumeOffer = null
+    onSettingsOpenChanged: if (settingsOpen) window.resumeOffer = null
     // Once ever, and never in a bench run. Opening the mixer counts as seeing it.
     readonly property bool hintShown: !forceChrome && !PlayerSettings.firstRunHintDone && tracks.length >= 2
     readonly property bool noSound: tracks.length > 0 && !tracks.some(t => t.enabled)
@@ -292,6 +297,7 @@ Item {
         }
     }
     Loader {
+        id: resumeLoader
         x: Theme.tokens.bar.inset
         y: item ? controlBar.y - item.height - 12 : 0
         active: !!ui.window.resumeOffer && !ui.settingsOpen

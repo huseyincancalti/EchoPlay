@@ -10,6 +10,7 @@ Item {
     required property string tab
     required property string title
     property string description
+    property color descriptionColor: colors.textMuted
     default property alias control: holder.data
 
     readonly property bool narrow: width < 480
@@ -39,13 +40,14 @@ Item {
             font.weight: Font.Bold
         }
         Label {
+            objectName: "settingDescription"
             visible: row.description !== ""
             width: parent.width
             wrapMode: Text.WordWrap
             lineHeight: 18
             lineHeightMode: Text.FixedHeight
             text: row.description
-            color: row.colors.textMuted
+            color: row.descriptionColor
             font.pixelSize: Theme.tokens.type.small
         }
     }

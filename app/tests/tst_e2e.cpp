@@ -556,7 +556,9 @@ private slots:
         QVERIFY(app.click("swatch-"));
         QTRY_COMPARE(app.services.theme.accentChoice(), QString());
 
-        // A new key for an action; a key another action uses is refused; reset.
+        // A new key for an action; a key another action uses is refused and the row being edited says why, until the
+        // next step; reset.
+        const auto keyMessage = [&](const char *row) { return Launch::search(app.item(row), "settingDescription"); };
         QVERIFY(app.click("settingsTab-shortcuts"));
         QVERIFY(app.click("key-mute"));
         QTest::qWait(50);
@@ -568,10 +570,35 @@ private slots:
         QTest::qWait(100);
         QCOMPARE(app.services.player.shortcuts().value("mute").toString(), QString("K"));
         QCOMPARE(app.prop("pause"), QString("no"));
+        QVERIFY2(keyMessage("keyRow-mute")->property("text").toString().contains("Play or pause"), "the row does not say why");
+        QCOMPARE(keyMessage("keyRow-mute")->property("color").value<QColor>(), QColor(app.services.theme.colors().value("danger").toString()));
+        QVERIFY(keyMessage("keyRow-pause")->property("text").toString().isEmpty());
         app.key(Qt::Key_K); // works at once
         QTRY_VERIFY(app.mpv->observed("mute").toBool() == false);
+        QVERIFY(app.click("key-mute")); // the next step: the message goes
+        QTRY_VERIFY(keyMessage("keyRow-mute")->property("text").toString().isEmpty());
+        app.key(Qt::Key_Escape);
+
+        // Far down the list, with its first row out of sight, the message is on screen with the row.
+        QQuickItem *rows = app.item("settingsRows");
+        rows->setProperty("contentY", rows->property("contentHeight").toReal() - rows->height());
+        QVERIFY(app.click("key-fullscreen"));
+        app.key(Qt::Key_Space);
+        QTRY_VERIFY(keyMessage("keyRow-fullscreen")->property("text").toString().contains("Play or pause"));
+        QVERIFY(keyMessage("keyRow-fullscreen")->isVisible());
+        const qreal messageTop = keyMessage("keyRow-fullscreen")->mapToItem(rows, QPointF(0, 0)).y();
+        QVERIFY(messageTop >= 0 && messageTop + keyMessage("keyRow-fullscreen")->height() <= rows->height());
+        app.shot("settings-key-refused");
+        QVERIFY(app.click("settingsTab-appearance")); // another tab: it goes too
+        QTRY_VERIFY(keyMessage("keyRow-fullscreen")->property("text").toString().isEmpty());
+        QVERIFY(app.click("settingsTab-shortcuts"));
+
+        QVERIFY(app.click("key-mute"));
+        app.key(Qt::Key_Space);
+        QTRY_VERIFY(!keyMessage("keyRow-mute")->property("text").toString().isEmpty());
         QVERIFY(app.click("resetShortcuts"));
         QTRY_VERIFY(app.services.player.shortcuts().isEmpty());
+        QVERIFY(keyMessage("keyRow-mute")->property("text").toString().isEmpty());
 
         // Light mode, and the panel in the smallest window.
         app.services.theme.setMode("light");
@@ -678,6 +705,129 @@ private slots:
             QVERIFY(QMetaObject::invokeMethod(app.window, "playNextClip"));
             QTRY_VERIFY(!app.item("errorScreen"));
             QTRY_COMPARE(app.window->title(), QString("b-good.mp4"));
+        }
+    }
+
+    // "Resume from 0:25?": it goes after 10 s or as soon as the person does something else, and the saved spot stays
+    // until there is a new one worth saving or they choose Start over.
+    void resumeQuestion()
+    {
+        const QString state = QDir(m_path).filePath("resume");
+        QVERIFY(QDir().mkpath(state));
+        double spot = 0;
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("resume1.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            app.mpv->command({"seek", 25, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") >= 25);
+            app.window->close();
+            spot = app.services.resume.position(m_clip);
+            QVERIFY(spot >= 25);
+        }
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("resume2.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QTRY_VERIFY(app.item("resumeCard"));
+            QElapsedTimer shown;
+            shown.start();
+
+            // None of these ends it: the pause and volume keys, the pointer moving, a click on the card itself.
+            app.key(Qt::Key_Space);
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
+            const double volume = app.number("volume");
+            app.key(Qt::Key_Down);
+            QTRY_COMPARE(app.number("volume"), volume - 5);
+            app.wake();
+            QQuickItem *card = app.item("resumeCard");
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, card->mapToScene(QPointF(card->width() - 8, 8)).toPoint());
+            QTest::qWait(100);
+            QVERIFY(app.item("resumeCard"));
+
+            // Left alone it goes after 10 s; closing the clip this early, under 15 s, keeps the spot.
+            QTRY_VERIFY_WITH_TIMEOUT(!app.item("resumeCard"), 12000);
+            QVERIFY2(shown.elapsed() > 8000, "the card went too soon");
+            QVERIFY(app.number("time-pos") < 15);
+            app.window->close();
+            QCOMPARE(app.services.resume.position(m_clip), spot);
+        }
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("resume3.log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            QCOMPARE(app.services.resume.position(m_clip), spot); // it came through the restart
+            QTRY_VERIFY(app.item("resumeCard"));
+            app.key(Qt::Key_Space); // paused: the clip stays where the checks put it, the bar stays up
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
+            // The question again, as this clip's first restart raised it.
+            const auto ask = [&] {
+                app.window->setProperty("resumePending", true);
+                QMetaObject::invokeMethod(app.window, "applyResume");
+                return QTest::qWaitFor([&] { return app.item("resumeCard") != nullptr; }, 3000);
+            };
+
+            // Clicks outside the card end it, and still do what they do.
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            QVERIFY(ask());
+            QVERIFY(app.click("seekBar"));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            QTRY_VERIFY(app.number("time-pos") > 25 && app.number("time-pos") < 35); // the middle of 60 s
+            QVERIFY(ask());
+            QVERIFY(app.click("playButton"));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            QTRY_COMPARE(app.prop("pause"), QString("no"));
+            app.key(Qt::Key_Space);
+            QTRY_COMPARE(app.prop("pause"), QString("yes"));
+
+            // A seek by arrow key.
+            QVERIFY(ask());
+            app.key(Qt::Key_Left);
+            QTRY_VERIFY(!app.item("resumeCard"));
+
+            // A popover, the playlist and settings, opened without a click. It does not come back when they close.
+            QVERIFY(ask());
+            app.item("mixerChip")->forceActiveFocus();
+            app.key(Qt::Key_Return);
+            QTRY_VERIFY(app.item("mixerPopover"));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("mixerPopover"));
+            QVERIFY(ask());
+            app.item("playlistButton")->forceActiveFocus();
+            app.key(Qt::Key_Return);
+            QTRY_VERIFY(app.item("playlistPanel"));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("playlistPanel"));
+            QVERIFY(ask());
+            QVERIFY(QMetaObject::invokeMethod(app.item("controlBar")->parentItem(), "openSettings"));
+            QTRY_VERIFY(app.item("settingsOverlay"));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("settingsOverlay"));
+            QTest::qWait(100);
+            QVERIFY(!app.item("resumeCard"));
+
+            // Passed by, the spot stays under 15 s and a new one from 15 s on replaces it.
+            app.mpv->command({"seek", 5, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") < 6);
+            QVERIFY(QMetaObject::invokeMethod(app.window, "rememberPosition"));
+            QVERIFY(app.services.resume.position(m_clip) >= 15);
+            app.mpv->command({"seek", 20, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") >= 20 && app.number("time-pos") < 25);
+            QVERIFY(QMetaObject::invokeMethod(app.window, "rememberPosition"));
+            QVERIFY(app.services.resume.position(m_clip) >= 20 && app.services.resume.position(m_clip) < 25);
+
+            // Start over: under 15 s the spot goes.
+            QVERIFY(ask());
+            QVERIFY(app.click("startOverButton"));
+            QTRY_VERIFY(!app.item("resumeCard"));
+            app.mpv->command({"seek", 5, "absolute"});
+            QTRY_VERIFY(app.number("time-pos") < 6);
+            app.window->close();
+            QCOMPARE(app.services.resume.position(m_clip), -1.0);
         }
     }
 

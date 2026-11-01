@@ -12,7 +12,8 @@ Column {
     readonly property var glassLevels: [strings.level_low, strings.level_medium, strings.level_high]
     readonly property var loudnessLevels: ["low", "medium", "high"]
     property string capturing: "" // the action whose new key is awaited
-    property string keyMessage
+    property string keyMessage    // why the key was refused, on keyMessageRow's row until the next step
+    property string keyMessageRow: ""
     property bool fontFailed: false
     property var audioDevices: []
     property string engine
@@ -33,6 +34,11 @@ Column {
             if (name === "audio-device-list") content.audioDevices = value || []
             else if (name === "mpv-version") content.engine = value || ""
         }
+    }
+    Connections {
+        target: content.overlay
+        function onTabChanged() { content.keyMessageRow = "" }
+        function onSearchChanged() { content.keyMessageRow = "" }
     }
 
     component Row_: SettingRow { settings: content.overlay }
@@ -410,12 +416,12 @@ Column {
     Row_ {
         tab: "shortcuts"
         title: content.strings.shortcuts_title
-        description: content.keyMessage || content.strings.shortcuts_desc
+        description: content.strings.shortcuts_desc
         Button_ {
             objectName: "resetShortcuts"
             icon: "refresh"
             text: content.strings.reset_shortcuts
-            onClicked: { content.keyMessage = ""; PlayerSettings.resetShortcuts() }
+            onClicked: { content.keyMessageRow = ""; PlayerSettings.resetShortcuts() }
         }
     }
     Repeater {
@@ -423,8 +429,11 @@ Column {
         Row_ {
             id: shortcutRow
             required property var modelData
+            objectName: "keyRow-" + modelData.id
             tab: "shortcuts"
             title: content.strings["action_" + modelData.id]
+            description: content.keyMessageRow === modelData.id ? content.keyMessage : ""
+            descriptionColor: content.colors.danger
             TextButton {
                 id: keyChip
                 objectName: "key-" + shortcutRow.modelData.id
@@ -435,7 +444,7 @@ Column {
                 controlColor: content.colors.control
                 borderColor: waiting ? Theme.accent : content.colors.border
                 onClicked: {
-                    content.keyMessage = ""
+                    content.keyMessageRow = ""
                     content.capturing = shortcutRow.modelData.id
                     forceActiveFocus()
                 }
@@ -454,8 +463,10 @@ Column {
                     const key = PlayerSettings.keyName(event.key, event.modifiers)
                     if (!key) return // a modifier alone: the key comes next
                     const owner = content.ui.window.actions.find(a => a.id !== shortcutRow.modelData.id && content.shortcutKey(a) === key)
-                    if (owner) content.keyMessage = content.strings.key_taken.arg(content.strings["action_" + owner.id])
-                    else PlayerSettings.setShortcut(shortcutRow.modelData.id, key)
+                    if (owner) {
+                        content.keyMessage = content.strings.key_taken.arg(content.strings["action_" + owner.id])
+                        content.keyMessageRow = shortcutRow.modelData.id
+                    } else PlayerSettings.setShortcut(shortcutRow.modelData.id, key)
                     content.capturing = ""
                 }
                 onActiveFocusChanged: if (!activeFocus && waiting) content.capturing = ""

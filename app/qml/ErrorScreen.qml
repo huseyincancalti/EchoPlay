@@ -10,11 +10,13 @@ Rectangle {
     required property var window  // Main.qml
     required property string path
     required property string why  // mpv's error text
-    required property string report
     readonly property var colors: Theme.colors
     readonly property var strings: I18n.strings
     readonly property string kind: ErrorReport.kind(why)
-    property bool copied: false
+    property string report // once Copy details was clicked; it replaces mpv's short words on the card
+    readonly property bool copied: report !== ""
+
+    function details() { report = window.errorReportText() }
 
     objectName: "errorScreen"
     color: colors.bg
@@ -144,8 +146,8 @@ Rectangle {
                             textColor: screen.colors.text
                             controlColor: Qt.alpha(screen.colors.success, 0.14)
                             onClicked: {
+                                screen.details()
                                 ErrorReport.copy(screen.report)
-                                screen.copied = true
                             }
                         }
                         TextButton {
@@ -156,7 +158,7 @@ Rectangle {
                             text: screen.strings.report_problem
                             fontWeight: Font.DemiBold
                             textColor: screen.colors.text
-                            onClicked: Qt.openUrlExternally(ErrorReport.issueUrl(screen.report))
+                            onClicked: Qt.openUrlExternally(ErrorReport.issueUrl(screen.window.errorReportText()))
                         }
                     }
                     Label {

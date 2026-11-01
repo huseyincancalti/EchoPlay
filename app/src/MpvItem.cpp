@@ -228,11 +228,11 @@ void MpvItem::drainEvents()
     while (true) {
         mpv_event *e = mpv_wait_event(m_mpv, 0);
         if (e->event_id == MPV_EVENT_NONE) break;
-        if (e->event_id == MPV_EVENT_PLAYBACK_RESTART) emit playbackRestarted();
-        if (e->event_id == MPV_EVENT_START_FILE) {
-            m_recentLog.clear(); // the report is about this file
-            emit fileStarted();
+        if (e->event_id == MPV_EVENT_PLAYBACK_RESTART) {
+            m_recentLog.clear(); // it plays: what came before says nothing about a later failure. Not at START_FILE, which
+            emit playbackRestarted(); // a client reads after the log messages that follow it
         }
+        if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
         if (e->event_id == MPV_EVENT_LOG_MESSAGE) {
             const auto *message = static_cast<mpv_event_log_message *>(e->data);
             m_recentLog << QString("[%1] %2").arg(message->prefix, QString::fromUtf8(message->text).trimmed());

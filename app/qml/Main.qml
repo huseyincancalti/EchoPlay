@@ -43,7 +43,7 @@ Window {
     property string mediaTitle: ""
     property string positionFile: ""  // the file whose time-pos can be trusted: it restarted
     property var playlist: []         // mpv's: the opened file's folder
-    property var fileError: null      // {path, why, report}: the error screen shows
+    property var fileError: null      // {path, why}: the error screen shows
     property bool resumePending: false
     property var resumeOffer: null    // {at, savedAt}: "Resume from 1:24?" is open
     property bool updateDismissed: false // Later, or 15 s: for this run
@@ -101,8 +101,12 @@ Window {
         mpv.command(["stop", "keep-playlist"])
         const entry = root.playlist.find(e => e.id === entryId)
         const path = entry ? entry.filename : root.file
-        root.fileError = {path: path, why: why,
-                          report: ErrorReport.report(path, why, mpv.recentLog(), UpdateCheck.currentVersion, mpv.observed("mpv-version") || "mpv")}
+        root.fileError = {path: path, why: why}
+    }
+    // Asked for when it is needed: mpv writes its last line about a failure just after it reports the failure.
+    function errorReportText() {
+        return ErrorReport.report(root.fileError.path, root.fileError.why, mpv.recentLog(), UpdateCheck.currentVersion,
+                                  mpv.observed("mpv-version") || "mpv")
     }
     // Once per file, on its first restart: where it was left, by the resume setting.
     function applyResume() {
@@ -319,9 +323,6 @@ Window {
     }
 
     WindowChrome { id: chrome }
-    // For PlayerUi below: inside it, the names mpv and chrome are its own properties.
-    readonly property MpvItem player: mpv
-    readonly property WindowChrome windowChrome: chrome
 
     // v1's default keys (main.lua KEY_ACTIONS) and the mpv defaults v1 users rely on. Settings > Shortcuts rebinds
     // them by id (PlayerSettings.shortcuts holds only what the user changed).
@@ -449,13 +450,9 @@ Window {
         anchors.margins: chrome.inset
         active: root.restarted && (!root.measuring || root.glass)
         asynchronous: true // the video is playing by now: never stall it
-        sourceComponent: PlayerUi {
-            mpv: root.player
-            window: root
-            chrome: root.windowChrome
-            mediaTitle: root.mediaTitle
-            forceChrome: root.measuring
-        }
+        // By name, not by type: a type named here would load with Main.qml, before the first frame.
+        onActiveChanged: if (active) setSource("PlayerUi.qml", {mpv: mpv, window: root, chrome: chrome, forceChrome: root.measuring,
+                                                                mediaTitle: Qt.binding(() => root.mediaTitle)})
     }
 
     // Nothing open. Loaded by name, here and below, so a launch with a file never loads these or their imports.
@@ -491,8 +488,7 @@ Window {
         onActiveChanged: if (active) setSource("ErrorScreen.qml", {
             chrome: chrome, window: root,
             path: Qt.binding(() => root.fileError ? root.fileError.path : ""),
-            why: Qt.binding(() => root.fileError ? root.fileError.why : ""),
-            report: Qt.binding(() => root.fileError ? root.fileError.report : "")
+            why: Qt.binding(() => root.fileError ? root.fileError.why : "")
         })
     }
     Connections {

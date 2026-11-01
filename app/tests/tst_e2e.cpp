@@ -661,12 +661,13 @@ private slots:
             app.shot("error");
             QVERIFY(Launch::searchVisible(app.window->contentItem(), "errorNext")); // b-good.mp4 comes after it
             // The button would overwrite the clipboard of whoever sits at the PC: the report is read from the screen.
-            QVERIFY(app.item("errorScreen")->setProperty("copied", true));
+            QVERIFY(QMetaObject::invokeMethod(app.item("errorScreen"), "details"));
             QTest::qWait(60);
             app.shot("error-details");
             const QString text = app.item("errorText")->property("text").toString();
             QVERIFY2(text.contains("Cause, from the mpv engine: unrecognized file format."), qPrintable(text));
             QVERIFY2(text.contains("a-broken.mp4"), qPrintable(text));
+            QVERIFY2(text.contains("Last log lines:"), qPrintable(text));
             QVERIFY2(!text.contains(QDir::home().dirName(), Qt::CaseInsensitive), qPrintable(text));
 
             // Next clip works from the plain view.
@@ -674,6 +675,50 @@ private slots:
             QTRY_VERIFY(!app.item("errorScreen"));
             QTRY_COMPARE(app.window->title(), QString("b-good.mp4"));
         }
+    }
+
+    // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.
+    void looks()
+    {
+        if (!qEnvironmentVariableIsSet("ECHOPLAY_E2E_SHOTS")) QSKIP("no screenshots asked for");
+        const QString state = QDir(m_path).filePath("looks");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, m_clip, QDir(m_path).filePath("looks.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+
+        // The arrow sweep lasts 360 ms: grabbed in the middle, not after the usual wait.
+        app.key(Qt::Key_Right);
+        QTest::qWait(150);
+        app.window->grabWindow().save(QDir(qEnvironmentVariable("ECHOPLAY_E2E_SHOTS")).filePath("sweep.png"));
+
+        // The preview over the seek bar: the pointer rests on it.
+        app.wake();
+        QTRY_VERIFY(app.item("controlBar")->isVisible());
+        QQuickItem *bar = app.item("controlBar");
+        const QPoint onSeekBar = bar->mapToScene(QPointF(bar->width() * 0.6, 19)).toPoint();
+        QTest::mouseMove(app.window, onSeekBar - QPoint(3, 0));
+        QTest::mouseMove(app.window, onSeekBar);
+        QTest::qWait(1200);
+        app.shot("seek-preview");
+
+        app.services.theme.setBarStyle("full");
+        app.wake();
+        app.shot("bar-full");
+        app.services.theme.setBarStyle("island");
+
+        app.key(Qt::Key_F);
+        QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
+        app.wake();
+        app.shot("fullscreen");
+        app.key(Qt::Key_Escape);
+        QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
+
+        app.window->resize(760, 420); // below 820: the volume and the chip's text collapse
+        QTRY_COMPARE(app.window->width(), 760);
+        app.wake();
+        app.shot("narrow");
     }
 
 #ifdef Q_OS_WIN

@@ -5,6 +5,7 @@
 #include <QQuickImageProvider>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QStorageInfo>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QtQml/qqmlextensionplugin.h>
@@ -188,6 +189,34 @@ struct Launch
     QQuickWindow *window = nullptr;
     MpvItem *mpv = nullptr;
 };
+
+#ifdef Q_OS_WIN
+// Takes back out of the Recycle Bin, for good, what a test put there from inside folder, and counts it. Each file in
+// the bin is a pair: $I<id> (from byte 28 on, its original path in UTF-16) and $R<id> (the file itself).
+int removeFromTrash(const QString &folder)
+{
+    const QString prefix = QDir::toNativeSeparators(QDir(folder).absolutePath()) + '\\';
+    const QDir bin(QStorageInfo(folder).rootPath() + "$Recycle.Bin");
+    const QDir::Filters hidden = QDir::Hidden | QDir::System;
+    int removed = 0;
+    for (const QFileInfo &user : bin.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | hidden)) {
+        const QDir dir(user.filePath());
+        for (const QFileInfo &info : dir.entryInfoList({"$I*"}, QDir::Files | hidden)) {
+            QFile f(info.filePath());
+            if (!f.open(QIODevice::ReadOnly)) continue;
+            const QByteArray data = f.readAll() + QByteArray(2, '\0');
+            f.close();
+            if (data.size() < 30) continue;
+            const QString original = QString::fromUtf16(reinterpret_cast<const char16_t *>(data.constData() + 28));
+            if (!original.startsWith(prefix, Qt::CaseInsensitive)) continue;
+            QFile::remove(dir.filePath("$R" + info.fileName().mid(2)));
+            QFile::remove(info.filePath());
+            ++removed;
+        }
+    }
+    return removed;
+}
+#endif
 
 int voInits(const QString &log)
 {
@@ -1102,6 +1131,142 @@ private slots:
         QTRY_VERIFY(!app.item("playlistPanel"));
         app.key(Qt::Key_Escape);
         QTRY_VERIFY(!app.item("mixerPopover"));
+    }
+
+    // The right-click menu, on the video and on playlist rows. Delete is real: hard links to the test clips go to the
+    // Recycle Bin, and the test takes them out of it again. Show in folder and Open file are not clicked: they open
+    // Explorer or the open dialog on the screen, outside the test window.
+    void contextMenu()
+    {
+#ifndef Q_OS_WIN
+        QSKIP("the Recycle Bin check reads Windows' own bin");
+#else
+        const QString state = QDir(m_path).filePath("menu");
+        const QString clips = QDir(m_path).filePath("menu-clips");
+        QVERIFY(QDir().mkpath(state));
+        QVERIFY(QDir().mkpath(clips));
+        const QString edge = QFileInfo(m_clip).absolutePath() + "/edge/video-only.mp4";
+        const auto link = [&](const QString &from, const char *name) { // no copies of a 100 MB clip
+            return CreateHardLinkW(reinterpret_cast<const wchar_t *>(QDir::toNativeSeparators(clips + "/" + name).utf16()),
+                                   reinterpret_cast<const wchar_t *>(QDir::toNativeSeparators(from).utf16()), nullptr) != 0;
+        };
+        QVERIFY(link(m_clip, "a.mp4") && link(m_clip, "b.mp4") && link(m_clip, "c.mp4") && link(edge, "d.mp4"));
+        const auto takeBack = qScopeGuard([&] { removeFromTrash(clips); });
+        Launch app(state, clips + "/a.mp4", QDir(m_path).filePath("menu.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+        const QPoint middle(app.window->width() / 2, app.window->height() / 2);
+        const auto rightClick = [&](QPoint at) {
+            QTest::qWait(60);
+            QTest::mouseClick(app.window, Qt::RightButton, Qt::NoModifier, at);
+        };
+        const auto menu = [&] { return app.item("contextMenu"); };
+        const auto playlistSize = [&] { return app.window->property("playlist").toList().size(); };
+
+        // At the pointer, with every row. A click outside closes it, and only that: no pause.
+        rightClick(middle);
+        QTRY_VERIFY(menu());
+        QCOMPARE(menu()->mapToScene(QPointF()).toPoint(), middle);
+        for (const char *row : {"menuOpen", "menuShowInFolder", "menuDelete", "menuScreenshot", "menuOnTop", "menuSettings"})
+            QVERIFY2(Launch::searchVisible(menu(), row), row);
+        app.shot("menu");
+        QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, QPoint(40, middle.y()));
+        QTRY_VERIFY(!menu());
+        QTest::qWait(300);
+        QCOMPARE(app.prop("pause"), QString("no"));
+        // Near the corner it opens up and to the left, inside the window. Esc closes it.
+        rightClick(QPoint(app.window->width() - 20, app.item("controlBar")->mapToScene(QPointF()).y() - 10));
+        QTRY_VERIFY(menu());
+        const QRectF placed(menu()->mapToScene(QPointF()), menu()->size());
+        QVERIFY(QRectF(0, 0, app.window->width(), app.window->height()).contains(placed));
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!menu());
+
+        // Always on top, both ways; the switch shows the state.
+        const auto onTop = [&] { return (GetWindowLongPtrW(HWND(app.window->winId()), GWL_EXSTYLE) & WS_EX_TOPMOST) != 0; };
+        QVERIFY(!onTop());
+        rightClick(middle);
+        QVERIFY(app.click("menuOnTop"));
+        QTRY_VERIFY(app.services.player.alwaysOnTop() && onTop());
+        QTRY_VERIFY(!menu());
+        rightClick(middle);
+        QTRY_VERIFY(menu());
+        app.shot("menu-on-top");
+        QVERIFY(app.click("menuOnTop"));
+        QTRY_VERIFY(!app.services.player.alwaysOnTop() && !onTop());
+
+        // Screenshot, as F1 does: one more picture in the folder.
+        const QDir shots(app.prop("screenshot-dir"));
+        const qsizetype before = shots.entryList({"*.png"}, QDir::Files).size();
+        rightClick(middle);
+        QVERIFY(app.click("menuScreenshot"));
+        QTRY_COMPARE_WITH_TIMEOUT(shots.entryList({"*.png"}, QDir::Files).size(), before + 1, 5000);
+
+        // All settings.
+        rightClick(middle);
+        QVERIFY(app.click("menuSettings"));
+        QTRY_VERIFY(app.item("settingsOverlay"));
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("settingsOverlay"));
+
+        // Delete asks first, in the menu's place; Cancel keeps the file.
+        rightClick(middle);
+        QVERIFY(app.click("menuDelete"));
+        QTRY_VERIFY(app.item("menuConfirm")->isVisible());
+        app.shot("menu-delete");
+        QVERIFY(app.click("menuCancel"));
+        QTRY_VERIFY(!menu());
+        QVERIFY(QFile::exists(clips + "/a.mp4"));
+
+        const auto deleteFromMenu = [&](QPoint at) {
+            rightClick(at);
+            QTRY_VERIFY(menu());
+            QVERIFY(app.click("menuDelete"));
+            QVERIFY(app.click("menuConfirmDelete"));
+        };
+        // The playing clip, while mpv reads it: it goes, and the next one plays.
+        deleteFromMenu(middle);
+        QTRY_VERIFY(!QFile::exists(clips + "/a.mp4"));
+        QTRY_COMPARE(app.window->title(), QString("b.mp4"));
+        QTRY_COMPARE(playlistSize(), 3);
+        // A playlist row that is not playing: only its two rows; it leaves the list, b keeps playing.
+        app.wake();
+        QTRY_VERIFY(app.item("playlistButton")->isVisible());
+        QVERIFY(app.click("playlistButton"));
+        QTRY_VERIFY(app.item("playlistRow-2"));
+        const auto rowCenter = [&](const char *row) {
+            QQuickItem *item = app.item(row);
+            return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
+        };
+        rightClick(rowCenter("playlistRow-2"));
+        QTRY_VERIFY(menu());
+        QVERIFY(!Launch::searchVisible(menu(), "menuOpen") && !Launch::searchVisible(menu(), "menuSettings"));
+        app.shot("menu-row");
+        QVERIFY(app.click("menuDelete"));
+        QVERIFY(app.click("menuConfirmDelete"));
+        QTRY_VERIFY(!QFile::exists(clips + "/d.mp4"));
+        QTRY_COMPARE(playlistSize(), 2);
+        QVERIFY(app.item("playlistPanel"));
+        QCOMPARE(app.window->title(), QString("b.mp4"));
+        // The last clip of the list, playing: the one before it plays.
+        QVERIFY(app.click("playlistRow-1"));
+        QTRY_COMPARE(app.window->title(), QString("c.mp4"));
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("playlistPanel"));
+        deleteFromMenu(middle);
+        QTRY_VERIFY(!QFile::exists(clips + "/c.mp4"));
+        QTRY_COMPARE(app.window->title(), QString("b.mp4"));
+        QTRY_COMPARE(playlistSize(), 1);
+        // The only clip: the start screen comes back.
+        deleteFromMenu(middle);
+        QTRY_VERIFY(!QFile::exists(clips + "/b.mp4"));
+        QTRY_VERIFY(app.item("startScreen"));
+        QTRY_VERIFY(!app.item("controlBar"));
+        app.shot("menu-nothing-left");
+        // All four are in the Recycle Bin, not deleted for good.
+        QCOMPARE(removeFromTrash(clips), 4);
+#endif
     }
 
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.

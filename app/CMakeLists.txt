@@ -28,7 +28,7 @@ qt_add_qml_module(echoplay_lib
               qml/GlassPanel.qml qml/RoundedImage.qml qml/Popover.qml qml/PlayerUi.qml qml/TitleBar.qml qml/ControlBar.qml
               qml/SeekBar.qml qml/VolumeSlider.qml qml/VolumeFlash.qml qml/ArrowSweep.qml qml/MixerPopover.qml
               qml/StartScreen.qml qml/DashedFrame.qml qml/DropOverlay.qml qml/OpenDialogs.qml qml/Stepper.qml
-              qml/QuickSettings.qml qml/SubtitlesPopover.qml qml/SettingRow.qml qml/Dropdown.qml qml/ColorPicker.qml
+              qml/QuickSettings.qml qml/ContextMenu.qml qml/SubtitlesPopover.qml qml/SettingRow.qml qml/Dropdown.qml qml/ColorPicker.qml
               qml/SettingsOverlay.qml qml/SettingsContent.qml qml/UpdateCard.qml qml/WhatsNewCard.qml qml/ErrorScreen.qml qml/UpdateNotice.qml
               qml/Toast.qml qml/ResumeCard.qml qml/HintCard.qml qml/NoSoundCard.qml qml/PlaylistPanel.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
@@ -43,7 +43,7 @@ qt_add_qml_module(echoplay_lib
 )
 qt_add_shaders(echoplay_lib "shaders" PREFIX "/shaders" BASE "${CMAKE_CURRENT_SOURCE_DIR}/shaders" FILES shaders/glass.frag)
 if(WIN32)
-    target_link_libraries(echoplay_lib PRIVATE dwmapi)
+    target_link_libraries(echoplay_lib PRIVATE dwmapi shell32)
 endif()
 qt_add_executable(echoplay src/main.cpp)
 # EchoPlay.exe, as v1's: "Open with", Task Manager and the installer's registry entries use this name.

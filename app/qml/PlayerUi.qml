@@ -37,8 +37,11 @@ Item {
     readonly property var subtitleTracks: trackList.filter(t => t.type === "sub")
     readonly property bool fullScreen: window.visibility === Window.FullScreen
 
-    // "" or the open popover: "mixer", "quick", "subtitles".
+    // "" or the open popover: "mixer", "quick", "subtitles", "menu" (the right-click menu).
     property string popover: forceChrome ? "mixer" : ""
+    property point menuAt // where the right-click was, in this item
+    property string menuPath // the clip it is about
+    property bool menuForRow: false // a playlist row's
     property bool playlistOpen: false
     property bool settingsOpen: false
     // Opening anything, by mouse or by key, is doing something else: the resume question is over.
@@ -59,6 +62,13 @@ Item {
         if (name === "mixer") PlayerSettings.firstRunHintDone = true
     }
     function toggleFullScreen() { chrome.toggleFullScreen() }
+    function openMenu(x, y, path, forRow) {
+        menuAt = Qt.point(x, y)
+        menuPath = path
+        menuForRow = forRow
+        popover = ""
+        popover = "menu" // a second right-click opens it anew, at the new place
+    }
     function trackLabel(track) { return track.title || track.lang || I18n.strings.track_n.arg(track.id) }
     function openSettings() {
         popover = ""
@@ -168,14 +178,19 @@ Item {
     MouseArea { // the video itself
         property bool pausedByClick: false
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: ui.chromeUp ? Qt.ArrowCursor : Qt.BlankCursor
         // A click that closes something, or ends the resume question, does only that.
-        onClicked: {
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton) {
+                ui.openMenu(mouse.x, mouse.y, ui.mpv.observed("path") || "", false)
+                return
+            }
             pausedByClick = !ui.closeTop() && !ui.window.clickEndedQuestion() && PlayerSettings.clickPauses
             if (pausedByClick) ui.mpv.command(["cycle", "pause"])
         }
-        onDoubleClicked: {
+        onDoubleClicked: mouse => {
+            if (mouse.button !== Qt.LeftButton) return
             if (pausedByClick) ui.mpv.command(["cycle", "pause"]) // the first click's, as on YouTube: no wait before a pause
             ui.toggleFullScreen()
         }
@@ -301,6 +316,18 @@ Item {
             ui: player
             width: 360
             height: Math.min(wanted, controlBar.y - 12 - playlistLoader.highest)
+        }
+    }
+
+    Loader { // at the pointer, inside the window: below and right of it where it fits
+        x: item ? Math.max(8, Math.min(ui.menuAt.x, ui.width - item.width - 8)) : 0
+        y: item ? (ui.menuAt.y + item.height <= ui.height - 8 ? ui.menuAt.y : Math.max(8, ui.menuAt.y - item.height)) : 0
+        active: ui.popover === "menu"
+        sourceComponent: ContextMenu {
+            ui: player
+            path: player.menuPath
+            forRow: player.menuForRow
+            height: implicitHeight
         }
     }
 

@@ -217,6 +217,11 @@
   "on_top_off": "No longer on top",
   "shot_saved": "Screenshot saved",
   "shot_failed": "The screenshot could not be saved",
+  "show_in_folder": "Show in folder",
+  "delete_clip": "Delete",
+  "trash_title": "Move this clip to the Recycle Bin?",
+  "trashed": "Moved to the Recycle Bin",
+  "trash_failed": "It could not be deleted. Another program may be using it.",
 
   "error_format_title": "This file can't be opened",
   "error_format_body": "It has no video or audio EchoPlay can read. It may still be recording, or it was cut off while saving.",

@@ -1,9 +1,16 @@
 #include "MediaFiles.h"
 
 #include <QCollator>
+#include <QDesktopServices>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <algorithm>
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shlobj.h>
+#endif
 
 namespace {
 
@@ -44,4 +51,23 @@ QString MediaFiles::pathToOpen(const QUrl &url)
 QString MediaFiles::displayName(const QUrl &url)
 {
     return url.isLocalFile() ? QFileInfo(url.toLocalFile()).fileName() : url.toString();
+}
+
+void MediaFiles::showInFolder(const QString &path)
+{
+#ifdef Q_OS_WIN
+    // The shell's own call, not "explorer /select,": a comma in the path breaks that one. COM is up: Qt's GUI thread
+    // starts OLE.
+    if (PIDLIST_ABSOLUTE item = ILCreateFromPathW(reinterpret_cast<const wchar_t *>(QDir::toNativeSeparators(path).utf16()))) {
+        const HRESULT shown = SHOpenFolderAndSelectItems(item, 0, nullptr, 0);
+        ILFree(item);
+        if (SUCCEEDED(shown)) return;
+    }
+#endif
+    QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+}
+
+bool MediaFiles::moveToTrash(const QString &path)
+{
+    return QFile::moveToTrash(path);
 }

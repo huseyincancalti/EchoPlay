@@ -10,6 +10,7 @@ content_copy
 contrast
 crop_square
 dark_mode
+delete
 download
 equalizer
 error
@@ -34,6 +35,7 @@ photo_camera
 play_arrow
 play_circle
 playlist_play
+push_pin
 refresh
 remove
 replay

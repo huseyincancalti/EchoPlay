@@ -5,7 +5,8 @@
 #include <QUrl>
 #include <QtQml/qqmlregistration.h>
 
-// What opening a file or a folder means. A folder plays its first video; mpv's autocreate-playlist builds the rest.
+// What opening a file or a folder means, and what the right-click menu does with a clip. A folder plays its first
+// video; mpv's autocreate-playlist builds the rest.
 class MediaFiles : public QObject
 {
     Q_OBJECT
@@ -23,4 +24,8 @@ public:
     Q_INVOKABLE static QString localPath(const QUrl &url) { return url.toLocalFile(); }
     // File or folder name, for the drop overlay.
     Q_INVOKABLE static QString displayName(const QUrl &url);
+    // Explorer on the clip's folder with the clip selected.
+    Q_INVOKABLE static void showInFolder(const QString &path);
+    // To the Recycle Bin, never deleted for good. False: it is still there (no rights, another program locks it).
+    Q_INVOKABLE static bool moveToTrash(const QString &path);
 };

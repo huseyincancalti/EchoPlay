@@ -217,6 +217,11 @@
   "on_top_off": "Artık üstte değil",
   "shot_saved": "Ekran görüntüsü kaydedildi",
   "shot_failed": "Ekran görüntüsü kaydedilemedi",
+  "show_in_folder": "Klasörde göster",
+  "delete_clip": "Sil",
+  "trash_title": "Bu klip Geri Dönüşüm Kutusu'na taşınsın mı?",
+  "trashed": "Geri Dönüşüm Kutusu'na taşındı",
+  "trash_failed": "Silinemedi. Başka bir program kullanıyor olabilir.",
 
   "error_format_title": "Bu dosya açılamıyor",
   "error_format_body": "EchoPlay'in okuyabileceği video ya da ses yok. Hâlâ kaydediliyor olabilir ya da kaydedilirken yarım kalmış olabilir.",

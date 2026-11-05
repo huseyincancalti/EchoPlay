@@ -106,6 +106,32 @@ Window {
         return at >= 0 && at + 1 < list.length ? at + 1 : -1
     }
     function playNextClip() { mpv.command(["playlist-play-index", nextClip()]) }
+    // The right-click menu's Delete, asked first. mpv opens files with FILE_SHARE_DELETE, so the playing one moves too;
+    // then the next clip plays, or the one before the last, or the start screen comes back.
+    function trashClip(path) {
+        if (!MediaFiles.moveToTrash(path)) { toast.show(I18n.strings.trash_failed, 3000); return }
+        toast.show(I18n.strings.trashed, 2000)
+        const list = (playlist || []).map(entry => entry.filename.replace(/\\/g, "/"))
+        const at = list.indexOf(path.replace(/\\/g, "/"))
+        if (at < 0) return
+        if (!(playlist[at].current || playlist[at].playing)) mpv.command(["playlist-remove", at])
+        else if (at + 1 < list.length) mpv.command(["playlist-remove", "current"]) // mpv plays the next
+        else if (at > 0) {
+            mpv.command(["playlist-play-index", at - 1])
+            mpv.command(["playlist-remove", at])
+        } else closeFile()
+    }
+    // Nothing left to play.
+    function closeFile() {
+        mpv.command(["stop"])
+        root.file = ""
+        root.restarted = false
+        if (!startScreen.item) startScreen.setSource("StartScreen.qml", {chrome: chrome, window: root})
+    }
+    function toggleOnTop() {
+        PlayerSettings.alwaysOnTop = !PlayerSettings.alwaysOnTop
+        toast.show(PlayerSettings.alwaysOnTop ? I18n.strings.on_top_on : I18n.strings.on_top_off, 1500)
+    }
     // mpv would go on to the next clip by itself and the failure would pass unseen: it stops here, on the error screen.
     function showError(why, entryId) {
         mpv.command(["stop", "keep-playlist"])
@@ -383,10 +409,7 @@ Window {
         {id: "next", key: ">", run: () => mpv.command(["playlist-next"])},
         {id: "previous", key: "<", run: () => mpv.command(["playlist-prev"])},
         {id: "fullscreen", key: "F", run: () => chrome.toggleFullScreen()},
-        {id: "always_on_top", key: "T", run: () => {
-            PlayerSettings.alwaysOnTop = !PlayerSettings.alwaysOnTop
-            toast.show(PlayerSettings.alwaysOnTop ? I18n.strings.on_top_on : I18n.strings.on_top_off, 1500)
-        }},
+        {id: "always_on_top", key: "T", run: () => root.toggleOnTop()},
     ]
     function changeVolume(step) {
         if (ui.item) ui.item.flashVolume()

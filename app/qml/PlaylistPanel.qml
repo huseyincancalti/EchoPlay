@@ -195,7 +195,14 @@ GlassPanel {
                 id: rowMouse
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: panel.ui.mpv.command(["playlist-play-index", row.index])
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: mouse => {
+                    if (mouse.button === Qt.LeftButton) panel.ui.mpv.command(["playlist-play-index", row.index])
+                    else {
+                        const at = mapToItem(panel.ui, mouse.x, mouse.y)
+                        panel.ui.openMenu(at.x, at.y, row.path, true)
+                    }
+                }
             }
         }
     }

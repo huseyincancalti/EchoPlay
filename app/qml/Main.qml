@@ -128,6 +128,11 @@ Window {
         root.restarted = false
         if (!startScreen.item) startScreen.setSource("StartScreen.qml", {chrome: chrome, window: root})
     }
+    function resetGeometry() {
+        mpv.setProperty("video-zoom", "0")
+        mpv.setProperty("video-rotate", "0")
+        mpv.setProperty("video-aspect-override", "-1")
+    }
     function toggleOnTop() {
         PlayerSettings.alwaysOnTop = !PlayerSettings.alwaysOnTop
         toast.show(PlayerSettings.alwaysOnTop ? I18n.strings.on_top_on : I18n.strings.on_top_off, 1500)
@@ -298,6 +303,7 @@ Window {
             ResumeStore.save() // the previous file's spot, in case EchoPlay does not close cleanly later
             mpv.setProperty("ab-loop-a", "no") // a part of the last clip means nothing in this one
             mpv.setProperty("ab-loop-b", "no")
+            root.resetGeometry() // zoom, rotation and aspect are for one clip
         }
         function onScreenshotFinished(saved) { toast.show(saved ? I18n.strings.shot_saved : I18n.strings.shot_failed, 2000) }
         function onPropertyChanged(name, value) {

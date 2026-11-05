@@ -11,6 +11,7 @@ Item {
     property real value: 0
     property real stepSize: 0
     property real mark: NaN
+    property real origin: from // where the fill starts
     property string name
     property color fill: Theme.accent
     property color track: Theme.tokens.glass.trackSoft
@@ -53,9 +54,11 @@ Item {
         radius: 1
         color: slider.markColor
     }
-    Rectangle {
+    Rectangle { // from the origin to the value: from either side of 0 for a -100..100 slider
+        readonly property real start: slider.to > slider.from ? Math.min(1, Math.max(0, (slider.origin - slider.from) / (slider.to - slider.from))) : 0
         anchors.verticalCenter: parent.verticalCenter
-        width: slider.width * slider.fraction
+        x: slider.width * Math.min(start, slider.fraction)
+        width: slider.width * Math.abs(slider.fraction - start)
         height: 4
         radius: 2
         color: slider.fill

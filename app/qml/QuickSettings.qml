@@ -162,6 +162,13 @@ Popover {
             available: quick.ui.subtitleTracks.length > 0
             onClicked: quick.ui.popover = "subtitles"
         }
+        LinkRow {
+            objectName: "quickPicture"
+            icon: "contrast"
+            text: quick.strings.adjust_picture
+            note: quick.ui.pictureChanged ? quick.strings.adjusted : ""
+            onClicked: quick.ui.popover = "picture"
+        }
         Item { width: parent.width; height: 9
             Rectangle { x: 2; y: 4; width: parent.width - 4; height: 1; color: quick.glass.hairline }
         }

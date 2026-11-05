@@ -129,6 +129,40 @@ private slots:
         QCOMPARE(s.updateLastChecked(), 0);
     }
 
+    void pictureRoundTrip()
+    {
+        {
+            AppState s(m_path);
+            QCOMPARE(s.picture(), (QVariantMap{{"brightness", 0}, {"contrast", 0}, {"saturation", 0}, {"gamma", 0}}));
+            s.setPicture("brightness", -40);
+            s.setPicture("gamma", 100);
+            s.setPicture("hue", 20); // not one of the four: ignored
+            QCOMPARE(s.picture().size(), 4);
+            s.save();
+        }
+        const QJsonObject json = read(m_path).value("picture").toObject();
+        QCOMPARE(json.value("brightness").toInt(), -40);
+        QVERIFY(!json.contains("hue"));
+        const QVariantMap again = AppState(m_path).picture();
+        QCOMPARE(again.value("brightness").toInt(), -40);
+        QCOMPARE(again.value("contrast").toInt(), 0);
+        QCOMPARE(again.value("saturation").toInt(), 0);
+        QCOMPARE(again.value("gamma").toInt(), 100);
+    }
+
+    void badPictureValuesKeepTheDefault()
+    {
+        write(m_path, R"({"schema": 1, "picture": {"brightness": 500, "contrast": "x", "saturation": 1.5, "gamma": -100}})");
+        const QVariantMap p = AppState(m_path).picture();
+        QCOMPARE(p.value("brightness").toInt(), 0); // out of range
+        QCOMPARE(p.value("contrast").toInt(), 0);   // not a number
+        QCOMPARE(p.value("saturation").toInt(), 0); // not a whole number
+        QCOMPARE(p.value("gamma").toInt(), -100);   // the edge is fine
+
+        write(m_path, R"({"schema": 1, "picture": [1, 2]})"); // not an object
+        QCOMPARE(AppState(m_path).picture().value("gamma").toInt(), 0);
+    }
+
     void newerSchemaKeepsKnownFields()
     {
         write(m_path, R"({"schema": 99, "language": "tr", "mixer": {"default_on": "all"}, "future": true})");

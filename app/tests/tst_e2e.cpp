@@ -1269,6 +1269,78 @@ private slots:
 #endif
     }
 
+    // Picture: brightness, contrast, saturation and gamma are kept; zoom, rotation and aspect ratio last one clip.
+    void pictureAdjust()
+    {
+        const QString state = QDir(m_path).filePath("picture");
+        QVERIFY(QDir().mkpath(state));
+        const auto observe = [](Launch &app) {
+            for (const char *name : {"brightness", "contrast", "video-zoom", "video-rotate", "video-aspect-override"})
+                app.mpv->observeProperty(name);
+        };
+        // A click on a -100..100 slider, at a fraction of its length.
+        const auto slide = [](Launch &app, const char *name, double fraction) {
+            QQuickItem *slider = app.item(name);
+            QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier,
+                              slider->mapToScene(QPointF(slider->width() * fraction, slider->height() / 2)).toPoint());
+        };
+        {
+            Launch app(state, m_clip, QDir(m_path).filePath("picture.log"));
+            QVERIFY(app.mpv);
+            observe(app);
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            app.wake();
+            QTRY_VERIFY(app.item("gearButton") && app.item("gearButton")->isVisible());
+            QVERIFY(app.click("gearButton"));
+            QTRY_VERIFY(app.item("quickPicture"));
+            QCOMPARE(app.item("quickPicture")->property("note").toString(), QString());
+            QVERIFY(app.click("quickPicture"));
+            QTRY_VERIFY(app.item("picturePopover"));
+            QVERIFY(!app.item("pictureReset")->isVisible());
+            app.shot("picture");
+            slide(app, "picture-brightness", 0.75);
+            QTRY_COMPARE(app.services.player.picture().value("brightness").toInt(), 50);
+            QTRY_COMPARE(app.number("brightness"), 50.0);
+            QVERIFY(app.item("pictureReset")->isVisible());
+            QVERIFY(app.click("pictureZoomMore")); // 110%
+            QVERIFY(app.click("pictureZoomMore")); // 125%
+            QTRY_VERIFY(std::abs(app.number("video-zoom") - std::log2(1.25)) < 0.001);
+            QVERIFY(app.click("segment-90"));
+            QTRY_COMPARE(app.number("video-rotate"), 90.0);
+            QVERIFY(app.click("segment-4:3"));
+            QTRY_VERIFY(std::abs(app.number("video-aspect-override") - 4.0 / 3) < 0.01);
+            app.shot("picture-changed");
+            // Reset takes all of it back.
+            QVERIFY(app.click("pictureReset"));
+            QTRY_COMPARE(app.number("brightness"), 0.0);
+            QTRY_COMPARE(app.number("video-zoom"), 0.0);
+            QTRY_COMPARE(app.number("video-rotate"), 0.0);
+            QTRY_COMPARE(app.number("video-aspect-override"), -1.0);
+            QTRY_VERIFY(!app.item("pictureReset")->isVisible());
+            // The next file: the rotation is gone, the contrast stays. The quick settings say something changed.
+            QVERIFY(app.click("segment-180"));
+            QTRY_COMPARE(app.number("video-rotate"), 180.0);
+            slide(app, "picture-contrast", 0.25);
+            QTRY_COMPARE(app.number("contrast"), -50.0);
+            app.mpv->command(QVariantList{"loadfile", m_clip});
+            QTRY_COMPARE(app.number("video-rotate"), 0.0);
+            QCOMPARE(app.number("contrast"), -50.0);
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("picturePopover"));
+            app.wake();
+            QVERIFY(app.click("gearButton"));
+            QTRY_VERIFY(app.item("quickPicture"));
+            QVERIFY(!app.item("quickPicture")->property("note").toString().isEmpty());
+        }
+        // And the next start.
+        Launch app(state, m_clip, QDir(m_path).filePath("picture-2.log"));
+        QVERIFY(app.mpv);
+        observe(app);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_COMPARE(app.number("contrast"), -50.0);
+        QCOMPARE(app.number("video-rotate"), 0.0);
+    }
+
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.
     void looks()
     {

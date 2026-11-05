@@ -146,6 +146,24 @@ void PlayerSettings::setResumeMode(const QString &mode)
     emit changed();
 }
 
+QVariantMap PlayerSettings::picture() const { return m_state->picture(); }
+
+void PlayerSettings::setPicture(const QString &name, int value)
+{
+    value = qBound(-AppState::PictureMax, value, AppState::PictureMax);
+    const QVariantMap now = picture();
+    if (!now.contains(name) || now.value(name).toInt() == value) return;
+    m_state->setPicture(name, value);
+    emit changed();
+}
+
+void PlayerSettings::resetPicture()
+{
+    const QVariantMap before = picture();
+    for (auto it = before.cbegin(); it != before.cend(); ++it) m_state->setPicture(it.key(), 0);
+    if (picture() != before) emit changed();
+}
+
 bool PlayerSettings::firstRunHintDone() const { return m_state->firstRunHintDone(); }
 
 void PlayerSettings::setFirstRunHintDone(bool done)
@@ -239,6 +257,9 @@ QVariantMap PlayerSettings::mpvOptions(const QString &videoPath) const
 
     out.insert("volume-max", QString::number(volumeMax()));
     out.insert("audio-device", audioDevice());
+    // The picture's keys are mpv's own option names.
+    const QVariantMap look = picture();
+    for (auto it = look.cbegin(); it != look.cend(); ++it) out.insert(it.key(), QString::number(it.value().toInt()));
     // Medium is v1's levelling. A stronger one lifts quiet parts more (m) and reacts faster (a small g), so it can pump.
     const QString strength = loudnessStrength();
     out.insert("af", !loudnessBoost()      ? QString()

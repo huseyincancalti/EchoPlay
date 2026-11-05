@@ -135,6 +135,46 @@ private slots:
         QCOMPARE(m_settings->audioDevice(), QString("wasapi/{1234}"));
     }
 
+    void pictureAdjustments()
+    {
+        const QStringList names{"brightness", "contrast", "saturation", "gamma"};
+        QSignalSpy changed(m_settings.get(), &PlayerSettings::changed);
+        QCOMPARE(m_settings->picture().size(), 4);
+        const QVariantMap defaults = m_settings->mpvOptions({});
+        for (const QString &name : names) {
+            QCOMPARE(m_settings->picture().value(name).toInt(), 0);
+            QCOMPARE(defaults.value(name).toString(), QString("0"));
+        }
+
+        m_settings->setPicture("brightness", 25);
+        QCOMPARE(m_settings->picture().value("brightness").toInt(), 25);
+        QCOMPARE(m_settings->mpvOptions({}).value("brightness").toString(), QString("25"));
+        QCOMPARE(changed.count(), 1);
+        m_settings->setPicture("brightness", 25); // the same value: no change
+        QCOMPARE(changed.count(), 1);
+
+        m_settings->setPicture("contrast", 500);
+        m_settings->setPicture("saturation", -500);
+        QCOMPARE(m_settings->picture().value("contrast").toInt(), 100);
+        QCOMPARE(m_settings->picture().value("saturation").toInt(), -100);
+        QCOMPARE(m_settings->mpvOptions({}).value("saturation").toString(), QString("-100"));
+        QCOMPARE(changed.count(), 3);
+
+        m_settings->setPicture("hue", 10); // not an adjustment: ignored
+        QCOMPARE(m_settings->picture().size(), 4);
+        QVERIFY(!m_settings->mpvOptions({}).contains("hue"));
+        QCOMPARE(changed.count(), 3);
+
+        m_settings->resetPicture();
+        for (const QString &name : names) {
+            QCOMPARE(m_settings->picture().value(name).toInt(), 0);
+            QCOMPARE(m_settings->mpvOptions({}).value(name).toString(), QString("0"));
+        }
+        QCOMPARE(changed.count(), 4); // one signal for all
+        m_settings->resetPicture();   // nothing to reset: no signal
+        QCOMPARE(changed.count(), 4);
+    }
+
     void shortcutsKeepOnlyWhatChanged()
     {
         QVERIFY(m_settings->shortcuts().isEmpty());
@@ -173,6 +213,8 @@ private slots:
         m_settings->setAudioDevice("wasapi/{1234}");
         m_settings->setTracksOnOpen("all");
         m_settings->setResumeMode("always");
+        m_settings->setPicture("brightness", -10);
+        m_settings->setPicture("gamma", 35);
         m_settings->setFirstRunHintDone(true);
         m_settings->setClickPauses(false);
         m_settings->setShowRemaining(true);
@@ -195,6 +237,9 @@ private slots:
         QCOMPARE(loaded.audioDevice(), QString("wasapi/{1234}"));
         QCOMPARE(loaded.tracksOnOpen(), QString("all"));
         QCOMPARE(loaded.resumeMode(), QString("always"));
+        QCOMPARE(loaded.picture().value("brightness").toInt(), -10);
+        QCOMPARE(loaded.picture().value("contrast").toInt(), 0);
+        QCOMPARE(loaded.mpvOptions({}).value("gamma").toString(), QString("35"));
         QVERIFY(loaded.firstRunHintDone());
         QVERIFY(!loaded.clickPauses());
         QVERIFY(loaded.showRemaining());
@@ -212,6 +257,7 @@ private slots:
         f.write(R"({"schema":1,"always_on_top":"x","window_placement":{"x":1,"y":1,"width":-5,"height":100},)"
                 R"("playback":{"end":"explode","speed_factor":50,"speed_step":-1,"seek_step":7,"resume":1,"click_pauses":1,"show_remaining":"x"},)"
                 R"("audio":{"volume_max":999,"loudness_boost":"yes","loudness_strength":"max","device":3,"tracks_on_open":"x"},)"
+                R"("picture":{"brightness":500,"contrast":"x","saturation":1.5},)"
                 R"("first_run_hint_done":"yes","shortcuts":{"mute":5},)"
                 R"("screenshots":{"folder":7,"custom":["x"]}})");
         f.close();
@@ -229,6 +275,9 @@ private slots:
         QCOMPARE(loaded.audioDevice(), QString("auto"));
         QCOMPARE(loaded.tracksOnOpen(), QString("last"));
         QCOMPARE(loaded.resumeMode(), QString("ask"));
+        QCOMPARE(loaded.picture().value("brightness").toInt(), 0);
+        QCOMPARE(loaded.picture().value("contrast").toInt(), 0);
+        QCOMPARE(loaded.picture().value("saturation").toInt(), 0);
         QVERIFY(!loaded.firstRunHintDone());
         QVERIFY(loaded.clickPauses());
         QVERIFY(!loaded.showRemaining());

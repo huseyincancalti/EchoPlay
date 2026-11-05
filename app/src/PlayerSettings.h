@@ -28,6 +28,7 @@ class PlayerSettings : public QObject
     Q_PROPERTY(QString audioDevice READ audioDevice WRITE setAudioDevice NOTIFY changed)   // mpv's audio-device
     Q_PROPERTY(QString tracksOnOpen READ tracksOnOpen WRITE setTracksOnOpen NOTIFY changed) // "last", "all"
     Q_PROPERTY(QString resumeMode READ resumeMode WRITE setResumeMode NOTIFY changed)      // "ask", "always", "never"
+    Q_PROPERTY(QVariantMap picture READ picture NOTIFY changed)                            // brightness, contrast, saturation, gamma: -100..100
     Q_PROPERTY(bool firstRunHintDone READ firstRunHintDone WRITE setFirstRunHintDone NOTIFY changed)
     Q_PROPERTY(bool clickPauses READ clickPauses WRITE setClickPauses NOTIFY changed)
     Q_PROPERTY(bool showRemaining READ showRemaining WRITE setShowRemaining NOTIFY changed)
@@ -69,6 +70,9 @@ public:
     void setTracksOnOpen(const QString &tracks); // anything else is ignored
     QString resumeMode() const;
     void setResumeMode(const QString &mode); // anything else is ignored
+    QVariantMap picture() const; // all four, as ints
+    Q_INVOKABLE void setPicture(const QString &name, int value); // an unknown name is ignored, the value is clamped
+    Q_INVOKABLE void resetPicture();                             // all four back to 0
     bool firstRunHintDone() const;
     void setFirstRunHintDone(bool done);
     bool clickPauses() const;
@@ -86,7 +90,7 @@ public:
     Q_INVOKABLE static QString keyName(int key, int modifiers);
 
     // The mpv properties for these settings while `videoPath` plays: loop-file, keep-open, screenshot-dir,
-    // volume-max, af, audio-device.
+    // volume-max, af, audio-device, brightness, contrast, saturation, gamma.
     Q_INVOKABLE QVariantMap mpvOptions(const QString &videoPath) const;
     // The fixed-speed key (v1): from normal speed to speedFactor, from any faster speed back to 1x.
     Q_INVOKABLE double toggledSpeed(double current) const { return current > 1.01 ? 1 : speedFactor(); }

@@ -31,13 +31,18 @@ Item {
     property var subtitleTrack: false
     property real loopA: -1 // the A-B loop's ends in seconds, -1 while not set
     property real loopB: -1
+    property real videoZoom: 0 // mpv's video-zoom: log2, 0 = 100%
+    property int videoRotate: 0
+    property real videoAspect: -1 // -1: the clip's own
+    readonly property bool pictureChanged: ["brightness", "contrast", "saturation", "gamma"].some(name => PlayerSettings.picture[name] !== 0)
+                                           || videoZoom !== 0 || videoRotate !== 0 || videoAspect !== -1
 
     readonly property var tracks: MixerController.tracks
     readonly property bool hasVideo: trackList.some(t => t.type === "video")
     readonly property var subtitleTracks: trackList.filter(t => t.type === "sub")
     readonly property bool fullScreen: window.visibility === Window.FullScreen
 
-    // "" or the open popover: "mixer", "quick", "subtitles", "menu" (the right-click menu).
+    // "" or the open popover: "mixer", "quick", "subtitles", "picture", "menu" (the right-click menu).
     property string popover: forceChrome ? "mixer" : ""
     property point menuAt // where the right-click was, in this item
     property string menuPath // the clip it is about
@@ -118,10 +123,14 @@ Item {
         case "sid": subtitleTrack = value; break
         case "ab-loop-a": loopA = typeof value === "number" ? value : -1; break // "no" while not set
         case "ab-loop-b": loopB = typeof value === "number" ? value : -1; break
+        case "video-zoom": videoZoom = value || 0; break
+        case "video-rotate": videoRotate = value || 0; break
+        case "video-aspect-override": videoAspect = typeof value === "number" ? value : -1; break
         }
     }
     Component.onCompleted: {
-        for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid", "ab-loop-a", "ab-loop-b"]) {
+        for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid", "ab-loop-a", "ab-loop-b", "video-zoom", "video-rotate",
+                            "video-aspect-override"]) {
             mpv.observeProperty(name)
             observe(name, mpv.observed(name))
         }
@@ -291,6 +300,15 @@ Item {
         name: "quick"
         anchorX: controlBar.gearCenter
         sourceComponent: QuickSettings {
+            ui: player
+            pointerX: controlBar.gearCenter - x - parent.x
+            height: implicitHeight
+        }
+    }
+    PopoverLoader {
+        name: "picture"
+        anchorX: controlBar.gearCenter
+        sourceComponent: PicturePopover {
             ui: player
             pointerX: controlBar.gearCenter - x - parent.x
             height: implicitHeight

@@ -22,6 +22,7 @@ class AppState : public QObject
 public:
     static constexpr int Schema = 1;
     static constexpr double VolumeMax = 300; // mpv's volume-max, as in v1
+    static constexpr int PictureMax = 100;   // the picture adjustments run -PictureMax..PictureMax
 
     explicit AppState(const QString &path, QObject *parent = nullptr); // loads the file
     ~AppState() override;                                               // writes a pending save
@@ -58,6 +59,8 @@ public:
     void setAudioDevice(const QString &device);
     QString tracksOnOpen() const { return m_tracksOnOpen; } // "last" (as the last clip), "all"
     void setTracksOnOpen(const QString &tracks);
+    QVariantMap picture() const { return m_picture; } // brightness, contrast, saturation, gamma: all four, as mpv names them
+    void setPicture(const QString &name, int value);  // an unknown name is ignored; PlayerSettings checks the range
     QString resumeMode() const { return m_resumeMode; } // "ask", "always", "never"
     void setResumeMode(const QString &mode);
     bool firstRunHintDone() const { return m_firstRunHintDone; }
@@ -128,6 +131,7 @@ private:
     QString m_loudnessStrength = QStringLiteral("medium");
     QString m_audioDevice = QStringLiteral("auto");
     QString m_tracksOnOpen = QStringLiteral("last");
+    QVariantMap m_picture{{"brightness", 0}, {"contrast", 0}, {"saturation", 0}, {"gamma", 0}};
     QString m_resumeMode = QStringLiteral("ask");
     bool m_firstRunHintDone = false;
     bool m_clickPauses = true;

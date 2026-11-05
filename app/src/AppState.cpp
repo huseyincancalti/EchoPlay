@@ -133,6 +133,14 @@ void AppState::setTracksOnOpen(const QString &tracks)
     changed();
 }
 
+void AppState::setPicture(const QString &name, int value)
+{
+    const auto it = m_picture.find(name);
+    if (it == m_picture.end() || it.value().toInt() == value) return;
+    it.value() = value;
+    changed();
+}
+
 void AppState::setResumeMode(const QString &mode)
 {
     if (mode == m_resumeMode) return;
@@ -304,6 +312,13 @@ void AppState::load()
     if (tracksOnOpen.match(audio.value("tracks_on_open").toString()).hasMatch())
         m_tracksOnOpen = audio.value("tracks_on_open").toString();
 
+    // toInt() gives the fallback for a string or a fraction too, and the fallback is out of range.
+    const QJsonObject picture = s.value("picture").toObject();
+    for (auto it = m_picture.begin(); it != m_picture.end(); ++it) {
+        const int value = picture.value(it.key()).toInt(PictureMax + 1);
+        if (value >= -PictureMax && value <= PictureMax) it.value() = value;
+    }
+
     m_firstRunHintDone = s.value("first_run_hint_done").toBool();
     const QJsonObject shortcuts = s.value("shortcuts").toObject();
     for (auto it = shortcuts.begin(); it != shortcuts.end(); ++it)
@@ -356,6 +371,7 @@ void AppState::save()
         {"audio", QJsonObject{{"volume_max", m_volumeMax}, {"loudness_boost", m_loudnessBoost},
                               {"loudness_strength", m_loudnessStrength}, {"device", m_audioDevice},
                               {"tracks_on_open", m_tracksOnOpen}}},
+        {"picture", QJsonObject::fromVariantMap(m_picture)},
         {"first_run_hint_done", m_firstRunHintDone},
         {"shortcuts", QJsonObject::fromVariantMap(m_shortcuts)},
         {"screenshots", QJsonObject{{"folder", m_screenshotFolder}, {"custom", m_screenshotCustomPath}}},

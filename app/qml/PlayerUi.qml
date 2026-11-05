@@ -31,6 +31,8 @@ Item {
     property var subtitleTrack: false
     property real loopA: -1 // the A-B loop's ends in seconds, -1 while not set
     property real loopB: -1
+    property var chapterList: [] // mpv's chapter-list: {title, time}
+    property real chapterStepAt: 0 // when a chapter key was pressed: the chapter it lands on gets a toast
     property real videoZoom: 0 // mpv's video-zoom: log2, 0 = 100%
     property int videoRotate: 0
     property real videoAspect: -1 // -1: the clip's own
@@ -114,6 +116,15 @@ Item {
         wake()
         mpv.command(["ab-loop"])
     }
+    // mpv's own step: back within 5 s of a chapter's start goes to the one before. The bar comes up to show where it
+    // landed, and a toast names it.
+    function stepChapter(step) {
+        if (chapterList.length === 0) return
+        chapterStepAt = Date.now()
+        wake()
+        mpv.command(["add", "chapter", step])
+    }
+    function chapterTitle(index) { return chapterList[index].title || I18n.strings.chapter_n.arg(index + 1) }
 
     function observe(name, value) {
         switch (name) {
@@ -126,6 +137,10 @@ Item {
         case "sid": subtitleTrack = value; break
         case "ab-loop-a": loopA = typeof value === "number" ? value : -1; break // "no" while not set
         case "ab-loop-b": loopB = typeof value === "number" ? value : -1; break
+        case "chapter-list": chapterList = value || []; break
+        case "chapter":
+            if (Date.now() - chapterStepAt < 1000 && value >= 0 && value < chapterList.length) window.showToast(chapterTitle(value), 2500)
+            break
         case "video-zoom": videoZoom = value || 0; break
         case "video-rotate": videoRotate = value || 0; break
         case "video-aspect-override": videoAspect = value > 0 ? value : -1; break // "no" reads 0, the old auto -1
@@ -134,7 +149,7 @@ Item {
         }
     }
     Component.onCompleted: {
-        for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid", "ab-loop-a", "ab-loop-b", "video-zoom", "video-rotate",
+        for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid", "ab-loop-a", "ab-loop-b", "chapter-list", "chapter", "video-zoom", "video-rotate",
                             "video-aspect-override", "sub-delay", "audio-delay"]) {
             mpv.observeProperty(name)
             observe(name, mpv.observed(name))

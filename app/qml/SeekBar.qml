@@ -11,6 +11,7 @@ Item {
     property bool hasVideo: true
     property real loopA: -1 // the A-B loop's two ends in seconds, -1 while not set
     property real loopB: -1
+    property var chapters: [] // mpv's chapter-list: {title, time}
     property Item bounds: parent // the preview stays inside this item
     signal seekRequested(real seconds, bool exact)
     readonly property bool active: hover.hovered || mouse.pressed
@@ -23,6 +24,12 @@ Item {
     readonly property real shownFraction: mouse.pressed ? dragFraction : duration > 0 ? Math.min(1, position / duration) : 0
     readonly property real targetFraction: mouse.pressed ? dragFraction : pointerFraction
     readonly property real targetSeconds: targetFraction * duration
+    readonly property string targetChapter: {
+        let title = ""
+        for (let i = 0; i < chapters.length && chapters[i].time <= targetSeconds; ++i)
+            title = chapters[i].title || I18n.strings.chapter_n.arg(i + 1)
+        return title
+    }
 
     onTargetSecondsChanged: if (active && hasVideo && duration > 0) Thumbnailer.request(targetSeconds)
 
@@ -51,6 +58,19 @@ Item {
             width: parent.width * Math.abs(seek.loopB - seek.loopA) / Math.max(1, seek.duration)
             height: parent.height
             color: Qt.alpha(Theme.tokens.glass.text, 0.45)
+        }
+        Repeater { // each chapter's start: a gap in the track, as on YouTube
+            model: seek.chapters
+            Rectangle {
+                required property var modelData
+                required property int index
+                objectName: "chapterMark-" + index
+                visible: modelData.time > 0 && modelData.time < seek.duration
+                x: parent.width * modelData.time / Math.max(1, seek.duration) - 1
+                width: 2
+                height: parent.height
+                color: Theme.tokens.glass.fill
+            }
         }
     }
     Repeater { // its ends
@@ -98,7 +118,7 @@ Item {
         id: preview
         visible: seek.active && seek.duration > 0
         spacing: 6
-        width: picture.visible ? picture.width : timeTag.width
+        width: Math.max(picture.visible ? picture.width : 0, timeTag.width)
         y: -height - 10
         x: {
             const wanted = seek.width * seek.targetFraction - width / 2
@@ -107,6 +127,7 @@ Item {
         }
         RoundedImage {
             id: picture
+            anchors.horizontalCenter: parent.horizontalCenter
             visible: seek.hasVideo && Thumbnailer.source.toString() !== ""
             height: 119
             width: Math.round(height * aspect)
@@ -122,14 +143,26 @@ Item {
             height: tag.implicitHeight + 6
             radius: height / 2
             color: Qt.alpha(Theme.tokens.glass.fill, 0.86)
-            Label {
+            Row { // the time, then the chapter it falls in
                 id: tag
                 anchors.centerIn: parent
-                text: Format.time(seek.targetSeconds)
-                color: Theme.tokens.glass.text
-                font.pixelSize: Theme.tokens.type.small
-                font.weight: Font.Bold
-                font.features: {"tnum": 1}
+                spacing: 8
+                Label {
+                    text: Format.time(seek.targetSeconds)
+                    color: Theme.tokens.glass.text
+                    font.pixelSize: Theme.tokens.type.small
+                    font.weight: Font.Bold
+                    font.features: {"tnum": 1}
+                }
+                Label {
+                    objectName: "seekChapter"
+                    visible: text !== ""
+                    width: Math.min(implicitWidth, 240)
+                    text: seek.targetChapter
+                    color: Theme.tokens.glass.textMuted
+                    font.pixelSize: Theme.tokens.type.small
+                    font.weight: Font.DemiBold
+                }
             }
         }
     }

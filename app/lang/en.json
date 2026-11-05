@@ -196,6 +196,8 @@
   "action_seek_fine_back": "1 second back",
   "action_frame_next": "Next frame",
   "action_frame_previous": "Previous frame",
+  "action_chapter_next": "Next chapter",
+  "action_chapter_previous": "Previous chapter",
   "action_ab_loop": "Loop a part: start, end, off",
   "action_always_on_top": "Always on top",
 
@@ -241,6 +243,7 @@
   "loop_start": "Loop starts at %1. Press again for its end.",
   "loop_on": "Looping %1 to %2",
   "loop_off": "Loop off",
+  "chapter_n": "Chapter %1",
   "on_top_on": "Always on top",
   "on_top_off": "No longer on top",
   "shot_saved": "Screenshot saved",

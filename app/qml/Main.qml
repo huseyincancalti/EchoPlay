@@ -406,6 +406,8 @@ Window {
         {id: "seek_fine_back", key: "Shift+Left", run: () => root.seekBy(-1, true)},
         {id: "frame_next", key: ".", run: () => mpv.command(["frame-step"])},
         {id: "frame_previous", key: ",", run: () => mpv.command(["frame-back-step"])},
+        {id: "chapter_next", key: "PgUp", run: () => { if (ui.item) ui.item.stepChapter(1) }}, // mpv's own keys
+        {id: "chapter_previous", key: "PgDown", run: () => { if (ui.item) ui.item.stepChapter(-1) }},
         {id: "ab_loop", key: "L", run: () => { if (ui.item) ui.item.cycleLoop() }},
         {id: "track_1", key: "Ctrl+1", run: () => MixerController.toggle(1)},
         {id: "track_2", key: "Ctrl+2", run: () => MixerController.toggle(2)},

@@ -41,6 +41,7 @@ GlassPanel {
         hasVideo: bar.ui.hasVideo
         loopA: bar.ui.loopA
         loopB: bar.ui.loopB
+        chapters: bar.ui.chapterList
         bounds: bar.parent
         onSeekRequested: (seconds, exact) => bar.ui.seekTo(seconds, exact)
     }

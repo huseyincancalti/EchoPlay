@@ -2,6 +2,7 @@
 #include <QCryptographicHash>
 #include <QQuickItem>
 #include <QQmlApplicationEngine>
+#include <QProcess>
 #include <QQuickImageProvider>
 #include <QQuickWindow>
 #include <QStandardPaths>
@@ -1445,6 +1446,69 @@ private slots:
         QTRY_VERIFY(app.item("mediaInfo"));
         QVERIFY(app.click("mediaInfoClose"));
         QTRY_VERIFY(!app.item("mediaInfo"));
+    }
+
+    // Chapters, as an MP4 carries them (OBS's hybrid MP4 writes chapter markers): gaps in the seek bar, the hovered
+    // one's title next to the time, PgUp/PgDown step through them with a toast.
+    void chapters()
+    {
+        const QString state = QDir(m_path).filePath("chapters");
+        const QString folder = QDir(m_path).filePath("chapters-clip");
+        QVERIFY(QDir().mkpath(state));
+        QVERIFY(QDir().mkpath(folder));
+        const QString meta = folder + "/chapters.txt"; // ffmpeg's metadata file: four parts of 15 s
+        QFile file(meta);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(";FFMETADATA1\n");
+        const QStringList titles{"Warm-up", "Round one", "Clutch", "Outro"};
+        for (int i = 0; i < titles.size(); ++i)
+            file.write(QString("[CHAPTER]\nTIMEBASE=1/1000\nSTART=%1\nEND=%2\ntitle=%3\n").arg(i * 15000).arg((i + 1) * 15000).arg(titles[i]).toUtf8());
+        file.close();
+        const QString clip = folder + "/chapters.mp4";
+        QProcess ffmpeg;
+        ffmpeg.start("ffmpeg", {"-v", "error", "-y", "-i", m_clip, "-i", meta, "-map", "0", "-map_chapters", "1", "-c", "copy", clip});
+        QVERIFY2(ffmpeg.waitForFinished(30000) && ffmpeg.exitCode() == 0, ffmpeg.readAllStandardError().constData());
+
+        Launch app(state, clip, QDir(m_path).filePath("chapters.log"));
+        QVERIFY(app.mpv);
+        for (const char *name : {"chapter", "chapter-list", "track-list"})
+            app.mpv->observeProperty(name);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_COMPARE(app.mpv->observed("chapter-list").toList().size(), 4);
+        // MP4's chapter text track is no subtitle track.
+        for (const QVariant &track : app.mpv->observed("track-list").toList())
+            QVERIFY(track.toMap().value("type").toString() != "sub");
+        app.wake();
+        QTRY_VERIFY(app.item("controlBar")->isVisible());
+        QQuickItem *seekBar = app.item("seekBar");
+        QVERIFY(seekBar);
+        QVERIFY(!Launch::searchVisible(seekBar, "chapterMark-0")); // the start is no gap
+        for (int i = 1; i < 4; ++i) {
+            QQuickItem *mark = Launch::searchVisible(seekBar, qPrintable(QString("chapterMark-%1").arg(i)));
+            QVERIFY2(mark, qPrintable(QString("chapterMark-%1").arg(i)));
+            QVERIFY(std::abs(mark->x() + 1 - seekBar->width() * i / 4) < 2);
+        }
+        // The pointer over the third part: its title next to the time.
+        const QPoint onClutch = seekBar->mapToScene(QPointF(seekBar->width() * 0.6, seekBar->height() / 2)).toPoint();
+        QTest::mouseMove(app.window, onClutch - QPoint(3, 0));
+        QTest::mouseMove(app.window, onClutch);
+        QTRY_COMPARE(app.item("seekChapter")->property("text").toString(), QString("Clutch"));
+        QTest::qWait(800); // the preview picture
+        app.shot("chapters");
+        QTest::mouseMove(app.window, QPoint(app.window->width() / 2, app.window->height() / 2));
+        // mpv's keys: PgUp next, PgDown back (within 5 s of a start: the part before).
+        const auto toast = [&] { return app.item("toastText")->property("text").toString(); };
+        app.key(Qt::Key_PageUp);
+        QTRY_COMPARE(app.number("chapter"), 1.0);
+        QTRY_COMPARE(toast(), QString("Round one"));
+        QTRY_VERIFY(app.number("time-pos") >= 14.9);
+        app.key(Qt::Key_PageUp);
+        QTRY_COMPARE(app.number("chapter"), 2.0);
+        QTRY_COMPARE(toast(), QString("Clutch"));
+        app.key(Qt::Key_PageDown);
+        QTRY_COMPARE(app.number("chapter"), 1.0);
+        QTRY_COMPARE(toast(), QString("Round one"));
+        QTRY_VERIFY(app.number("time-pos") < 20);
     }
 
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.

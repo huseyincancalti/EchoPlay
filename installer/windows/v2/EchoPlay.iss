@@ -210,6 +210,10 @@ Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueN
 #endif
 
 [Run]
+; Windows checks new program files the first time they run: the first start after an install or an update took about
+; 2 s longer (tools/first-run.sh: a 2 s clip 5.7 s against 3.4 s). A hidden --smoke run pays that here instead, and
+; leaves the next start as fast as any other. --after-setup: this setup's own lock does not apply to it.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--smoke --after-setup"; Flags: runhidden nowait
 ; --after-setup: this setup's own lock does not apply, the files are in place.
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--after-setup"; Description: "Launch EchoPlay"; Flags: postinstall nowait skipifsilent unchecked
 ; An update started with Install from inside EchoPlay (/ECHOPLAYUPDATE=1) reopens it, on the start screen. One that

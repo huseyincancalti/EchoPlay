@@ -43,8 +43,15 @@ playedThatClip() { # playedThatClip <log> <ms>: the launch came back, with its p
     sleep 0.2
   done
 }
-testAppRunning() {
-  [ "$(powershell.exe -NoProfile -Command "@(Get-Process EchoPlay -ErrorAction SilentlyContinue | Where-Object { \$_.Path -like '*setup-test*' }).Count" 2>/dev/null | tr -d '\r')" != "0" ]
+testAppProcesses() { # testAppProcesses <-like|-notlike>: how many test-folder EchoPlays have --smoke, or have not
+  powershell.exe -NoProfile -Command "@(Get-CimInstance Win32_Process -Filter \"Name='EchoPlay.exe'\" | Where-Object { \$_.ExecutablePath -like '*setup-test*' -and \$_.CommandLine $1 '*--smoke*' }).Count" 2>/dev/null | tr -d '\r'
+}
+# Not counting the setup's hidden warm-up run (--smoke, installer/windows/v2/EchoPlay.iss [Run]): it ends by itself.
+testAppRunning() { [ "$(testAppProcesses -notlike)" != "0" ]; }
+warmUpRunning() { [ "$(testAppProcesses -like)" != "0" ]; }
+waitWarmUp() { # a running exe cannot be written to
+  local start; start=$(now)
+  while warmUpRunning && [ $(($(now) - start)) -lt 10000 ]; do sleep 0.2; done
 }
 notRunning() { ! testAppRunning; }
 killTestApp() { # only processes from the test folder, never a real EchoPlay. Its files are free when this returns.
@@ -60,6 +67,7 @@ sameAsStage() { # every staged file is installed, byte for byte
 }
 oldVersion() { # what the setup must put right, as an update does. The exe and a DLL too: a file a running EchoPlay
   # holds is what an update can fail on, and a byte at the end of a PE file changes nothing when it runs.
+  waitWarmUp
   rm -f "$APP/lang/tr.json"
   echo '{}' > "$APP/theme.json"
   printf 'x' >> "$APP/EchoPlay.exe"
@@ -80,7 +88,7 @@ seesInstallingLock() { # up to a minute
 }
 
 killTestApp
-rm -rf "$APP" "$OUT/logs"
+rm -rf "$APP" "$OUT/logs" "$OUT/first-install.log"
 mkdir -p "$OUT/logs"
 : > "$OUT/report.txt"
 before=$(theRealEchoPlay)
@@ -99,8 +107,10 @@ CLIPM=$(cygpath -m "$PWD/$CLIP")
 
 report "first install"
 start=$(now)
-code=0; clean "$SETUP" //VERYSILENT //SUPPRESSMSGBOXES //NORESTART || code=$?
+code=0; clean "$SETUP" //VERYSILENT //SUPPRESSMSGBOXES //NORESTART "//LOG=$(cygpath -w "$PWD/$OUT/first-install.log")" || code=$?
 report "  $(($(now) - start)) ms, exit $code"
+# What the warm-up saves is measured by tools/first-run.sh (these files are the stage's, already run once).
+check "it started its hidden warm-up run" grep -q -- '--smoke --after-setup' "$OUT/first-install.log"
 check "it installed every staged file" sameAsStage
 
 report "update on close, nothing else opened"

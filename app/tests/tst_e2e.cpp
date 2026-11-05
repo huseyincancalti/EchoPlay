@@ -1410,6 +1410,43 @@ private slots:
         QCOMPARE(app.services.player.subtitlePosition(), 95);
     }
 
+    // Clip info: the file and each track, as the container reports them; Copy gives the same as text.
+    void mediaInfo()
+    {
+        const QString state = QDir(m_path).filePath("info");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, m_clip, QDir(m_path).filePath("info.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+        app.key(Qt::Key_I);
+        QTRY_VERIFY(app.item("mediaInfo"));
+        const auto text = [&](const char *name) {
+            QQuickItem *item = app.item(name);
+            return item ? item->property("details").toString() : QString("(missing)");
+        };
+        QTRY_VERIFY(app.item("mediaInfoFile")->property("text").toString().contains(" MB · 1:00 · "));
+        const QString video = text("mediaInfoTrack-video-1");
+        QVERIFY2(video.contains("H.264") && video.contains("1280 × 720") && video.contains("60 fps"), qPrintable(video));
+        for (const char *audio : {"mediaInfoTrack-audio-1", "mediaInfoTrack-audio-2"})
+            QVERIFY2(text(audio).contains("AAC") && text(audio).contains("kHz"), qPrintable(text(audio)));
+        app.shot("media-info");
+        // What Copy puts on the clipboard, read without clicking it: that would overwrite the clipboard of whoever sits
+        // at the PC.
+        QVariant copied;
+        QVERIFY(QMetaObject::invokeMethod(app.item("mediaInfo"), "asText", Q_RETURN_ARG(QVariant, copied)));
+        QVERIFY2(copied.toString().contains("Microphone") && copied.toString().contains("H.264"), qPrintable(copied.toString()));
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("mediaInfo"));
+        // From the right-click menu too.
+        QTest::mouseClick(app.window, Qt::RightButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
+        QTRY_VERIFY(app.item("contextMenu"));
+        QVERIFY(app.click("menuInfo"));
+        QTRY_VERIFY(app.item("mediaInfo"));
+        QVERIFY(app.click("mediaInfoClose"));
+        QTRY_VERIFY(!app.item("mediaInfo"));
+    }
+
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.
     void looks()
     {

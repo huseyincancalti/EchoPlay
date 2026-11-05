@@ -128,6 +128,14 @@ Popover {
             onClicked: menu.run(() => MediaFiles.showInFolder(menu.path))
         }
         MenuRow {
+            objectName: "menuInfo"
+            visible: !menu.forRow
+            icon: "info"
+            text: menu.strings.clip_info
+            key: menu.keyOf("clip_info")
+            onClicked: menu.run(() => menu.ui.popover = "info")
+        }
+        MenuRow {
             objectName: "menuDelete"
             icon: "delete"
             text: menu.strings.delete_clip

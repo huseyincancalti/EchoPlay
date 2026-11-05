@@ -419,6 +419,7 @@ Window {
         {id: "next", key: ">", run: () => mpv.command(["playlist-next"])},
         {id: "previous", key: "<", run: () => mpv.command(["playlist-prev"])},
         {id: "fullscreen", key: "F", run: () => chrome.toggleFullScreen()},
+        {id: "clip_info", key: "I", run: () => { if (ui.item) ui.item.togglePopover("info") }},
         {id: "always_on_top", key: "T", run: () => root.toggleOnTop()},
     ]
     function changeVolume(step) {

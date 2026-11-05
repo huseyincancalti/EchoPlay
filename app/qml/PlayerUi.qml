@@ -44,7 +44,8 @@ Item {
     readonly property var subtitleTracks: trackList.filter(t => t.type === "sub")
     readonly property bool fullScreen: window.visibility === Window.FullScreen
 
-    // "" or the open popover: "mixer", "quick", "subtitles", "picture", "menu" (the right-click menu).
+    // "" or the open popover: "mixer", "quick", "subtitles", "picture", "info" (clip info), "menu" (the right-click
+    // menu).
     property string popover: forceChrome ? "mixer" : ""
     property point menuAt // where the right-click was, in this item
     property string menuPath // the clip it is about
@@ -347,6 +348,12 @@ Item {
         }
     }
 
+    Loader { // clip info, in the middle
+        x: item ? (ui.width - item.width) / 2 : 0
+        y: item ? Math.max(16, (ui.height - item.height) / 2 - 24) : 0
+        active: ui.popover === "info"
+        sourceComponent: MediaInfoPanel { ui: player; height: implicitHeight }
+    }
     Loader { // at the pointer, inside the window: below and right of it where it fits
         x: item ? Math.max(8, Math.min(ui.menuAt.x, ui.width - item.width - 8)) : 0
         y: item ? (ui.menuAt.y + item.height <= ui.height - 8 ? ui.menuAt.y : Math.max(8, ui.menuAt.y - item.height)) : 0

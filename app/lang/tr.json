@@ -191,6 +191,7 @@
   "action_next": "Sonraki klip",
   "action_previous": "Önceki klip",
   "action_fullscreen": "Tam ekran",
+  "action_clip_info": "Klip bilgisi",
   "action_seek_fine_forward": "1 saniye ileri",
   "action_seek_fine_back": "1 saniye geri",
   "action_frame_next": "Sonraki kare",
@@ -266,6 +267,10 @@
   "open_another": "Başka dosya aç",
   "copy_details": "Ayrıntıları kopyala",
   "copied": "Kopyalandı",
+  "clip_info": "Klip bilgisi",
+  "info_video": "Video",
+  "info_channels": "%1 kanal",
+  "copy": "Kopyala",
   "report_problem": "Sorun bildir",
   "sends_nothing": "EchoPlay kendisi hiçbir şey göndermez.",
 

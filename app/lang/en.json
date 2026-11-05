@@ -191,6 +191,7 @@
   "action_next": "Next clip",
   "action_previous": "Previous clip",
   "action_fullscreen": "Full screen",
+  "action_clip_info": "Clip info",
   "action_seek_fine_forward": "1 second forward",
   "action_seek_fine_back": "1 second back",
   "action_frame_next": "Next frame",
@@ -266,6 +267,10 @@
   "open_another": "Open another file",
   "copy_details": "Copy details",
   "copied": "Copied",
+  "clip_info": "Clip info",
+  "info_video": "Video",
+  "info_channels": "%1 channels",
+  "copy": "Copy",
   "report_problem": "Report a problem",
   "sends_nothing": "EchoPlay sends nothing itself.",
 

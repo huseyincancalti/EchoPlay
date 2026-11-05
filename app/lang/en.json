@@ -137,6 +137,8 @@
   "accent_title": "Accent color",
   "accent_desc": "Used for the progress bar, switches and the mixer. Pick one, or any color.",
   "any_color": "Any color",
+  "accent_windows_title": "Windows accent color",
+  "accent_windows_desc": "Uses the color picked in Windows (Personalization > Colors) and follows it when it changes.",
   "bar_title": "Control bar",
   "bar_desc": "A floating island, or edge to edge.",
   "bar_island": "Island",

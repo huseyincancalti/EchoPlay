@@ -162,6 +162,20 @@ private slots:
         QCOMPARE(changed.count(), 1);
         theme.setAccentChoice(QString()); // back to the token
         QCOMPARE(theme.accent(), QColor("#FF7D26"));
+        theme.setAccentChoice("system"); // Windows' accent: none without a GUI, so the token
+        QCOMPARE(theme.accentChoice(), QString("system"));
+        QCOMPARE(theme.accent(), QColor("#FF7D26"));
+    }
+
+    void windowsAccentIsReadable()
+    {
+        const auto near = [](const QColor &a, const QColor &b) {
+            return std::abs(a.red() - b.red()) <= 1 && std::abs(a.green() - b.green()) <= 1 && std::abs(a.blue() - b.blue()) <= 1;
+        };
+        QVERIFY(near(Theme::readableAccent(QColor("#0078D4")), QColor("#0078D4"))); // Windows' default blue stays
+        QVERIFY(Theme::readableAccent(QColor("#001A33")).lightnessF() >= 0.39f);   // too dark on the glass
+        QVERIFY(Theme::readableAccent(QColor("#E0F0FF")).lightnessF() <= 0.66f);   // too light on a light panel
+        QVERIFY(Theme::readableAccent(QColor("#000000")).isValid());               // no hue at all
     }
 
     void glassStrengthMovesTheOpacity()

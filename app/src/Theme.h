@@ -27,7 +27,8 @@ class Theme : public QObject
     Q_PROPERTY(QVariantMap colors READ colors NOTIFY modeChanged)
     Q_PROPERTY(QString mode READ mode WRITE setMode NOTIFY modeChanged)                 // "dark", "light", "system"
     Q_PROPERTY(bool dark READ dark NOTIFY modeChanged)                                  // the mode in effect
-    Q_PROPERTY(QString accentChoice READ accentChoice WRITE setAccentChoice NOTIFY accentChanged) // empty = the token
+    // Empty = the token, "system" = Windows' accent color, followed live.
+    Q_PROPERTY(QString accentChoice READ accentChoice WRITE setAccentChoice NOTIFY accentChanged)
     Q_PROPERTY(QColor accent READ accent NOTIFY accentChanged)
     Q_PROPERTY(QColor onAccent READ onAccent NOTIFY accentChanged)
     Q_PROPERTY(QString barStyle READ barStyle WRITE setBarStyle NOTIFY barStyleChanged) // "island", "full"
@@ -51,8 +52,10 @@ public:
     void setSystemDark(bool dark); // follows Windows' app mode once startGui() ran
 
     QString accentChoice() const;
-    void setAccentChoice(const QString &color); // empty or a color name; anything else is ignored
+    void setAccentChoice(const QString &color); // empty, "system" or a color name; anything else is ignored
     QColor accent() const;
+    // Windows' accent pulled into a lightness that reads on the dark glass and on light panels, as VLC's redesign does.
+    static QColor readableAccent(const QColor &color);
     // The token color with the better contrast on accent: any color can be picked.
     QColor onAccent() const;
 
@@ -84,6 +87,9 @@ public:
     }
     static void setInstance(Theme *theme) { s_instance = theme; } // main.cpp, before QML loads
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override; // Windows' accent changed: the palette did
+
 signals:
     void modeChanged();
     void accentChanged();
@@ -107,4 +113,5 @@ private:
     QStringList m_userFonts;
     bool m_guiStarted = false;
     bool m_systemDark = true;
+    QColor m_systemAccent; // invalid until startGui()
 };

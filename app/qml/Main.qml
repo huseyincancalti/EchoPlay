@@ -558,6 +558,7 @@ Window {
     // Bench with glass: a bar and a popover stay open, the worst case. --no-glass stays bare, for shot-compare.
     Loader {
         id: ui
+        objectName: "playerUiLoader"
         anchors.fill: parent
         anchors.margins: chrome.inset
         active: root.restarted && (!root.measuring || root.glass)

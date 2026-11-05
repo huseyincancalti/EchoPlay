@@ -8,10 +8,13 @@
 #include <QGuiApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPalette>
 #include <QStyleHints>
 #include <QUrl>
 #include <QtMath>
 #include "AppState.h"
+
+#include <algorithm>
 
 namespace {
 
@@ -114,15 +117,35 @@ QString Theme::accentChoice() const { return m_state->accentColor(); }
 
 void Theme::setAccentChoice(const QString &color)
 {
-    if (color == accentChoice() || (!color.isEmpty() && !QColor::isValidColorName(color))) return;
+    if (color == accentChoice() || (!color.isEmpty() && color != "system" && !QColor::isValidColorName(color))) return;
     m_state->setAccentColor(color);
     emit accentChanged();
 }
 
 QColor Theme::accent() const
 {
+    if (accentChoice() == "system" && m_systemAccent.isValid()) return readableAccent(m_systemAccent);
     const QColor choice(accentChoice());
     return choice.isValid() ? choice : QColor(m_tokens.value("accent").toString());
+}
+
+QColor Theme::readableAccent(const QColor &color)
+{
+    const QColor hsl = color.toHsl();
+    return QColor::fromHslF(std::max(0.0f, hsl.hslHueF()), hsl.hslSaturationF(), std::clamp(hsl.lightnessF(), 0.4f, 0.65f));
+}
+
+bool Theme::eventFilter(QObject *watched, QEvent *event)
+{
+    // Links follow the accent through the palette too (Services.cpp): only a new Accent role counts.
+    if (watched == qApp && event->type() == QEvent::ApplicationPaletteChange) {
+        const QColor now = QGuiApplication::palette().color(QPalette::Accent);
+        if (now != m_systemAccent) {
+            m_systemAccent = now;
+            if (accentChoice() == "system") emit accentChanged();
+        }
+    }
+    return false;
 }
 
 QColor Theme::onAccent() const
@@ -218,6 +241,8 @@ void Theme::startGui()
     m_systemDark = hints->colorScheme() != Qt::ColorScheme::Light;
     connect(hints, &QStyleHints::colorSchemeChanged, this,
             [this](Qt::ColorScheme scheme) { setSystemDark(scheme != Qt::ColorScheme::Light); });
+    m_systemAccent = QGuiApplication::palette().color(QPalette::Accent);
+    qApp->installEventFilter(this);
 }
 
 QString Theme::loadFontFile(const QUrl &file)

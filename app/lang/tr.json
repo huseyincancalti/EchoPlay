@@ -137,6 +137,8 @@
   "accent_title": "Vurgu rengi",
   "accent_desc": "İlerleme çubuğu, anahtarlar ve karıştırıcıda kullanılır. Birini ya da istediğin rengi seç.",
   "any_color": "İstediğin renk",
+  "accent_windows_title": "Windows vurgu rengi",
+  "accent_windows_desc": "Windows'ta seçilen rengi (Kişiselleştirme > Renkler) kullanır, o değişince bu da değişir.",
   "bar_title": "Denetim çubuğu",
   "bar_desc": "Yüzen bir ada ya da kenardan kenara.",
   "bar_island": "Ada",

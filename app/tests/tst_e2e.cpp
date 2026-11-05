@@ -2,6 +2,7 @@
 #include <QCryptographicHash>
 #include <QQuickItem>
 #include <QQmlApplicationEngine>
+#include <QPalette>
 #include <QProcess>
 #include <QQuickImageProvider>
 #include <QQuickWindow>
@@ -100,7 +101,14 @@ struct Launch
         QSignalSpy restarted(mpv, &MpvItem::playbackRestarted);
         if (!restarted.wait(20000)) return false;
         mpv->setProperty("mute", true);
-        return QTest::qWaitFor([this] { return prop("vo-configured") == "yes" && prop("pause") == "no" && number("time-pos") > 0.3; }, 10000);
+        return QTest::qWaitFor([this] { return prop("vo-configured") == "yes" && prop("pause") == "no" && number("time-pos") > 0.3 && uiLoaded(); }, 10000);
+    }
+    // The player's UI loads asynchronously: its items are in the tree before the Loader hands it over, and a key that
+    // reaches it through the Loader (L, I, PgUp) does nothing until then. Seen: L lost after "controlBar" was found.
+    bool uiLoaded() const
+    {
+        QQuickItem *loader = item("playerUiLoader");
+        return loader && loader->property("item").value<QObject *>();
     }
 
     // mpv reads "no" back as the flag false (aid=no, dither=no): compare as the strings that were set.
@@ -786,6 +794,14 @@ private slots:
         app.services.theme.setMode("light");
         QVERIFY(app.click("settingsTab-appearance"));
         app.shot("settings-light");
+        // Windows' accent color, made readable; a swatch takes over from it.
+        QVERIFY(app.click("accentWindowsSwitch"));
+        QTRY_COMPARE(app.services.theme.accentChoice(), QString("system"));
+        QCOMPARE(app.services.theme.accent(), Theme::readableAccent(QGuiApplication::palette().color(QPalette::Accent)));
+        app.shot("settings-accent-windows");
+        QVERIFY(app.click("swatch-"));
+        QTRY_COMPARE(app.services.theme.accentChoice(), QString());
+        QVERIFY(!app.item("accentWindowsSwitch")->property("checked").toBool());
         app.services.theme.setMode("dark");
         app.window->resize(app.window->minimumSize());
         QTRY_COMPARE(app.window->width(), app.window->minimumWidth());

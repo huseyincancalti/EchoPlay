@@ -290,7 +290,7 @@ Column {
                     id: swatch
                     required property string modelData
                     readonly property color shown: modelData || Theme.tokens.accent
-                    readonly property bool selected: Qt.colorEqual(shown, Theme.accent)
+                    readonly property bool selected: Theme.accentChoice !== "system" && Qt.colorEqual(shown, Theme.accent)
                     objectName: "swatch-" + modelData
                     width: 28
                     height: 28
@@ -337,6 +337,20 @@ Column {
                     fill: "transparent"
                 }
             }
+        }
+    }
+    Row_ {
+        tab: "appearance"
+        title: content.strings.accent_windows_title
+        description: content.strings.accent_windows_desc
+        ToggleSwitch {
+            objectName: "accentWindowsSwitch"
+            width: 44
+            height: 26
+            name: content.strings.accent_windows_title
+            offColor: content.colors.track
+            checked: Theme.accentChoice === "system"
+            onToggled: Theme.accentChoice = checked ? "" : "system"
         }
     }
     Row_ {

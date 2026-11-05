@@ -53,8 +53,10 @@ if(WIN32)
     string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)" _ "${ECHOPLAY_VERSION}")
     set(ECHOPLAY_VERSION_RC "${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0")
     set(ECHOPLAY_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../assets/logo.ico")
+    set(ECHOPLAY_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/echoplay.manifest")
     configure_file(echoplay.rc.in echoplay.rc @ONLY)
     target_sources(echoplay PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/echoplay.rc")
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/echoplay.rc" PROPERTIES OBJECT_DEPENDS "${ECHOPLAY_MANIFEST}")
 endif()
 
 # libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship

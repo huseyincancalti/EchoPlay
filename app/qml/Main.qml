@@ -7,7 +7,7 @@ Window {
     id: root
     width: 1280
     height: 720
-    minimumWidth: 640
+    minimumWidth: 500 // Microsoft: snap layouts may not place a window whose minimum width is above ~500
     minimumHeight: 360
     flags: Qt.Window | Qt.FramelessWindowHint // WindowChrome gives Windows its frame back
     visible: false // shown once mpv opens the file (MpvItem's onCompleted)

@@ -12,7 +12,8 @@ Popover {
     objectName: "quickPopover"
     backdrop: ui.backdrop
     width: 340
-    implicitHeight: column.height + 16
+    readonly property real maxHeight: ui.height - ui.bar.height - 80 // a short window scrolls it, as the other popovers
+    implicitHeight: Math.min(maxHeight, column.height + 16)
 
     component Heading: Item {
         property string icon
@@ -88,116 +89,125 @@ Popover {
         }
     }
 
-    Column {
-        id: column
-        x: 8
+    Flickable {
+        id: list
         y: 8
-        width: parent.width - 16
+        width: parent.width
+        height: quick.height - 16
+        contentHeight: column.height
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+        Column {
+            id: column
+            x: 8
+            width: list.width - 16
 
-        Item {
-            width: parent.width
-            height: 52
-            Heading {
-                anchors.verticalCenter: parent.verticalCenter
-                icon: "speed"
-                text: quick.strings.speed
+            Item {
+                width: parent.width
+                height: 52
+                Heading {
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: "speed"
+                    text: quick.strings.speed
+                }
+                Stepper {
+                    objectName: "speed"
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: quick.ui.speed.toFixed(2) + "x"
+                    lessName: quick.strings.slower
+                    moreName: quick.strings.faster
+                    onLess: quick.ui.mpv.command(["add", "speed", -PlayerSettings.speedStep])
+                    onMore: quick.ui.mpv.command(["add", "speed", PlayerSettings.speedStep])
+                }
             }
-            Stepper {
-                objectName: "speed"
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                text: quick.ui.speed.toFixed(2) + "x"
-                lessName: quick.strings.slower
-                moreName: quick.strings.faster
-                onLess: quick.ui.mpv.command(["add", "speed", -PlayerSettings.speedStep])
-                onMore: quick.ui.mpv.command(["add", "speed", PlayerSettings.speedStep])
+            Item { // for this clip only: it resets on the next one (Main.qml)
+                width: parent.width
+                height: 52
+                Heading {
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: "history"
+                    text: quick.strings.audio_delay
+                }
+                Stepper {
+                    objectName: "audioDelay"
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    valueWidth: 72
+                    text: (quick.ui.audioDelay > 0.004 ? "+" : "") + Math.round(quick.ui.audioDelay * 1000) + " ms"
+                    lessName: quick.strings.earlier
+                    moreName: quick.strings.later
+                    onLess: quick.ui.mpv.command(["add", "audio-delay", -0.05])
+                    onMore: quick.ui.mpv.command(["add", "audio-delay", 0.05])
+                }
             }
-        }
-        Item { // for this clip only: it resets on the next one (Main.qml)
-            width: parent.width
-            height: 52
-            Heading {
-                anchors.verticalCenter: parent.verticalCenter
-                icon: "history"
-                text: quick.strings.audio_delay
+            Column {
+                width: parent.width
+                topPadding: 8
+                bottomPadding: 12
+                spacing: 10
+                Heading {
+                    icon: "hd"
+                    text: quick.strings.picture
+                    note: PictureQuality.pref === "auto"
+                          ? quick.strings.picture_auto_on.arg(quick.strings["tier_" + PictureQuality.active]) : ""
+                }
+                Segmented {
+                    x: 10
+                    width: parent.width - 20
+                    equal: true
+                    options: [{value: "auto", label: quick.strings.tier_auto}, {value: "ultra", label: quick.strings.tier_ultra},
+                              {value: "normal", label: quick.strings.tier_normal}, {value: "low", label: quick.strings.tier_low}]
+                    value: PictureQuality.pref
+                    onChosen: value => PictureQuality.pref = value
+                }
             }
-            Stepper {
-                objectName: "audioDelay"
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                valueWidth: 72
-                text: (quick.ui.audioDelay > 0.004 ? "+" : "") + Math.round(quick.ui.audioDelay * 1000) + " ms"
-                lessName: quick.strings.earlier
-                moreName: quick.strings.later
-                onLess: quick.ui.mpv.command(["add", "audio-delay", -0.05])
-                onMore: quick.ui.mpv.command(["add", "audio-delay", 0.05])
+            Column {
+                width: parent.width
+                topPadding: 8
+                bottomPadding: 12
+                spacing: 10
+                Heading {
+                    icon: "skip_next"
+                    text: quick.strings.end_title
+                }
+                Segmented {
+                    x: 10
+                    width: parent.width - 20
+                    equal: true
+                    options: [{value: "next", label: quick.strings.end_next}, {value: "loop", label: quick.strings.end_loop},
+                              {value: "stop", label: quick.strings.end_stop}]
+                    value: PlayerSettings.endMode
+                    onChosen: value => PlayerSettings.endMode = value
+                }
             }
-        }
-        Column {
-            width: parent.width
-            topPadding: 8
-            bottomPadding: 12
-            spacing: 10
-            Heading {
-                icon: "hd"
-                text: quick.strings.picture
-                note: PictureQuality.pref === "auto"
-                      ? quick.strings.picture_auto_on.arg(quick.strings["tier_" + PictureQuality.active]) : ""
+            LinkRow {
+                objectName: "quickSubtitles"
+                icon: "subtitles"
+                text: quick.strings.subtitles
+                note: quick.ui.subtitleName
+                onClicked: quick.ui.popover = "subtitles"
             }
-            Segmented {
-                x: 10
-                width: parent.width - 20
-                equal: true
-                options: [{value: "auto", label: quick.strings.tier_auto}, {value: "ultra", label: quick.strings.tier_ultra},
-                          {value: "normal", label: quick.strings.tier_normal}, {value: "low", label: quick.strings.tier_low}]
-                value: PictureQuality.pref
-                onChosen: value => PictureQuality.pref = value
+            LinkRow {
+                objectName: "quickPicture"
+                icon: "contrast"
+                text: quick.strings.adjust_picture
+                note: quick.ui.pictureChanged ? quick.strings.adjusted : ""
+                onClicked: quick.ui.popover = "picture"
             }
-        }
-        Column {
-            width: parent.width
-            topPadding: 8
-            bottomPadding: 12
-            spacing: 10
-            Heading {
-                icon: "skip_next"
-                text: quick.strings.end_title
+            Item { width: parent.width; height: 9
+                Rectangle { x: 2; y: 4; width: parent.width - 4; height: 1; color: quick.glass.hairline }
             }
-            Segmented {
-                x: 10
-                width: parent.width - 20
-                equal: true
-                options: [{value: "next", label: quick.strings.end_next}, {value: "loop", label: quick.strings.end_loop},
-                          {value: "stop", label: quick.strings.end_stop}]
-                value: PlayerSettings.endMode
-                onChosen: value => PlayerSettings.endMode = value
+            LinkRow {
+                objectName: "allSettings"
+                icon: "tune"
+                text: quick.strings.all_settings
+                trailing: "arrow_forward"
+                onClicked: quick.ui.openSettings()
             }
-        }
-        LinkRow {
-            objectName: "quickSubtitles"
-            icon: "subtitles"
-            text: quick.strings.subtitles
-            note: quick.ui.subtitleName
-            onClicked: quick.ui.popover = "subtitles"
-        }
-        LinkRow {
-            objectName: "quickPicture"
-            icon: "contrast"
-            text: quick.strings.adjust_picture
-            note: quick.ui.pictureChanged ? quick.strings.adjusted : ""
-            onClicked: quick.ui.popover = "picture"
-        }
-        Item { width: parent.width; height: 9
-            Rectangle { x: 2; y: 4; width: parent.width - 4; height: 1; color: quick.glass.hairline }
-        }
-        LinkRow {
-            objectName: "allSettings"
-            icon: "tune"
-            text: quick.strings.all_settings
-            trailing: "arrow_forward"
-            onClicked: quick.ui.openSettings()
         }
     }
 }

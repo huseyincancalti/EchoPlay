@@ -1601,12 +1601,40 @@ private slots:
         QTRY_COMPARE(app.window->width(), 760);
         app.wake();
         app.shot("narrow");
+
+        // The smallest window, as thin as a snap layout's slot: the bar and the popovers still fit.
+        app.window->resize(app.window->minimumSize());
+        QTRY_COMPARE(app.window->width(), 500);
+        app.wake();
+        QTRY_VERIFY(bar->isVisible());
+        for (const char *name : {"playButton", "timeDisplay", "mixerChip", "fullscreenButton"}) {
+            QQuickItem *item = Launch::searchVisible(bar, name);
+            QVERIFY2(item, name);
+            const QRectF box = item->mapRectToItem(bar, QRectF(0, 0, item->width(), item->height()));
+            QVERIFY2(box.left() >= 0 && box.right() <= bar->width(), name);
+        }
+        app.shot("minimum");
+        app.wake();
+        QTRY_VERIFY(bar->isVisible());
+        QVERIFY(app.click("mixerChip"));
+        QTRY_VERIFY(app.item("mixerPopover"));
+        app.shot("minimum-mixer");
+        QVERIFY(app.click("gearButton"));
+        QTRY_VERIFY(app.item("quickPopover"));
+        app.shot("minimum-quick");
+        app.key(Qt::Key_Escape);
     }
 
 #ifdef Q_OS_WIN
     // The frameless window as Windows sees it. Messages go to this window only, so no real input is needed.
     void windowFrame()
     {
+        // The snap layouts flyout wants Windows 10/11 support claimed in the manifest, in EchoPlay.exe and in this test.
+        for (const QString &exe : {QCoreApplication::applicationDirPath() + "/EchoPlay.exe", QCoreApplication::applicationFilePath()}) {
+            QFile file(exe);
+            QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(exe));
+            QVERIFY2(file.readAll().contains("{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"), qPrintable(exe));
+        }
         const QString state = QDir(m_path).filePath("frame"); // its own: closing must not change what the second run reads
         QVERIFY(QDir().mkpath(state));
         Launch app(state, m_clip, QDir(m_path).filePath("frame.log"));
@@ -1732,7 +1760,7 @@ private slots:
         MINMAXINFO limits{};
         SendMessageW(hwnd, WM_GETMINMAXINFO, 0, LPARAM(&limits));
         const qreal ratio = app.window->devicePixelRatio();
-        QVERIFY2(limits.ptMinTrackSize.x >= qRound(640 * ratio) && limits.ptMinTrackSize.y >= qRound(360 * ratio), "minimum size is not enforced");
+        QVERIFY2(limits.ptMinTrackSize.x >= qRound(500 * ratio) && limits.ptMinTrackSize.y >= qRound(360 * ratio), "minimum size is not enforced");
         app.window->close();
     }
 #endif
@@ -1841,7 +1869,7 @@ private slots:
         check("the picture follows", [&] { return qRound(app.mpv->width() * ratio) == rect().width(); });
         const QRect smaller = rect();
         drag(QPoint(smaller.left(), smaller.center().y()), QPoint(smaller.left() + 3000, smaller.center().y())); // far past the minimum
-        check("the minimum width holds", [&] { return rect().width() >= qRound(640 * ratio) - 1 && rect().width() < smaller.width(); });
+        check("the minimum width holds", [&] { return rect().width() >= qRound(500 * ratio) - 1 && rect().width() < smaller.width(); });
 
         // The caption moves it.
         const QRect before = rect();

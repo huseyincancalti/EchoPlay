@@ -87,6 +87,9 @@ set_tests_properties(silencecheck PROPERTIES FIXTURES_REQUIRED silencecheck-clip
 qt_add_executable(tst_e2e tst_e2e.cpp)
 set_target_properties(tst_e2e PROPERTIES WIN32_EXECUTABLE OFF)
 target_link_libraries(tst_e2e PRIVATE echoplay_lib echoplay_libplugin Qt6::Test Qt6::Network)
+if(WIN32) # EchoPlay.exe's resources, its manifest above all: the test window gets snap layouts the same way
+    target_sources(tst_e2e PRIVATE "${CMAKE_BINARY_DIR}/echoplay.rc")
+endif()
 add_test(NAME e2e COMMAND tst_e2e)
 set_tests_properties(e2e PROPERTIES LABELS e2e)
 

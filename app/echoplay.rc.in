@@ -2,6 +2,9 @@
 // IDI_ICON1: the exe icon in Explorer and the taskbar; Qt also uses it as the default window icon.
 IDI_ICON1 ICON "@ECHOPLAY_ICON@"
 
+// 1 RT_MANIFEST: Windows 10/11 support claimed (snap layouts on the frameless window), run as the user.
+1 24 "@ECHOPLAY_MANIFEST@"
+
 // Version info: Task Manager shows FileDescription; file properties show the rest.
 1 VERSIONINFO
 FILEVERSION @ECHOPLAY_VERSION_RC@

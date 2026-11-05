@@ -40,10 +40,11 @@ qt_add_qml_module(echoplay_lib
             src/SilenceCheck.h src/SilenceCheck.cpp src/PlayerSettings.h src/PlayerSettings.cpp
             src/Services.h src/Services.cpp src/WindowChrome.h src/WindowChrome.cpp src/MediaFiles.h src/MediaFiles.cpp
             src/ErrorReport.h src/ErrorReport.cpp src/ClipInfo.h src/ClipInfo.cpp
+            src/TaskbarButtons.h src/TaskbarButtons.cpp
 )
 qt_add_shaders(echoplay_lib "shaders" PREFIX "/shaders" BASE "${CMAKE_CURRENT_SOURCE_DIR}/shaders" FILES shaders/glass.frag)
 if(WIN32)
-    target_link_libraries(echoplay_lib PRIVATE dwmapi shell32)
+    target_link_libraries(echoplay_lib PRIVATE dwmapi shell32 ole32 uuid)
 endif()
 qt_add_executable(echoplay src/main.cpp)
 # EchoPlay.exe, as v1's: "Open with", Task Manager and the installer's registry entries use this name.

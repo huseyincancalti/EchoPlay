@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QImage>
 #include <QQuickRhiItem>
 #include <QSet>
 #include <QVariant>
@@ -24,6 +25,8 @@ public:
 
     Q_INVOKABLE void command(const QVariantList &args);
     Q_INVOKABLE void screenshot(const QString &mode); // "subtitles", "video", "window"; screenshotFinished says how it went
+    Q_INVOKABLE void copyFrame();                     // the current frame, subtitles on it, onto the clipboard; frameCopied says how it went
+    void captureFrame();                              // the same request, but frameCaptured gets the image and the clipboard is left alone (the end-to-end test)
     Q_INVOKABLE void setOption(const QString &name, const QString &value); // before start() only
     Q_INVOKABLE void start();                                              // mpv_initialize
     // Synchronous: waits for mpv's core. Avoid it while playing. A GUI thread blocked on the core stalls Qt's
@@ -56,6 +59,8 @@ signals:
     void propertyChanged(const QString &name, const QVariant &value); // null value: property unavailable
     void keepingAwakeChanged();
     void screenshotFinished(bool saved);
+    void frameCopied(bool ok);
+    void frameCaptured(const QImage &image); // null when mpv could not make the frame
 
 protected:
     QQuickRhiItemRenderer *createRenderer() override;
@@ -65,6 +70,7 @@ private slots:
 
 private:
     void setKeepingAwake(bool on);
+    void requestFrame(quint64 reply);
 
     mpv_handle *m_mpv = nullptr;
     bool m_keepingAwake = false;

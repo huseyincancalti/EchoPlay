@@ -369,9 +369,16 @@ Item {
         active: ui.popover === "info"
         sourceComponent: MediaInfoPanel { ui: player; height: implicitHeight }
     }
-    Loader { // at the pointer, inside the window: below and right of it where it fits
+    Loader { // at the pointer, inside the window: below and right of it where it fits, else above, else as low as it
+             // fits; never under the title bar
         x: item ? Math.max(8, Math.min(ui.menuAt.x, ui.width - item.width - 8)) : 0
-        y: item ? (ui.menuAt.y + item.height <= ui.height - 8 ? ui.menuAt.y : Math.max(8, ui.menuAt.y - item.height)) : 0
+        y: {
+            if (!item) return 0
+            const top = titleBar.visible ? titleBar.height + 8 : 8
+            const above = ui.menuAt.y - item.height
+            const wanted = ui.menuAt.y + item.height <= ui.height - 8 ? ui.menuAt.y : above >= top ? above : ui.height - 8 - item.height
+            return Math.max(top, wanted)
+        }
         active: ui.popover === "menu"
         sourceComponent: ContextMenu {
             ui: player

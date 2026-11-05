@@ -1,6 +1,8 @@
 #include "MpvItem.h"
 
+#include <QClipboard>
 #include <QDir>
+#include <QGuiApplication>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <mpv/client.h>
@@ -20,6 +22,8 @@ namespace {
 
 constexpr quint64 KeepAwakeReply = 1; // observeProperty() uses 0
 constexpr quint64 ScreenshotReply = 2; // command() uses 0
+constexpr quint64 CopyFrameReply = 3;
+constexpr quint64 CaptureFrameReply = 4;
 constexpr int RecentLogLines = 12;
 
 // QVariant -> mpv_node (strings, numbers, bools, lists). Owns the memory the node points into;
@@ -72,6 +76,30 @@ QVariant fromNode(const mpv_node &n)
     }
     default: return {};
     }
+}
+
+// The reply to screenshot-raw: a node map {w, h, stride, format, data}. An image that owns its pixels, because the
+// event's memory goes with the next mpv_wait_event. Null when the command failed or the node is not what we asked for.
+QImage frameFromReply(const mpv_event &e)
+{
+    if (e.error < 0) return {};
+    const mpv_node &result = static_cast<const mpv_event_command *>(e.data)->result;
+    if (result.format != MPV_FORMAT_NODE_MAP) return {};
+    qint64 w = 0, h = 0, stride = 0;
+    QString format;
+    const mpv_byte_array *pixels = nullptr;
+    for (int i = 0; i < result.u.list->num; ++i) {
+        const QByteArray key = result.u.list->keys[i];
+        const mpv_node &v = result.u.list->values[i];
+        if (key == "w" && v.format == MPV_FORMAT_INT64) w = v.u.int64;
+        else if (key == "h" && v.format == MPV_FORMAT_INT64) h = v.u.int64;
+        else if (key == "stride" && v.format == MPV_FORMAT_INT64) stride = v.u.int64;
+        else if (key == "format" && v.format == MPV_FORMAT_STRING) format = QString::fromUtf8(v.u.string);
+        else if (key == "data" && v.format == MPV_FORMAT_BYTE_ARRAY) pixels = v.u.ba;
+    }
+    // bgr0 in memory, a little-endian 0xffRRGGBB word to Qt.
+    if (format != "bgr0" || !pixels || w <= 0 || h <= 0 || stride < w * 4 || qint64(pixels->size) < stride * h) return {};
+    return QImage(static_cast<const uchar *>(pixels->data), int(w), int(h), qsizetype(stride), QImage::Format_RGB32).copy();
 }
 
 // Renders mpv into the item's color texture on Qt's own D3D11 device (no OpenGL driver to load,
@@ -195,6 +223,19 @@ void MpvItem::screenshot(const QString &mode)
     mpv_command_node_async(m_mpv, ScreenshotReply, &node);
 }
 
+// Asynchronous like screenshot(): the frame waits for the video output, which waits for the render thread.
+void MpvItem::requestFrame(quint64 reply)
+{
+    NodeBuilder b;
+    mpv_node node;
+    b.build(QVariantList{"screenshot-raw", "subtitles", "bgr0"}, node);
+    mpv_command_node_async(m_mpv, reply, &node);
+}
+
+void MpvItem::copyFrame() { requestFrame(CopyFrameReply); }
+
+void MpvItem::captureFrame() { requestFrame(CaptureFrameReply); }
+
 QVariant MpvItem::getProperty(const QString &name) const
 {
     mpv_node node;
@@ -243,6 +284,12 @@ void MpvItem::drainEvents()
         }
         if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
         if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == ScreenshotReply) emit screenshotFinished(e->error >= 0);
+        if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == CopyFrameReply) {
+            const QImage frame = frameFromReply(*e);
+            if (!frame.isNull()) QGuiApplication::clipboard()->setImage(frame);
+            emit frameCopied(!frame.isNull());
+        }
+        if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == CaptureFrameReply) emit frameCaptured(frameFromReply(*e));
         if (e->event_id == MPV_EVENT_LOG_MESSAGE) {
             const auto *message = static_cast<mpv_event_log_message *>(e->data);
             m_recentLog << QString("[%1] %2").arg(message->prefix, QString::fromUtf8(message->text).trimmed());

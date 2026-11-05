@@ -153,6 +153,14 @@ Popover {
             onClicked: menu.run(() => menu.ui.mpv.screenshot("subtitles"))
         }
         MenuRow {
+            objectName: "menuCopyFrame"
+            visible: !menu.forRow
+            icon: "content_copy"
+            text: menu.strings.action_copy_frame
+            key: menu.keyOf("copy_frame")
+            onClicked: menu.run(() => menu.ui.mpv.copyFrame())
+        }
+        MenuRow {
             objectName: "menuOnTop"
             visible: !menu.forRow
             icon: "push_pin"

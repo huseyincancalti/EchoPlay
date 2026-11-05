@@ -220,6 +220,7 @@ Window {
             setOption("vid", "no")
             start()
             chrome.attach(root)
+            if (!root.measuring) taskbar.window = root // before it shows: the taskbar button's message comes then
             observeProperty("track-list")
             // The file opens (demuxer, audio device: WASAPI alone took ~190 ms) while Qt creates the window, the
             // D3D11 device and the first frame (~600 ms before; measured 2026-10-31), instead of after them.
@@ -310,6 +311,7 @@ Window {
             mpv.setProperty("audio-delay", "0")
         }
         function onScreenshotFinished(saved) { toast.show(saved ? I18n.strings.shot_saved : I18n.strings.shot_failed, 2000) }
+        function onFrameCopied(ok) { toast.show(ok ? I18n.strings.frame_copied : I18n.strings.frame_copy_failed, 2000) }
         function onPropertyChanged(name, value) {
             if (name === "track-list") MixerController.setTrackList(value || [])
             else if (name === "volume" && typeof value === "number") AppState.volume = value
@@ -392,6 +394,17 @@ Window {
     }
 
     WindowChrome { id: chrome }
+    // Previous, play/pause and next under the taskbar thumbnail (HC Player, VLC, PotPlayer).
+    readonly property int playlistIndex: playlist.findIndex(entry => entry.current)
+    TaskbarButtons {
+        id: taskbar
+        objectName: "taskbarButtons"
+        paused: !ui.item || ui.item.paused
+        hasPrevious: root.playlistIndex > 0
+        hasNext: root.playlistIndex >= 0 && root.playlistIndex < root.playlist.length - 1
+        tips: [I18n.strings.action_previous, paused ? I18n.strings.play : I18n.strings.pause, I18n.strings.action_next]
+        onClicked: button => mpv.command(button === "previous" ? ["playlist-prev"] : button === "next" ? ["playlist-next"] : ["cycle", "pause"])
+    }
 
     // v1's default keys (main.lua KEY_ACTIONS) and the mpv defaults v1 users rely on. Settings > Shortcuts rebinds
     // them by id (PlayerSettings.shortcuts holds only what the user changed).
@@ -418,6 +431,7 @@ Window {
         {id: "screenshot", key: "F1", run: () => mpv.screenshot("subtitles")},
         {id: "screenshot_video", key: "Shift+S", run: () => mpv.screenshot("video")},
         {id: "screenshot_window", key: "Ctrl+S", run: () => mpv.screenshot("window")},
+        {id: "copy_frame", key: "Ctrl+C", run: () => mpv.copyFrame()}, // PotPlayer's key
         {id: "next", key: ">", run: () => mpv.command(["playlist-next"])},
         {id: "previous", key: "<", run: () => mpv.command(["playlist-prev"])},
         {id: "fullscreen", key: "F", run: () => chrome.toggleFullScreen()},

@@ -21,6 +21,7 @@
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shobjidl.h>
 #endif
 
 Q_IMPORT_QML_PLUGIN(EchoPlayPlugin)
@@ -1170,8 +1171,10 @@ private slots:
         // At the pointer, with every row. A click outside closes it, and only that: no pause.
         rightClick(middle);
         QTRY_VERIFY(menu());
-        QCOMPARE(menu()->mapToScene(QPointF()).toPoint(), middle);
-        for (const char *row : {"menuOpen", "menuShowInFolder", "menuDelete", "menuScreenshot", "menuOnTop", "menuSettings"})
+        const QPoint at = menu()->mapToScene(QPointF()).toPoint();
+        QCOMPARE(at.x(), middle.x()); // at the pointer, moved up only as far as the window needs
+        QVERIFY(at.y() <= middle.y() && (at.y() == middle.y() || qRound(at.y() + menu()->height()) == app.window->height() - 8));
+        for (const char *row : {"menuOpen", "menuShowInFolder", "menuDelete", "menuScreenshot", "menuCopyFrame", "menuOnTop", "menuSettings"})
             QVERIFY2(Launch::searchVisible(menu(), row), row);
         app.shot("menu");
         QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier, QPoint(40, middle.y()));
@@ -1509,6 +1512,51 @@ private slots:
         QTRY_COMPARE(app.number("chapter"), 1.0);
         QTRY_COMPARE(toast(), QString("Round one"));
         QTRY_VERIFY(app.number("time-pos") < 20);
+    }
+
+    // Copy frame and the taskbar's thumbnail buttons. The frame is captured the way Copy frame takes it, without the
+    // clipboard: that belongs to whoever sits at the PC. The buttons are clicked by the message the taskbar posts for them
+    // (posted: Qt hands a WM_COMMAND sent straight to the window procedure to no native event filter).
+    void copyFrameAndTaskbar()
+    {
+        const QString state = QDir(m_path).filePath("windows");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, m_clip, QDir(m_path).filePath("windows.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QSignalSpy captured(app.mpv, &MpvItem::frameCaptured);
+        app.mpv->captureFrame();
+        QVERIFY(captured.wait(5000));
+        const QImage frame = captured.first().first().value<QImage>();
+        QCOMPARE(frame.size(), QSize(1280, 720));
+        QVERIFY(frame.pixelColor(20, 20) != frame.pixelColor(1260, 700)); // a picture, not one color
+        QTRY_VERIFY(app.item("controlBar"));
+        QTest::mouseClick(app.window, Qt::RightButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
+        QTRY_VERIFY(app.item("contextMenu"));
+        QVERIFY(Launch::searchVisible(app.item("contextMenu"), "menuCopyFrame"));
+        // Opened in the middle, it fits neither below nor above: as low as it fits, not under the title bar.
+        QTRY_VERIFY(app.item("contextMenu")->mapToScene(QPointF(0, 0)).y() >= app.item("titleBar")->height());
+        app.shot("menu-copy-frame");
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("contextMenu"));
+#ifdef Q_OS_WIN
+        QObject *taskbar = app.window->findChild<QObject *>("taskbarButtons");
+        QVERIFY(taskbar);
+        QTRY_VERIFY_WITH_TIMEOUT(taskbar->property("ready").toBool(), 10000);
+        QVERIFY(!taskbar->property("hasPrevious").toBool()); // one clip in its folder
+        QVERIFY(!taskbar->property("hasNext").toBool());
+        QCOMPARE(taskbar->property("tips").toStringList().value(1), app.services.i18n.strings().value("pause").toString());
+        const HWND hwnd = HWND(app.window->winId());
+        QSignalSpy clicks(taskbar, SIGNAL(clicked(QString)));
+        PostMessageW(hwnd, WM_COMMAND, MAKEWPARAM(1, THBN_CLICKED), 0);
+        QTRY_COMPARE(clicks.count(), 1);
+        QCOMPARE(clicks.first().first().toString(), QString("playPause"));
+        QTRY_COMPARE(app.prop("pause"), QString("yes"));
+        QTRY_VERIFY(taskbar->property("paused").toBool());
+        QCOMPARE(taskbar->property("tips").toStringList().value(1), app.services.i18n.strings().value("play").toString());
+        PostMessageW(hwnd, WM_COMMAND, MAKEWPARAM(1, THBN_CLICKED), 0);
+        QTRY_COMPARE(app.prop("pause"), QString("no"));
+#endif
     }
 
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.

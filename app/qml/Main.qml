@@ -203,6 +203,8 @@ Window {
             if (!root.measuring) {
                 // v1's mpv.conf, player side.
                 setOption("autocreate-playlist", "same") // the other videos in the folder are the playlist,
+                setOption("video-exts", MediaFiles.videoExtensions) // of the types EchoPlay opens (MediaFiles.cpp)
+                setOption("audio-exts", MediaFiles.audioExtensions)
                 setOption("directory-mode", "ignore")    // a subfolder next to them is not
                 setOption("volume", String(Math.min(AppState.volume, PlayerSettings.volumeMax)))
                 setOption("screenshot-format", "png")

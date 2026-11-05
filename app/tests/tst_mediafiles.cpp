@@ -13,6 +13,25 @@ class TestMediaFiles : public QObject
     }
 
 private slots:
+    // The installer registers the same types EchoPlay opens: "Open with" and Windows' Default apps page.
+    void theInstallerKnowsTheSameTypes()
+    {
+        QFile iss(ECHOPLAY_INSTALLER_ISS);
+        QVERIFY(iss.open(QIODevice::ReadOnly | QIODevice::Text));
+        const QString text = QString::fromUtf8(iss.readAll());
+        QSet<QString> expected;
+        for (const QString &list : {MediaFiles::videoExtensions(), MediaFiles::audioExtensions()})
+            for (const QString &extension : list.split(','))
+                expected.insert(extension);
+        QCOMPARE(expected.size(), 53);
+        for (const char *block : {"SupportedTypes", "Capabilities\\\\FileAssociations"}) {
+            QSet<QString> found;
+            const QRegularExpression line(QString("%1\"; ValueType: string; ValueName: \"\\.(\\w+)\"").arg(block));
+            for (auto it = line.globalMatch(text); it.hasNext();) found.insert(it.next().captured(1));
+            QCOMPARE(found, expected);
+        }
+    }
+
     void aFileIsItself()
     {
         QTemporaryDir dir;

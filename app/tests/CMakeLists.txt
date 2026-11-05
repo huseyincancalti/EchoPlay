@@ -31,6 +31,7 @@ target_include_directories(setup_on_close PRIVATE ../src)
 target_link_libraries(setup_on_close PRIVATE Qt6::Core)
 echoplay_test(resumestore ../src/ResumeStore.h ../src/ResumeStore.cpp)
 echoplay_test(mediafiles ../src/MediaFiles.h ../src/MediaFiles.cpp)
+target_compile_definitions(tst_mediafiles PRIVATE ECHOPLAY_INSTALLER_ISS="${CMAKE_SOURCE_DIR}/../installer/windows/v2/EchoPlay.iss")
 echoplay_test(errorreport ../src/ErrorReport.h ../src/ErrorReport.cpp)
 echoplay_test(playersettings ../src/PlayerSettings.h ../src/PlayerSettings.cpp ../src/AppState.h ../src/AppState.cpp
               ../src/Mixer.h ../src/Mixer.cpp)

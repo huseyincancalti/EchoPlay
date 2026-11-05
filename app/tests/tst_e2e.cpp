@@ -695,6 +695,8 @@ private slots:
         for (const char *tab : {"playback", "picture", "appearance", "language", "screenshots", "shortcuts", "about"}) {
             QVERIFY2(app.click(QByteArray("settingsTab-") + tab), tab);
             app.shot(QString("settings-") + tab);
+            if (QByteArray(tab) == "playback") // not clicked: it opens Windows' Settings on the screen
+                QVERIFY(Launch::searchVisible(app.window->contentItem(), "defaultPlayerButton"));
             // No words run out of their row: this test's own screenshot folder is a long path with no spaces.
             const QList<QQuickItem *> words = Launch::searchAllVisible(app.window->contentItem(), "settingDescription");
             for (QQuickItem *text : words)

@@ -12,13 +12,17 @@ class MediaFiles : public QObject
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
-    Q_PROPERTY(QString videoGlobs READ videoGlobs CONSTANT) // for the open dialog's filter
+    Q_PROPERTY(QString mediaGlobs READ mediaGlobs CONSTANT) // for the open dialog's filter: video and audio
+    Q_PROPERTY(QString videoExtensions READ videoExtensions CONSTANT) // mpv's video-exts and audio-exts, comma-separated
+    Q_PROPERTY(QString audioExtensions READ audioExtensions CONSTANT)
     Q_PROPERTY(QString subtitleGlobs READ subtitleGlobs CONSTANT)
 
 public:
     explicit MediaFiles(QObject *parent = nullptr) : QObject(parent) {}
 
-    static QString videoGlobs();
+    static QString mediaGlobs();
+    static QString videoExtensions();
+    static QString audioExtensions();
     static QString subtitleGlobs();
     // An existing local file with a subtitle extension (any case); a folder, a missing file or a link is not.
     Q_INVOKABLE static bool isSubtitle(const QUrl &url);

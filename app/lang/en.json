@@ -28,7 +28,7 @@
   "start_body": "Or open one. EchoPlay finds every audio track in ShadowPlay, NVIDIA App and OBS recordings.",
   "open_file": "Open file",
   "open_folder": "Open folder",
-  "videos": "Videos",
+  "media_files": "Video and audio files",
   "all_files": "All files",
   "drop_title": "Drop to play",
   "drop_note": "The other clips in its folder join the playlist.",
@@ -125,6 +125,9 @@
   "clickpause_desc": "A double click is full screen either way.",
   "ontop_title": "Always on top",
   "ontop_desc": "Keeps EchoPlay above other windows.",
+  "default_title": "Default player",
+  "default_desc": "Only you can choose it in Windows: this opens EchoPlay's page in Default apps, where you pick it for the file types you want.",
+  "default_open": "Open Windows settings",
 
   "quality_title": "Picture quality",
   "quality_desc": "Auto starts at Normal and moves a step when frames drop. Ultra needs a strong graphics card.",

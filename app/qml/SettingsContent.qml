@@ -251,6 +251,18 @@ Column {
             onToggled: PlayerSettings.alwaysOnTop = !checked
         }
     }
+    Row_ {
+        tab: "playback"
+        title: content.strings.default_title
+        description: content.strings.default_desc
+        Button_ {
+            objectName: "defaultPlayerButton"
+            icon: "open_in_new"
+            text: content.strings.default_open
+            // EchoPlay's own page in Default apps (the installer registers it); Windows lets no app set itself there.
+            onClicked: Qt.openUrlExternally("ms-settings:defaultapps?registeredAppUser=EchoPlay")
+        }
+    }
 
     // Picture
     Row_ {

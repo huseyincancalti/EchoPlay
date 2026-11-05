@@ -14,9 +14,15 @@
 
 namespace {
 
-// mpv's own video-exts, so a folder opens on a file autocreate-playlist also takes.
-const QStringList VideoExtensions = {"3g2", "3gp", "avi", "flv", "ivf", "m2ts", "m4v", "mj2", "mkv", "mov",
-                                     "mp4", "mpeg", "mpg", "mxf", "ogv", "rmvb", "ts", "webm", "wmv", "y4m"};
+// mpv's own video-exts and audio-exts (mpv --list-options), and video types other players open too: camcorder .mts and
+// .m2t, DVD .vob, .f4v, .divx, .asf, .rm. Main.qml gives both lists to mpv, so the folder playlist, the open dialog and
+// the installer's file types (installer/windows/v2/EchoPlay.iss, checked by tst_mediafiles) all take the same files.
+const QStringList VideoExtensions = {"3g2", "3gp", "asf", "avi", "divx", "f4v", "flv", "ivf", "m2t", "m2ts", "m4v",
+                                     "mj2", "mkv", "mov", "mp4", "mpeg", "mpg", "mts", "mxf", "ogv", "rm", "rmvb",
+                                     "ts", "vob", "webm", "wmv", "y4m"};
+const QStringList AudioExtensions = {"aac", "ac3", "aiff", "ape", "au", "dff", "dsf", "dts", "eac3", "flac", "m4a",
+                                     "mka", "mp1", "mp2", "mp3", "mpc", "oga", "ogg", "ogm", "opus", "tak", "thd",
+                                     "tta", "wav", "wma", "wv"};
 
 const QStringList SubtitleExtensions = {"ass", "srt", "ssa", "sub", "sup", "vtt"};
 
@@ -29,9 +35,19 @@ QStringList globs(const QStringList &extensions)
 
 } // namespace
 
-QString MediaFiles::videoGlobs()
+QString MediaFiles::mediaGlobs()
 {
-    return globs(VideoExtensions).join(' ');
+    return globs(VideoExtensions + AudioExtensions).join(' ');
+}
+
+QString MediaFiles::videoExtensions()
+{
+    return VideoExtensions.join(',');
+}
+
+QString MediaFiles::audioExtensions()
+{
+    return AudioExtensions.join(',');
 }
 
 QString MediaFiles::subtitleGlobs()

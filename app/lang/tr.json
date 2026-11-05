@@ -28,7 +28,7 @@
   "start_body": "Ya da aç. EchoPlay; ShadowPlay, NVIDIA App ve OBS kayıtlarındaki tüm ses izlerini bulur.",
   "open_file": "Dosya aç",
   "open_folder": "Klasör aç",
-  "videos": "Videolar",
+  "media_files": "Video ve ses dosyaları",
   "all_files": "Tüm dosyalar",
   "drop_title": "Oynatmak için bırak",
   "drop_note": "Klasöründeki diğer klipler oynatma listesine katılır.",
@@ -125,6 +125,9 @@
   "clickpause_desc": "Çift tıklama her durumda tam ekrandır.",
   "ontop_title": "Her zaman üstte",
   "ontop_desc": "EchoPlay'i diğer pencerelerin üstünde tutar.",
+  "default_title": "Varsayılan oynatıcı",
+  "default_desc": "Windows'ta bunu yalnız sen seçebilirsin: Varsayılan uygulamalar'da EchoPlay'in sayfası açılır, istediğin dosya türleri için orada seçersin.",
+  "default_open": "Windows ayarlarını aç",
 
   "quality_title": "Görüntü kalitesi",
   "quality_desc": "Otomatik, Normal ile başlar ve kare düştükçe bir adım değişir. Ultra güçlü bir ekran kartı ister.",

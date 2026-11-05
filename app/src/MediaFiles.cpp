@@ -18,10 +18,12 @@ namespace {
 const QStringList VideoExtensions = {"3g2", "3gp", "avi", "flv", "ivf", "m2ts", "m4v", "mj2", "mkv", "mov",
                                      "mp4", "mpeg", "mpg", "mxf", "ogv", "rmvb", "ts", "webm", "wmv", "y4m"};
 
-QStringList globs()
+const QStringList SubtitleExtensions = {"ass", "srt", "ssa", "sub", "sup", "vtt"};
+
+QStringList globs(const QStringList &extensions)
 {
     QStringList result;
-    for (const QString &extension : VideoExtensions) result << "*." + extension;
+    for (const QString &extension : extensions) result << "*." + extension;
     return result;
 }
 
@@ -29,7 +31,19 @@ QStringList globs()
 
 QString MediaFiles::videoGlobs()
 {
-    return globs().join(' ');
+    return globs(VideoExtensions).join(' ');
+}
+
+QString MediaFiles::subtitleGlobs()
+{
+    return globs(SubtitleExtensions).join(' ');
+}
+
+bool MediaFiles::isSubtitle(const QUrl &url)
+{
+    if (!url.isLocalFile()) return false;
+    const QFileInfo file(url.toLocalFile());
+    return file.isFile() && SubtitleExtensions.contains(file.suffix(), Qt::CaseInsensitive);
 }
 
 QString MediaFiles::pathToOpen(const QUrl &url)
@@ -39,7 +53,7 @@ QString MediaFiles::pathToOpen(const QUrl &url)
     if (!QFileInfo(path).isDir()) return path;
 
     QDir folder(path);
-    QStringList videos = folder.entryList(globs(), QDir::Files | QDir::Readable);
+    QStringList videos = folder.entryList(globs(VideoExtensions), QDir::Files | QDir::Readable);
     if (videos.isEmpty()) return {};
     QCollator natural;
     natural.setNumericMode(true);

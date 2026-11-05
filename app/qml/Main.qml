@@ -99,6 +99,8 @@ Window {
     function clickEndedQuestion() { return Date.now() - root.questionEndedAt < 1000 }
     function pickFile() { chooser().pickVideo(url => root.openUrl(url)) }
     function pickFolder() { chooser().pickFolder(url => root.openUrl(url)) }
+    function pickSubtitle() { chooser().pickSubtitle(url => root.addSubtitle(url)) }
+    function addSubtitle(url) { mpv.command(["sub-add", MediaFiles.localPath(url), "select"]) }
     // The clip after the one that failed, or -1. A file that fails stops playback (showError), the playlist stays.
     function nextClip() {
         const list = (playlist || []).map(entry => entry.filename.replace(/\\/g, "/"))
@@ -131,7 +133,7 @@ Window {
     function resetGeometry() {
         mpv.setProperty("video-zoom", "0")
         mpv.setProperty("video-rotate", "0")
-        mpv.setProperty("video-aspect-override", "-1")
+        mpv.setProperty("video-aspect-override", "no") // -1 is deprecated (mpv's log)
     }
     function toggleOnTop() {
         PlayerSettings.alwaysOnTop = !PlayerSettings.alwaysOnTop
@@ -303,7 +305,9 @@ Window {
             ResumeStore.save() // the previous file's spot, in case EchoPlay does not close cleanly later
             mpv.setProperty("ab-loop-a", "no") // a part of the last clip means nothing in this one
             mpv.setProperty("ab-loop-b", "no")
-            root.resetGeometry() // zoom, rotation and aspect are for one clip
+            root.resetGeometry() // zoom, rotation and aspect are for one clip, and so is a delay
+            mpv.setProperty("sub-delay", "0")
+            mpv.setProperty("audio-delay", "0")
         }
         function onScreenshotFinished(saved) { toast.show(saved ? I18n.strings.shot_saved : I18n.strings.shot_failed, 2000) }
         function onPropertyChanged(name, value) {
@@ -562,12 +566,19 @@ Window {
     DropArea {
         id: drop
         property string dragged
+        property bool subtitle: false // a subtitle file over a playing clip: added to it, not opened
         anchors.fill: parent
         enabled: !root.measuring
         keys: ["text/uri-list"]
-        onEntered: drag => dragged = MediaFiles.displayName(drag.urls[0])
+        onEntered: drag => {
+            dragged = MediaFiles.displayName(drag.urls[0])
+            subtitle = root.restarted && MediaFiles.isSubtitle(drag.urls[0])
+        }
         onDropped: event => {
-            root.openUrl(event.urls[0])
+            if (subtitle) {
+                root.addSubtitle(event.urls[0])
+                toast.show(I18n.strings.subtitle_added, 2000)
+            } else root.openUrl(event.urls[0])
             event.accept(Qt.CopyAction)
         }
     }
@@ -614,7 +625,8 @@ Window {
         anchors.fill: parent
         anchors.margins: chrome.inset
         active: drop.containsDrag
-        onActiveChanged: if (active) setSource("DropOverlay.qml", {name: Qt.binding(() => drop.dragged), overVideo: root.restarted})
+        onActiveChanged: if (active) setSource("DropOverlay.qml", {name: Qt.binding(() => drop.dragged), overVideo: root.restarted,
+                                                                 subtitle: Qt.binding(() => drop.subtitle)})
     }
     // A click anywhere but on the resume card ends the question; the click itself still reaches what is under it.
     MouseArea {

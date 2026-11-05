@@ -8,6 +8,7 @@ Item {
 
     required property string name // the file or folder under the pointer
     required property bool overVideo
+    required property bool subtitle // added to the playing clip
     readonly property color foreground: overVideo ? Theme.tokens.glass.text : Theme.colors.text
     readonly property color muted: overVideo ? Theme.tokens.glass.textMuted : Theme.colors.textMuted
 
@@ -48,7 +49,7 @@ Item {
                 width: parent.width
                 topPadding: 6
                 horizontalAlignment: Text.AlignHCenter
-                text: I18n.strings.drop_title
+                text: overlay.subtitle ? I18n.strings.drop_subtitle_title : I18n.strings.drop_title
                 color: overlay.foreground
                 font.pixelSize: Theme.tokens.type.display
                 font.weight: Font.Bold
@@ -63,6 +64,7 @@ Item {
                 font.weight: Font.DemiBold
             }
             Label {
+                visible: !overlay.subtitle
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: I18n.strings.drop_note

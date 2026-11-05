@@ -665,10 +665,12 @@ private slots:
         QTRY_COMPARE(app.prop("loop-file"), QString("inf"));
         QVERIFY(app.click("segment-stop"));
         QTRY_COMPARE(app.prop("loop-file"), QString("no"));
-        QVERIFY(app.click("quickSubtitles")); // the clip has none: nothing opens
-        QTest::qWait(100);
-        QVERIFY(app.item("quickPopover"));
-        QVERIFY(!app.item("subtitlesPopover"));
+        QVERIFY(app.click("quickSubtitles")); // the clip has none: it opens anyway, to add a file
+        QTRY_VERIFY(app.item("subtitlesPopover"));
+        QVERIFY(!app.item("quickPopover"));
+        QVERIFY(Launch::searchVisible(app.item("subtitlesPopover"), "subtitleAdd"));
+        QVERIFY(app.click("gearButton"));
+        QTRY_VERIFY(app.item("quickPopover"));
 
         QVERIFY(app.click("allSettings"));
         QTRY_VERIFY(app.item("settingsOverlay"));
@@ -1315,7 +1317,7 @@ private slots:
             QTRY_COMPARE(app.number("brightness"), 0.0);
             QTRY_COMPARE(app.number("video-zoom"), 0.0);
             QTRY_COMPARE(app.number("video-rotate"), 0.0);
-            QTRY_COMPARE(app.number("video-aspect-override"), -1.0);
+            QTRY_VERIFY(app.number("video-aspect-override") <= 0); // "no": the clip's own
             QTRY_VERIFY(!app.item("pictureReset")->isVisible());
             // The next file: the rotation is gone, the contrast stays. The quick settings say something changed.
             QVERIFY(app.click("segment-180"));
@@ -1339,6 +1341,73 @@ private slots:
         QVERIFY2(app.playing(), "the clip did not start playing");
         QTRY_COMPARE(app.number("contrast"), -50.0);
         QCOMPARE(app.number("video-rotate"), 0.0);
+    }
+
+    // Subtitles from a file (a Turkish one in cp1254, the old Windows code page, must read right), their delay,
+    // size and height, and the audio delay. Size and height are kept; both delays last one clip.
+    void subtitlesAndSync()
+    {
+        const QString state = QDir(m_path).filePath("subs");
+        const QString folder = QDir(m_path).filePath("subs-clip");
+        QVERIFY(QDir().mkpath(state));
+        QVERIFY(QDir().mkpath(folder));
+        const QString srt = folder + "/turkish.srt";
+        QFile file(srt);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        // "Şimdi ığdır çöğüş İstanbul'da güneşli" in cp1254, split where a hex escape would eat the next letter.
+        file.write("1\r\n00:00:00,000 --> 00:01:00,000\r\n"
+                   "\xDE" "imdi \xFD\xF0" "d\xFDr \xE7\xF6\xF0\xFC\xFE \xDD" "stanbul'da g\xFC" "ne\xFE" "li\r\n");
+        file.close();
+        Launch app(state, m_clip, QDir(m_path).filePath("subs.log"));
+        QVERIFY(app.mpv);
+        for (const char *name : {"sid", "sub-text", "sub-delay", "audio-delay", "sub-scale", "sub-pos", "sub-margin-y"})
+            app.mpv->observeProperty(name);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+        // What the open dialog and a dropped file both end in.
+        QVERIFY(QMetaObject::invokeMethod(app.window, "addSubtitle", Q_ARG(QVariant, QUrl::fromLocalFile(srt))));
+        QTRY_VERIFY(app.number("sid") > 0);
+        QTRY_COMPARE_WITH_TIMEOUT(app.prop("sub-text"), QString("Şimdi ığdır çöğüş İstanbul'da güneşli"), 5000);
+        app.wake();
+        QTRY_VERIFY(app.item("subtitlesButton")->isVisible());
+        QVERIFY(app.click("subtitlesButton"));
+        QTRY_VERIFY(app.item("subtitlesPopover"));
+        QVERIFY(app.click("subtitleDelayMore"));
+        QVERIFY(app.click("subtitleDelayMore"));
+        QTRY_VERIFY(std::abs(app.number("sub-delay") - 0.2) < 0.001);
+        QVERIFY(app.click("subtitleSizeMore"));
+        QTRY_VERIFY(std::abs(app.number("sub-scale") - 1.1) < 0.001);
+        QVERIFY(app.click("subtitleHeightMore"));
+        QTRY_COMPARE(app.number("sub-pos"), 95.0);
+        app.shot("subtitles");
+        QVERIFY(app.number("sub-margin-y") > 100); // above the bar while it shows
+        // Off and on again from the list.
+        QVERIFY(app.click("subtitleRow-0"));
+        QTRY_COMPARE(app.prop("sid"), QString("no"));
+        QVERIFY(!Launch::searchVisible(app.item("subtitlesPopover"), "subtitleDelay"));
+        QVERIFY(app.click("subtitleRow-1"));
+        QTRY_COMPARE(app.number("sid"), 1.0);
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("subtitlesPopover"));
+        QTRY_VERIFY_WITH_TIMEOUT(!app.item("controlBar")->isVisible(), 4000);
+        QTRY_COMPARE(app.number("sub-margin-y"), 22.0); // the bar is gone: back down
+        app.shot("subtitles-idle");
+        // Audio delay, in the gear's popover.
+        app.wake();
+        QVERIFY(app.click("gearButton"));
+        QTRY_VERIFY(app.item("quickPopover"));
+        QVERIFY(app.click("audioDelayMore"));
+        QTRY_VERIFY(std::abs(app.number("audio-delay") - 0.05) < 0.001);
+        app.shot("quick-audio-delay");
+        app.key(Qt::Key_Escape);
+        // The next file: both delays are gone, size and height stay.
+        app.mpv->command(QVariantList{"loadfile", m_clip});
+        QTRY_COMPARE(app.number("sub-delay"), 0.0);
+        QTRY_COMPARE(app.number("audio-delay"), 0.0);
+        QVERIFY(std::abs(app.number("sub-scale") - 1.1) < 0.001);
+        QCOMPARE(app.number("sub-pos"), 95.0);
+        QVERIFY(std::abs(app.services.player.subtitleScale() - 1.1) < 0.001);
+        QCOMPARE(app.services.player.subtitlePosition(), 95);
     }
 
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.

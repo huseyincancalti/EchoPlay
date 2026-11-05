@@ -163,6 +163,46 @@ private slots:
         QCOMPARE(AppState(m_path).picture().value("gamma").toInt(), 0);
     }
 
+    void subtitlesRoundTrip()
+    {
+        {
+            AppState s(m_path);
+            QCOMPARE(s.subtitleScale(), 1.0);
+            QCOMPARE(s.subtitlePosition(), 100);
+            s.setSubtitleScale(1.5);
+            s.setSubtitlePosition(0);
+            s.save();
+        }
+        const QJsonObject json = read(m_path).value("subtitles").toObject();
+        QCOMPARE(json.value("scale").toDouble(), 1.5);
+        QCOMPARE(json.value("position").toInt(-1), 0);
+        AppState again(m_path);
+        QCOMPARE(again.subtitleScale(), 1.5);
+        QCOMPARE(again.subtitlePosition(), 0);
+    }
+
+    void badSubtitleValuesKeepTheDefault()
+    {
+        write(m_path, R"({"schema": 1, "subtitles": {"scale": 9, "position": 151}})");
+        QCOMPARE(AppState(m_path).subtitleScale(), 1.0);
+        QCOMPARE(AppState(m_path).subtitlePosition(), 100);
+        write(m_path, R"({"schema": 1, "subtitles": {"scale": 0.4, "position": -1}})");
+        QCOMPARE(AppState(m_path).subtitleScale(), 1.0);
+        QCOMPARE(AppState(m_path).subtitlePosition(), 100);
+        write(m_path, R"({"schema": 1, "subtitles": {"scale": "big", "position": 50.5}})"); // not numbers, not whole
+        QCOMPARE(AppState(m_path).subtitleScale(), 1.0);
+        QCOMPARE(AppState(m_path).subtitlePosition(), 100);
+        write(m_path, R"({"schema": 1, "subtitles": {"scale": 3, "position": 150}})"); // the edges are fine
+        QCOMPARE(AppState(m_path).subtitleScale(), 3.0);
+        QCOMPARE(AppState(m_path).subtitlePosition(), 150);
+        write(m_path, R"({"schema": 1, "subtitles": [1, 2]})"); // not an object
+        QCOMPARE(AppState(m_path).subtitleScale(), 1.0);
+        QCOMPARE(AppState(m_path).subtitlePosition(), 100);
+        write(m_path, R"({"schema": 1})"); // missing
+        QCOMPARE(AppState(m_path).subtitleScale(), 1.0);
+        QCOMPARE(AppState(m_path).subtitlePosition(), 100);
+    }
+
     void newerSchemaKeepsKnownFields()
     {
         write(m_path, R"({"schema": 99, "language": "tr", "mixer": {"default_on": "all"}, "future": true})");

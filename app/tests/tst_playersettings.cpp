@@ -175,6 +175,41 @@ private slots:
         QCOMPARE(changed.count(), 4);
     }
 
+    void subtitleSizeAndPosition()
+    {
+        QSignalSpy changed(m_settings.get(), &PlayerSettings::changed);
+        QCOMPARE(m_settings->subtitleScale(), 1.0);
+        QCOMPARE(m_settings->subtitlePosition(), 100);
+        const QVariantMap defaults = m_settings->mpvOptions({});
+        QCOMPARE(defaults.value("sub-scale").toString(), QString("1"));
+        QCOMPARE(defaults.value("sub-pos").toString(), QString("100"));
+
+        m_settings->setSubtitleScale(1.5);
+        m_settings->setSubtitlePosition(90);
+        QCOMPARE(m_settings->mpvOptions({}).value("sub-scale").toString(), QString("1.5"));
+        QCOMPARE(m_settings->mpvOptions({}).value("sub-pos").toString(), QString("90"));
+        QCOMPARE(changed.count(), 2);
+        m_settings->setSubtitleScale(1.5); // the same values: no change
+        m_settings->setSubtitlePosition(90);
+        QCOMPARE(changed.count(), 2);
+
+        m_settings->setSubtitleScale(9);
+        QCOMPARE(m_settings->subtitleScale(), 3.0);
+        m_settings->setSubtitleScale(0);
+        QCOMPARE(m_settings->subtitleScale(), 0.5);
+        m_settings->setSubtitlePosition(500);
+        QCOMPARE(m_settings->subtitlePosition(), 150);
+        m_settings->setSubtitlePosition(-5);
+        QCOMPARE(m_settings->subtitlePosition(), 0);
+        QCOMPARE(m_settings->mpvOptions({}).value("sub-pos").toString(), QString("0"));
+
+        // Twelve +0.1 steps from 1.0 must land on 2.2, not 2.2000000000000006
+        m_settings->setSubtitleScale(1.0);
+        for (int i = 0; i < 12; ++i) m_settings->setSubtitleScale(m_settings->subtitleScale() + 0.1);
+        QCOMPARE(m_settings->subtitleScale(), 2.2);
+        QCOMPARE(m_settings->mpvOptions({}).value("sub-scale").toString(), QString("2.2"));
+    }
+
     void shortcutsKeepOnlyWhatChanged()
     {
         QVERIFY(m_settings->shortcuts().isEmpty());
@@ -215,6 +250,8 @@ private slots:
         m_settings->setResumeMode("always");
         m_settings->setPicture("brightness", -10);
         m_settings->setPicture("gamma", 35);
+        m_settings->setSubtitleScale(1.3);
+        m_settings->setSubtitlePosition(85);
         m_settings->setFirstRunHintDone(true);
         m_settings->setClickPauses(false);
         m_settings->setShowRemaining(true);
@@ -240,6 +277,8 @@ private slots:
         QCOMPARE(loaded.picture().value("brightness").toInt(), -10);
         QCOMPARE(loaded.picture().value("contrast").toInt(), 0);
         QCOMPARE(loaded.mpvOptions({}).value("gamma").toString(), QString("35"));
+        QCOMPARE(loaded.subtitleScale(), 1.3);
+        QCOMPARE(loaded.subtitlePosition(), 85);
         QVERIFY(loaded.firstRunHintDone());
         QVERIFY(!loaded.clickPauses());
         QVERIFY(loaded.showRemaining());
@@ -258,6 +297,7 @@ private slots:
                 R"("playback":{"end":"explode","speed_factor":50,"speed_step":-1,"seek_step":7,"resume":1,"click_pauses":1,"show_remaining":"x"},)"
                 R"("audio":{"volume_max":999,"loudness_boost":"yes","loudness_strength":"max","device":3,"tracks_on_open":"x"},)"
                 R"("picture":{"brightness":500,"contrast":"x","saturation":1.5},)"
+                R"("subtitles":{"scale":"big","position":999},)"
                 R"("first_run_hint_done":"yes","shortcuts":{"mute":5},)"
                 R"("screenshots":{"folder":7,"custom":["x"]}})");
         f.close();
@@ -278,6 +318,8 @@ private slots:
         QCOMPARE(loaded.picture().value("brightness").toInt(), 0);
         QCOMPARE(loaded.picture().value("contrast").toInt(), 0);
         QCOMPARE(loaded.picture().value("saturation").toInt(), 0);
+        QCOMPARE(loaded.subtitleScale(), 1.0);
+        QCOMPARE(loaded.subtitlePosition(), 100);
         QVERIFY(!loaded.firstRunHintDone());
         QVERIFY(loaded.clickPauses());
         QVERIFY(!loaded.showRemaining());

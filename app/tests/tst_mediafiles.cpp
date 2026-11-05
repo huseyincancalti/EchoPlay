@@ -45,6 +45,23 @@ private slots:
         QCOMPARE(MediaFiles::pathToOpen(link), link.toString());
     }
 
+    void subtitleFilesByExtension()
+    {
+        QTemporaryDir dir;
+        touch(dir.filePath("a.SRT")); // any case
+        touch(dir.filePath("b.ass"));
+        touch(dir.filePath("c.mp4"));
+        QVERIFY(QDir(dir.path()).mkdir("d.srt")); // a folder never counts, whatever its name
+        QVERIFY(MediaFiles::isSubtitle(QUrl::fromLocalFile(dir.filePath("a.SRT"))));
+        QVERIFY(MediaFiles::isSubtitle(QUrl::fromLocalFile(dir.filePath("b.ass"))));
+        QVERIFY(!MediaFiles::isSubtitle(QUrl::fromLocalFile(dir.filePath("c.mp4"))));
+        QVERIFY(!MediaFiles::isSubtitle(QUrl::fromLocalFile(dir.filePath("d.srt"))));
+        QVERIFY(!MediaFiles::isSubtitle(QUrl::fromLocalFile(dir.path())));
+        QVERIFY(!MediaFiles::isSubtitle(QUrl::fromLocalFile(dir.filePath("missing.srt"))));
+        QVERIFY(!MediaFiles::isSubtitle(QUrl("https://example.com/a.srt")));
+        QCOMPARE(MediaFiles::subtitleGlobs(), QString("*.ass *.srt *.ssa *.sub *.sup *.vtt"));
+    }
+
     void displayNames()
     {
         QTemporaryDir dir;

@@ -29,6 +29,8 @@ class PlayerSettings : public QObject
     Q_PROPERTY(QString tracksOnOpen READ tracksOnOpen WRITE setTracksOnOpen NOTIFY changed) // "last", "all"
     Q_PROPERTY(QString resumeMode READ resumeMode WRITE setResumeMode NOTIFY changed)      // "ask", "always", "never"
     Q_PROPERTY(QVariantMap picture READ picture NOTIFY changed)                            // brightness, contrast, saturation, gamma: -100..100
+    Q_PROPERTY(double subtitleScale READ subtitleScale WRITE setSubtitleScale NOTIFY changed)          // 0.5..3, 1 = as authored
+    Q_PROPERTY(int subtitlePosition READ subtitlePosition WRITE setSubtitlePosition NOTIFY changed)    // 0..150, 100 = bottom
     Q_PROPERTY(bool firstRunHintDone READ firstRunHintDone WRITE setFirstRunHintDone NOTIFY changed)
     Q_PROPERTY(bool clickPauses READ clickPauses WRITE setClickPauses NOTIFY changed)
     Q_PROPERTY(bool showRemaining READ showRemaining WRITE setShowRemaining NOTIFY changed)
@@ -73,6 +75,10 @@ public:
     QVariantMap picture() const; // all four, as ints
     Q_INVOKABLE void setPicture(const QString &name, int value); // an unknown name is ignored, the value is clamped
     Q_INVOKABLE void resetPicture();                             // all four back to 0
+    double subtitleScale() const;
+    void setSubtitleScale(double scale); // clamped to the range, kept to 2 decimals so +0.1 steps do not drift
+    int subtitlePosition() const;
+    void setSubtitlePosition(int position); // clamped to the range
     bool firstRunHintDone() const;
     void setFirstRunHintDone(bool done);
     bool clickPauses() const;
@@ -90,7 +96,7 @@ public:
     Q_INVOKABLE static QString keyName(int key, int modifiers);
 
     // The mpv properties for these settings while `videoPath` plays: loop-file, keep-open, screenshot-dir,
-    // volume-max, af, audio-device, brightness, contrast, saturation, gamma.
+    // volume-max, af, audio-device, brightness, contrast, saturation, gamma, sub-scale, sub-pos.
     Q_INVOKABLE QVariantMap mpvOptions(const QString &videoPath) const;
     // The fixed-speed key (v1): from normal speed to speedFactor, from any faster speed back to 1x.
     Q_INVOKABLE double toggledSpeed(double current) const { return current > 1.01 ? 1 : speedFactor(); }

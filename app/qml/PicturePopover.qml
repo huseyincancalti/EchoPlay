@@ -12,7 +12,7 @@ Popover {
     readonly property real maxHeight: ui.height - ui.bar.height - 80
     readonly property var zoomSteps: [50, 67, 75, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400] // percent
     readonly property int zoomPercent: Math.round(Math.pow(2, ui.videoZoom) * 100)
-    readonly property var aspects: [{value: "-1", label: strings.aspect_auto, ratio: -1}, {value: "16:9", label: "16:9", ratio: 16 / 9},
+    readonly property var aspects: [{value: "no", label: strings.aspect_auto, ratio: -1}, {value: "16:9", label: "16:9", ratio: 16 / 9},
                                     {value: "4:3", label: "4:3", ratio: 4 / 3}, {value: "21:9", label: "21:9", ratio: 21 / 9}]
 
     objectName: "picturePopover"

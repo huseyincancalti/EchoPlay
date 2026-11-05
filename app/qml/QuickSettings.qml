@@ -114,6 +114,27 @@ Popover {
                 onMore: quick.ui.mpv.command(["add", "speed", PlayerSettings.speedStep])
             }
         }
+        Item { // for this clip only: it resets on the next one (Main.qml)
+            width: parent.width
+            height: 52
+            Heading {
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "history"
+                text: quick.strings.audio_delay
+            }
+            Stepper {
+                objectName: "audioDelay"
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                valueWidth: 72
+                text: (quick.ui.audioDelay > 0.004 ? "+" : "") + Math.round(quick.ui.audioDelay * 1000) + " ms"
+                lessName: quick.strings.earlier
+                moreName: quick.strings.later
+                onLess: quick.ui.mpv.command(["add", "audio-delay", -0.05])
+                onMore: quick.ui.mpv.command(["add", "audio-delay", 0.05])
+            }
+        }
         Column {
             width: parent.width
             topPadding: 8
@@ -159,7 +180,6 @@ Popover {
             icon: "subtitles"
             text: quick.strings.subtitles
             note: quick.ui.subtitleName
-            available: quick.ui.subtitleTracks.length > 0
             onClicked: quick.ui.popover = "subtitles"
         }
         LinkRow {

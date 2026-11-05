@@ -9,6 +9,7 @@ Item {
     property var done: null // what to do with the chosen url
 
     function pickVideo(callback) { pick(callback, [I18n.strings.videos + " (" + MediaFiles.videoGlobs + ")", I18n.strings.all_files + " (*)"]) }
+    function pickSubtitle(callback) { pick(callback, [I18n.strings.subtitle_files + " (" + MediaFiles.subtitleGlobs + ")", I18n.strings.all_files + " (*)"]) }
     function pickFont(callback) { pick(callback, [I18n.strings.fonts + " (*.ttf *.otf)"]) }
     function pick(callback, filters) {
         done = callback

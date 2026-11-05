@@ -164,6 +164,26 @@ void PlayerSettings::resetPicture()
     if (picture() != before) emit changed();
 }
 
+double PlayerSettings::subtitleScale() const { return m_state->subtitleScale(); }
+
+void PlayerSettings::setSubtitleScale(double scale)
+{
+    scale = qRound(qBound(AppState::SubtitleScaleMin, scale, AppState::SubtitleScaleMax) * 100) / 100.0;
+    if (scale == subtitleScale()) return;
+    m_state->setSubtitleScale(scale);
+    emit changed();
+}
+
+int PlayerSettings::subtitlePosition() const { return m_state->subtitlePosition(); }
+
+void PlayerSettings::setSubtitlePosition(int position)
+{
+    position = qBound(0, position, AppState::SubtitlePositionMax);
+    if (position == subtitlePosition()) return;
+    m_state->setSubtitlePosition(position);
+    emit changed();
+}
+
 bool PlayerSettings::firstRunHintDone() const { return m_state->firstRunHintDone(); }
 
 void PlayerSettings::setFirstRunHintDone(bool done)
@@ -260,6 +280,8 @@ QVariantMap PlayerSettings::mpvOptions(const QString &videoPath) const
     // The picture's keys are mpv's own option names.
     const QVariantMap look = picture();
     for (auto it = look.cbegin(); it != look.cend(); ++it) out.insert(it.key(), QString::number(it.value().toInt()));
+    out.insert("sub-scale", QString::number(subtitleScale()));
+    out.insert("sub-pos", QString::number(subtitlePosition()));
     // Medium is v1's levelling. A stronger one lifts quiet parts more (m) and reacts faster (a small g), so it can pump.
     const QString strength = loudnessStrength();
     out.insert("af", !loudnessBoost()      ? QString()

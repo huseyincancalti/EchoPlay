@@ -192,8 +192,7 @@ GlassPanel {
             id: subtitles
             objectName: "subtitlesButton"
             icon: "subtitles"
-            filled: bar.ui.subtitleTrack > 0
-            enabledLook: bar.ui.subtitleTracks.length > 0
+            filled: bar.ui.subtitleTrack > 0 // with none in the clip, the popover still adds a file
             tip: I18n.strings.subtitles
             onClicked: bar.ui.togglePopover("subtitles")
         }

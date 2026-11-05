@@ -34,6 +34,8 @@ Item {
     property real videoZoom: 0 // mpv's video-zoom: log2, 0 = 100%
     property int videoRotate: 0
     property real videoAspect: -1 // -1: the clip's own
+    property real subDelay: 0 // seconds
+    property real audioDelay: 0
     readonly property bool pictureChanged: ["brightness", "contrast", "saturation", "gamma"].some(name => PlayerSettings.picture[name] !== 0)
                                            || videoZoom !== 0 || videoRotate !== 0 || videoAspect !== -1
 
@@ -125,16 +127,19 @@ Item {
         case "ab-loop-b": loopB = typeof value === "number" ? value : -1; break
         case "video-zoom": videoZoom = value || 0; break
         case "video-rotate": videoRotate = value || 0; break
-        case "video-aspect-override": videoAspect = typeof value === "number" ? value : -1; break
+        case "video-aspect-override": videoAspect = value > 0 ? value : -1; break // "no" reads 0, the old auto -1
+        case "sub-delay": subDelay = value || 0; break
+        case "audio-delay": audioDelay = value || 0; break
         }
     }
     Component.onCompleted: {
         for (const name of ["pause", "mute", "volume", "speed", "duration", "track-list", "sid", "ab-loop-a", "ab-loop-b", "video-zoom", "video-rotate",
-                            "video-aspect-override"]) {
+                            "video-aspect-override", "sub-delay", "audio-delay"]) {
             mpv.observeProperty(name)
             observe(name, mpv.observed(name))
         }
         position = mpv.observed("time-pos") || 0
+        mpv.setProperty("sub-margin-y", String(subtitleMargin))
     }
     Connections {
         target: ui.mpv
@@ -150,6 +155,11 @@ Item {
     // Chrome hides after 1 s without mouse movement, unless paused, a popover is open or the pointer is on a
     // control; then only a 2 px progress line remains, and a blank cursor.
     property bool pointerMoving: true
+    // Subtitles stand above the bar while it shows, as on YouTube: mpv puts them at the bottom, under the bar, so a
+    // pause hid them. sub-margin-y counts in mpv's 720-line units; 22 is its default.
+    readonly property int subtitleMargin: controlBar.visible && height > 0
+                                          ? Math.max(22, Math.round((height - controlBar.y + 8) * 720 / height)) : 22
+    onSubtitleMarginChanged: mpv.setProperty("sub-margin-y", String(subtitleMargin))
     readonly property bool overControls: controlBar.hovered || (titleBar.visible && titleBar.hovered)
     readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || settingsOpen || hintShown || overControls
 

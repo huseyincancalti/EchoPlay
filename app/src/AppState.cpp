@@ -141,6 +141,20 @@ void AppState::setPicture(const QString &name, int value)
     changed();
 }
 
+void AppState::setSubtitleScale(double scale)
+{
+    if (scale == m_subtitleScale) return;
+    m_subtitleScale = scale;
+    changed();
+}
+
+void AppState::setSubtitlePosition(int position)
+{
+    if (position == m_subtitlePosition) return;
+    m_subtitlePosition = position;
+    changed();
+}
+
 void AppState::setResumeMode(const QString &mode)
 {
     if (mode == m_resumeMode) return;
@@ -319,6 +333,13 @@ void AppState::load()
         if (value >= -PictureMax && value <= PictureMax) it.value() = value;
     }
 
+    // As with the picture: a wrong type (or a fraction, for the position) gives the out-of-range fallback.
+    const QJsonObject subtitles = s.value("subtitles").toObject();
+    const double subtitleScale = subtitles.value("scale").toDouble(0);
+    if (subtitleScale >= SubtitleScaleMin && subtitleScale <= SubtitleScaleMax) m_subtitleScale = subtitleScale;
+    const int subtitlePosition = subtitles.value("position").toInt(SubtitlePositionMax + 1);
+    if (subtitlePosition >= 0 && subtitlePosition <= SubtitlePositionMax) m_subtitlePosition = subtitlePosition;
+
     m_firstRunHintDone = s.value("first_run_hint_done").toBool();
     const QJsonObject shortcuts = s.value("shortcuts").toObject();
     for (auto it = shortcuts.begin(); it != shortcuts.end(); ++it)
@@ -372,6 +393,7 @@ void AppState::save()
                               {"loudness_strength", m_loudnessStrength}, {"device", m_audioDevice},
                               {"tracks_on_open", m_tracksOnOpen}}},
         {"picture", QJsonObject::fromVariantMap(m_picture)},
+        {"subtitles", QJsonObject{{"scale", m_subtitleScale}, {"position", m_subtitlePosition}}},
         {"first_run_hint_done", m_firstRunHintDone},
         {"shortcuts", QJsonObject::fromVariantMap(m_shortcuts)},
         {"screenshots", QJsonObject{{"folder", m_screenshotFolder}, {"custom", m_screenshotCustomPath}}},

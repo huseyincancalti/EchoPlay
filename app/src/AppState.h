@@ -23,6 +23,8 @@ public:
     static constexpr int Schema = 1;
     static constexpr double VolumeMax = 300; // mpv's volume-max, as in v1
     static constexpr int PictureMax = 100;   // the picture adjustments run -PictureMax..PictureMax
+    static constexpr double SubtitleScaleMin = 0.5, SubtitleScaleMax = 3.0; // mpv's sub-scale, as shown
+    static constexpr int SubtitlePositionMax = 150; // mpv's sub-pos: 0 top, 100 bottom, up to 150 below the picture
 
     explicit AppState(const QString &path, QObject *parent = nullptr); // loads the file
     ~AppState() override;                                               // writes a pending save
@@ -61,6 +63,10 @@ public:
     void setTracksOnOpen(const QString &tracks);
     QVariantMap picture() const { return m_picture; } // brightness, contrast, saturation, gamma: all four, as mpv names them
     void setPicture(const QString &name, int value);  // an unknown name is ignored; PlayerSettings checks the range
+    double subtitleScale() const { return m_subtitleScale; } // SubtitleScaleMin..Max, 1 = the subtitle's own size
+    void setSubtitleScale(double scale);
+    int subtitlePosition() const { return m_subtitlePosition; } // 0..SubtitlePositionMax, 100 = mpv's default
+    void setSubtitlePosition(int position);
     QString resumeMode() const { return m_resumeMode; } // "ask", "always", "never"
     void setResumeMode(const QString &mode);
     bool firstRunHintDone() const { return m_firstRunHintDone; }
@@ -132,6 +138,8 @@ private:
     QString m_audioDevice = QStringLiteral("auto");
     QString m_tracksOnOpen = QStringLiteral("last");
     QVariantMap m_picture{{"brightness", 0}, {"contrast", 0}, {"saturation", 0}, {"gamma", 0}};
+    double m_subtitleScale = 1.0;
+    int m_subtitlePosition = 100;
     QString m_resumeMode = QStringLiteral("ask");
     bool m_firstRunHintDone = false;
     bool m_clickPauses = true;

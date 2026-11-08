@@ -11,11 +11,12 @@ name="$(basename "${video%.*}" | tr -c 'A-Za-z0-9.\n-' '_')-t$at"
 out=.out/shots; mkdir -p "$out"
 a="$out/$name-v1.png"; b="$out/$name-v2.png"; rm -f "$a" "$b"
 
-"$MPV_EXE" --no-config --vo=gpu-next --gpu-api=d3d11 --hwdec=auto-safe \
+# timeout: a file that does not open would leave either player waiting for its first frame for good.
+timeout 90 "$MPV_EXE" --no-config --vo=gpu-next --gpu-api=d3d11 --hwdec=auto-safe \
   --scale=lanczos --cscale=lanczos --dscale=mitchell --geometry="$V1_GEOMETRY" --mute=yes \
   --start="$at" --pause=yes --screenshot-format=png --script=tools/bench/v1-probe.lua \
   --script-opts=shot-out="$(cygpath -m "$PWD/$a")" "$video" >/dev/null 2>&1 || true
-.out/build-v2/EchoPlay.exe --no-glass --shot-at "$at" --shot-out "$(cygpath -m "$PWD/$b")" "$video" >/dev/null 2>&1 || true
+timeout 90 .out/build-v2/EchoPlay.exe --no-glass --shot-at "$at" --shot-out "$(cygpath -m "$PWD/$b")" "$video" >/dev/null 2>&1 || true
 
 for f in "$a" "$b"; do
   [ -f "$f" ] || { echo "missing $f"; exit 1; }

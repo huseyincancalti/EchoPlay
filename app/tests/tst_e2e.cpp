@@ -22,7 +22,10 @@
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <dwmapi.h>
 #include <shobjidl.h>
+#include <uiautomation.h>
+#include <wrl/client.h>
 #endif
 
 Q_IMPORT_QML_PLUGIN(EchoPlayPlugin)
@@ -170,18 +173,29 @@ struct Launch
 #ifdef Q_OS_WIN
     // The screen around the window, not the window: only this shows the shadow and the rounded corners Windows adds.
     // On top for the moment of the grab, without taking the focus: otherwise this catches whatever else is open.
-    void desktopShot(const QString &name)
+    // onTop false leaves Windows' own flyouts over the window in the picture (TOPMOST would hide them).
+    void desktopShot(const QString &name, bool onTop = true)
     {
         const QString dir = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS");
         if (dir.isEmpty()) return;
         const HWND hwnd = HWND(window->winId());
         const UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
-        QTest::qWait(350);
+        if (onTop) SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
+        if (onTop) QTest::qWait(350);
         QDir().mkpath(dir);
         const QRect around = window->geometry().adjusted(-40, -40, 40, 40);
         window->screen()->grabWindow(0, around.x(), around.y(), around.width(), around.height()).save(QDir(dir).filePath(name + ".png"));
-        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+        if (onTop) SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+    }
+    // A screen rectangle in physical pixels (what Win32 and UI Automation give), for what Windows draws outside the window.
+    void screenShot(const QString &name, const QRect &physical)
+    {
+        const QString dir = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS");
+        if (dir.isEmpty() || physical.isEmpty()) return;
+        QDir().mkpath(dir);
+        const qreal ratio = window->devicePixelRatio();
+        const QRect r(qFloor(physical.x() / ratio), qFloor(physical.y() / ratio), qCeil(physical.width() / ratio), qCeil(physical.height() / ratio));
+        window->screen()->grabWindow(0, r.x(), r.y(), r.width(), r.height()).save(QDir(dir).filePath(name + ".png"));
     }
 #endif
     // The pointer moves over the window: the chrome comes up. It stays up for a second after that.
@@ -225,6 +239,85 @@ int removeFromTrash(const QString &folder)
         }
     }
     return removed;
+}
+
+// Visible top-level windows of other processes over area (screen pixels), with their class names. Cloaked ones are
+// left out: Windows keeps some of its flyouts "visible" and only cloaks them while they are away.
+QHash<quintptr, QString> shownWindows(const QRect &area)
+{
+    struct Probe {
+        RECT area;
+        QHash<quintptr, QString> found;
+    } probe{{area.left(), area.top(), area.right() + 1, area.bottom() + 1}, {}};
+    EnumWindows([](HWND w, LPARAM data) -> BOOL {
+        auto &probe = *reinterpret_cast<Probe *>(data);
+        DWORD pid = 0, cloaked = 0;
+        GetWindowThreadProcessId(w, &pid);
+        DwmGetWindowAttribute(w, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+        RECT r, overlap;
+        if (pid != GetCurrentProcessId() && IsWindowVisible(w) && !cloaked && GetWindowRect(w, &r) && IntersectRect(&overlap, &r, &probe.area)) {
+            wchar_t name[128] = {};
+            GetClassNameW(w, name, 127);
+            probe.found.insert(quintptr(w), QString::fromWCharArray(name));
+        }
+        return TRUE;
+    }, LPARAM(&probe));
+    return probe.found;
+}
+
+// UI Automation, for what only Windows draws and nothing else locates: the taskbar's buttons, the thumbnail's buttons.
+// The first button whose name passes match, in the top-level windows of pid (of those classes, when given), and the
+// window it is in, in screen pixels; seen collects every name looked at. Call it off the GUI thread: a query that
+// reaches the test window waits for that thread.
+struct FoundButton {
+    QRect button, window;
+};
+FoundButton findButton(DWORD pid, const QStringList &classes, const std::function<bool(const QString &)> &match, QStringList *seen = nullptr)
+{
+    using Microsoft::WRL::ComPtr;
+    const auto qrect = [](const RECT &r) { return QRect(r.left, r.top, r.right - r.left, r.bottom - r.top); };
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const auto uninit = qScopeGuard([] { CoUninitialize(); });
+    ComPtr<IUIAutomation> uia;
+    ComPtr<IUIAutomationElement> root;
+    ComPtr<IUIAutomationCondition> ofPid, isButton;
+    ComPtr<IUIAutomationElementArray> windows;
+    VARIANT v;
+    VariantInit(&v);
+    v.vt = VT_I4;
+    if (FAILED(CoCreateInstance(__uuidof(CUIAutomation), nullptr, CLSCTX_INPROC_SERVER, __uuidof(IUIAutomation), reinterpret_cast<void **>(uia.GetAddressOf())))) return {};
+    v.lVal = LONG(pid);
+    uia->CreatePropertyCondition(UIA_ProcessIdPropertyId, v, ofPid.GetAddressOf());
+    v.lVal = UIA_ButtonControlTypeId;
+    uia->CreatePropertyCondition(UIA_ControlTypePropertyId, v, isButton.GetAddressOf());
+    if (FAILED(uia->GetRootElement(root.GetAddressOf())) || !ofPid || !isButton || FAILED(root->FindAll(TreeScope_Children, ofPid.Get(), windows.GetAddressOf())) || !windows) return {};
+    int count = 0;
+    windows->get_Length(&count);
+    for (int i = 0; i < count; ++i) {
+        ComPtr<IUIAutomationElement> window;
+        ComPtr<IUIAutomationElementArray> buttons;
+        BSTR cls = nullptr;
+        RECT windowRect{};
+        if (FAILED(windows->GetElement(i, window.GetAddressOf())) || FAILED(window->get_CurrentClassName(&cls))) continue;
+        const QString className = QString::fromWCharArray(cls ? cls : L"");
+        SysFreeString(cls);
+        if (!classes.isEmpty() && !classes.contains(className)) continue;
+        window->get_CurrentBoundingRectangle(&windowRect);
+        if (FAILED(window->FindAll(TreeScope_Descendants, isButton.Get(), buttons.GetAddressOf())) || !buttons) continue;
+        int n = 0;
+        buttons->get_Length(&n);
+        for (int j = 0; j < n; ++j) {
+            ComPtr<IUIAutomationElement> button;
+            BSTR name = nullptr;
+            RECT r{};
+            if (FAILED(buttons->GetElement(j, button.GetAddressOf())) || FAILED(button->get_CurrentName(&name))) continue;
+            const QString text = QString::fromWCharArray(name ? name : L"");
+            SysFreeString(name);
+            if (seen) *seen << text;
+            if (match(text) && SUCCEEDED(button->get_CurrentBoundingRectangle(&r)) && r.right > r.left) return {qrect(r), qrect(windowRect)};
+        }
+    }
+    return {};
 }
 #endif
 
@@ -1838,6 +1931,18 @@ private slots:
             SetCursorPos(p.x(), p.y());
             QThread::msleep(40);
         };
+        // A move through the input stack, as a real mouse sends it: what Windows' own hover flyouts may wait for.
+        const auto glideTo = [](QPoint p) {
+            const int vx = GetSystemMetrics(SM_XVIRTUALSCREEN), vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            const int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN), vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            INPUT input{};
+            input.type = INPUT_MOUSE;
+            input.mi.dx = LONG((p.x() - vx) * 65535LL / (vw - 1));
+            input.mi.dy = LONG((p.y() - vy) * 65535LL / (vh - 1));
+            input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
+            SendInput(1, &input, sizeof(input));
+            QThread::msleep(40);
+        };
         const auto button = [](DWORD flag) {
             INPUT input{};
             input.type = INPUT_MOUSE;
@@ -1906,13 +2011,49 @@ private slots:
         QVERIFY(chrome);
         const int buttonWidth = qRound(46 * ratio);
         const QPoint maximize(rect().right() - buttonWidth - buttonWidth / 2, rect().top() + 18);
+        // The flyout is a window of Windows' own under the button. Settings > System > Multitasking can turn it off.
+        const QRect underButton(maximize.x() - qRound(160 * ratio), rect().top() + qRound(32 * ratio), qRound(320 * ratio), qRound(160 * ratio));
+        const QHash<quintptr, QString> shownBefore = shownWindows(underButton);
+        const auto newIn = [](const QRect &area, const QHash<quintptr, QString> &before) { // windows not there before
+            QStringList classes;
+            const QHash<quintptr, QString> now = shownWindows(area);
+            for (auto it = now.cbegin(); it != now.cend(); ++it)
+                if (!before.contains(it.key())) classes << it.value();
+            return classes;
+        };
         fromOutside([&] {
-            moveTo(maximize);
-            moveTo(maximize + QPoint(1, 0));
+            for (int i = 4; i >= 0; --i) glideTo(maximize + QPoint(0, 3 * i)); // comes in from below, then rests
         });
         check("the maximize button's hover arrives", [&] { return chrome->maximizeHovered(); });
-        QTest::qWait(1200);
-        app.desktopShot("frame-snap-layouts");
+        QTest::qWait(1500);
+        check("the title bar stays up while the pointer rests on it", [&] { return app.item("titleBar")->opacity() == 1; });
+        const bool ourFlyout = QTest::qWaitFor([&] { return !newIn(underButton, shownBefore).isEmpty(); }, 2500);
+        qInfo("new windows under the button: %s", qPrintable(newIn(underButton, shownBefore).join(", ")));
+        app.desktopShot("frame-snap-layouts", false);
+        // The same hover on a plain window with Windows' own frame tells whether the flyout opens for this input at all:
+        // on this PC (2026-11-08, build 26300) it does not, for SetCursorPos nor SendInput, so it is left to the eye.
+        bool plainFlyout = false;
+        {
+            const QRect r = rect();
+            const HWND plain = CreateWindowExW(0, L"STATIC", L"snap probe", WS_OVERLAPPEDWINDOW | WS_VISIBLE, r.left() - 200, r.top() + 60, 600, 400,
+                                               nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+            QTest::qWait(500);
+            TITLEBARINFOEX bar{};
+            bar.cbSize = sizeof(bar);
+            SendMessageW(plain, WM_GETTITLEBARINFOEX, 0, LPARAM(&bar));
+            const QRect plainMax(bar.rgrect[3].left, bar.rgrect[3].top, bar.rgrect[3].right - bar.rgrect[3].left, bar.rgrect[3].bottom - bar.rgrect[3].top);
+            const QRect underPlain(plainMax.center().x() - qRound(160 * ratio), plainMax.bottom(), qRound(320 * ratio), qRound(160 * ratio));
+            const QHash<quintptr, QString> plainBefore = shownWindows(underPlain);
+            fromOutside([&] {
+                for (int i = 4; i >= 0; --i) glideTo(plainMax.center() + QPoint(0, 3 * i));
+            });
+            plainFlyout = QTest::qWaitFor([&] { return !newIn(underPlain, plainBefore).isEmpty(); }, 2500);
+            DestroyWindow(plain);
+        }
+        const QSettings explorer("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", QSettings::NativeFormat);
+        if (ourFlyout || plainFlyout) check("the snap layouts flyout opens (it does on a plain window)", [&] { return ourFlyout; });
+        else qInfo("NOT CHECKED: no snap layouts flyout for synthetic input on a plain window either (EnableSnapAssistFlyout = %d)",
+                   explorer.value("EnableSnapAssistFlyout", 1).toInt());
         click(maximize + QPoint(1, 0));
         check("a click on the maximize button maximizes", [&] { return IsZoomed(hwnd); });
         click(QPoint(work().right() - buttonWidth - buttonWidth / 2, work().top() + 18));
@@ -1931,6 +2072,61 @@ private slots:
         });
         keys({VK_ESCAPE}); // the snap assist Windows offers beside it
         app.desktopShot("frame-snapped-left");
+
+        // The thumbnail's buttons with the real pointer: hover our taskbar button, click Pause on the thumbnail. e2e
+        // posts the message the taskbar posts; this shows the taskbar really sends it and Qt hands it to us.
+        QObject *taskbar = app.window->findChild<QObject *>("taskbarButtons");
+        QVERIFY(taskbar);
+        check("the thumbnail buttons are ready", [&] { return taskbar->property("ready").toBool(); });
+        const QString pauseTip = taskbar->property("tips").toStringList().value(1);
+        const QString title = app.window->title();
+        DWORD shell = 0;
+        GetWindowThreadProcessId(FindWindowW(L"Shell_TrayWnd", nullptr), &shell);
+        FoundButton taskButton, thumbButton;
+        QStringList seen;
+        fromOutside([&] {
+            // Windows 11 names it after the exe ("tst_e2e.exe - 1 running window"); older taskbars use the title.
+            const QString exe = QFileInfo(QCoreApplication::applicationFilePath()).fileName();
+            const auto ours = [&](const QString &name) { return name.startsWith(exe, Qt::CaseInsensitive) || name == title; };
+            taskButton = findButton(shell, {"Shell_TrayWnd", "Shell_SecondaryTrayWnd"}, ours, &seen);
+        });
+        check("UI Automation finds our taskbar button", [&] { return !taskButton.button.isNull(); });
+        if (taskButton.button.isNull()) qInfo("taskbar buttons seen: %s", qPrintable(seen.join(" | ")));
+        if (!taskButton.button.isNull()) {
+            seen.clear();
+            const QRect screen(GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN), GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+            const QHash<quintptr, QString> anywhereBefore = shownWindows(screen);
+            fromOutside([&] {
+                for (int i = 4; i >= 0; --i) glideTo(taskButton.button.center() + QPoint(2 * i, 0));
+                QThread::msleep(2500); // the thumbnail fades in
+                thumbButton = findButton(shell, {}, [&](const QString &name) { return name == pauseTip; }, &seen);
+            });
+            QStringList appeared;
+            const QHash<quintptr, QString> anywhere = shownWindows(screen);
+            for (auto it = anywhere.cbegin(); it != anywhere.cend(); ++it)
+                if (!anywhereBefore.contains(it.key())) appeared << it.value();
+            qInfo("windows that appeared on the hover: %s", qPrintable(appeared.join(", ")));
+            // Like the flyout, no thumbnail opened for synthetic hover on this PC (2026-11-08): nothing to click then.
+            if (appeared.isEmpty() && thumbButton.button.isNull()) qInfo("NOT CHECKED: no thumbnail opened for synthetic hover");
+            else check("UI Automation finds Pause on our thumbnail", [&] { return !thumbButton.button.isNull(); });
+            if (thumbButton.button.isNull() && !appeared.isEmpty()) qInfo("explorer buttons seen: %s", qPrintable(seen.mid(0, 60).join(" | ")));
+            app.screenShot("taskbar-thumbnail", thumbButton.window.isNull() ? taskButton.button.adjusted(-200, -320, 200, 40) : thumbButton.window);
+        }
+        if (!thumbButton.button.isNull()) {
+            const QPoint from = taskButton.button.center(), to = thumbButton.button.center();
+            fromOutside([&] {
+                for (int i = 1; i <= 6; ++i) moveTo(from + (to - from) * i / 6);
+                button(MOUSEEVENTF_LEFTDOWN);
+                button(MOUSEEVENTF_LEFTUP);
+            });
+            check("a real click on the thumbnail's Pause pauses", [&] { return app.prop("pause") == "yes" && taskbar->property("paused").toBool(); });
+            fromOutside([&] {
+                button(MOUSEEVENTF_LEFTDOWN);
+                button(MOUSEEVENTF_LEFTUP);
+            });
+            check("a second click plays again", [&] { return app.prop("pause") == "no"; });
+        }
+        fromOutside([&] { moveTo(work().center()); }); // the thumbnail closes
         app.window->close();
         QVERIFY2(failures.isEmpty(), qPrintable(failures.join(", ")));
     }

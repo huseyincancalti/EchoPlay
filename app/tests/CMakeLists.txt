@@ -90,6 +90,7 @@ set_target_properties(tst_e2e PROPERTIES WIN32_EXECUTABLE OFF)
 target_link_libraries(tst_e2e PRIVATE echoplay_lib echoplay_libplugin Qt6::Test Qt6::Network)
 if(WIN32) # EchoPlay.exe's resources, its manifest above all: the test window gets snap layouts the same way
     target_sources(tst_e2e PRIVATE "${CMAKE_BINARY_DIR}/echoplay.rc")
+    target_link_libraries(tst_e2e PRIVATE dwmapi ole32 oleaut32) # realWindowInput: Windows' flyouts, UI Automation
 endif()
 add_test(NAME e2e COMMAND tst_e2e)
 set_tests_properties(e2e PROPERTIES LABELS e2e)

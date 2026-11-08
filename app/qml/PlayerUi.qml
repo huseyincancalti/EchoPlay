@@ -176,7 +176,8 @@ Item {
     readonly property int subtitleMargin: controlBar.visible && height > 0
                                           ? Math.max(22, Math.round((height - controlBar.y + 8) * 720 / height)) : 22
     onSubtitleMarginChanged: mpv.setProperty("sub-margin-y", String(subtitleMargin))
-    readonly property bool overControls: controlBar.hovered || (titleBar.visible && titleBar.hovered)
+    // The maximize button is Windows' (non-client, for snap layouts): QML sees no hover there, WindowChrome does.
+    readonly property bool overControls: controlBar.hovered || (titleBar.visible && (titleBar.hovered || ui.chrome.maximizeHovered))
     readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || settingsOpen || hintShown || overControls
 
     function wake() {

@@ -213,11 +213,27 @@ Item {
     }
     MouseArea { // the video itself
         property bool pausedByClick: false
+        // Dragging the picture moves the window, as in every player. The move is Windows' own (Aero Snap works from
+        // here too) and swallows the release; Qt sends one when it ends, which must not count as a click.
+        property point pressedAt
+        property bool movedWindow: false
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: ui.chromeUp ? Qt.ArrowCursor : Qt.BlankCursor
+        onPressed: mouse => {
+            pressedAt = Qt.point(mouse.x, mouse.y)
+            movedWindow = false
+        }
+        onPositionChanged: mouse => {
+            if (movedWindow || mouse.buttons !== Qt.LeftButton || ui.fullScreen) return
+            const far = Application.styleHints.startDragDistance
+            if (Math.abs(mouse.x - pressedAt.x) < far && Math.abs(mouse.y - pressedAt.y) < far) return
+            movedWindow = true
+            ui.window.startSystemMove()
+        }
         // A click that closes something, or ends the resume question, does only that.
         onClicked: mouse => {
+            if (movedWindow) return
             if (mouse.button === Qt.RightButton) {
                 ui.openMenu(mouse.x, mouse.y, ui.mpv.observed("path") || "", false)
                 return

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # What only Windows itself can do with EchoPlay's frameless window, with the real mouse and keyboard: drag the resize
-# edges and the caption, double-click the caption, hover the maximize button (the snap layouts flyout must open), Aero
+# edges, the caption and the picture, double-click the caption, hover the maximize button (the snap layouts flyout must open), Aero
 # Snap by dragging to the top edge and with Win+Left, hover the taskbar button and click Pause on its thumbnail.
 # tools/e2e.sh covers the rest without real input.
 # It TAKES THE MOUSE AND KEYBOARD for about 25 s: run it only when the maintainer says so. The pointer returns at the end.

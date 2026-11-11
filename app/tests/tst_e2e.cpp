@@ -1999,6 +1999,21 @@ private slots:
         drag(caption(), caption() + QPoint(-30, 40));
         check("the caption moves it", [&] { return rect().topLeft() == before.topLeft() + QPoint(-30, 40) && rect().size() == before.size(); });
 
+        // The picture moves it too, as in every player. The window starts a drag distance behind the pointer, and the
+        // drag is not a click: the clip plays on. A click without a move still pauses.
+        const QRect beforePicture = rect();
+        drag(beforePicture.center(), beforePicture.center() + QPoint(120, -80));
+        check("a drag on the picture moves it", [&] {
+            const QPoint moved = rect().topLeft() - beforePicture.topLeft();
+            return moved.x() >= 80 && moved.x() <= 120 && moved.y() <= -50 && moved.y() >= -80 && rect().size() == beforePicture.size();
+        });
+        check("that drag does not pause", [&] { return app.prop("pause") == "no"; });
+        click(rect().center());
+        check("a click on the picture still pauses", [&] { return app.prop("pause") == "yes"; });
+        QTest::qWait(700); // not a double-click
+        click(rect().center());
+        check("and plays again", [&] { return app.prop("pause") == "no"; });
+
         // A double-click on the caption maximizes, and again restores.
         const QRect normal = rect();
         click(caption(), 2);

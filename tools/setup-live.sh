@@ -70,8 +70,21 @@ oldVersion() { # what the setup must put right, as an update does. The exe and a
   waitWarmUp
   rm -f "$APP/lang/tr.json"
   echo '{}' > "$APP/theme.json"
-  printf 'x' >> "$APP/EchoPlay.exe"
-  printf 'x' >> "$APP/libmpv-2.dll"
+  oneMoreByte "$APP/EchoPlay.exe"
+  oneMoreByte "$APP/libmpv-2.dll"
+}
+oneMoreByte() { # Just after its process is gone a file can still be held (seen once, 2026-11-12: "Device or resource
+  # busy" on EchoPlay.exe right after killTestApp, with no EchoPlay running from the test folder; who held it is not
+  # known): say what runs from the test folder, and wait for it.
+  local start said=0; start=$(now)
+  until { printf 'x' >> "$1"; } 2>/dev/null; do
+    if [ $said = 0 ]; then
+      said=1
+      report "  note: $(basename "$1") was busy; running from the test folder: $(powershell.exe -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \"Name='EchoPlay.exe'\" | Where-Object { \$_.ExecutablePath -like '*setup-test*' } | ForEach-Object { \$_.CommandLine }) -join ' | '" 2>/dev/null | tr -d '\r')"
+    fi
+    [ $(($(now) - start)) -lt 15000 ] || { report "  FAIL  $(basename "$1") stayed busy for 15 s"; exit 1; }
+    sleep 0.2
+  done
 }
 theRealEchoPlay() { # fingerprint of what is installed on this machine: must not move
   local real="$LOCALAPPDATA/Programs/EchoPlay"

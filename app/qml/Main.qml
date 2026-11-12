@@ -37,6 +37,7 @@ Window {
     property bool videoOn: false      // the render context exists, so video can play
     property bool earlyRestart: false // the file restarted before video was on: audio only so far
     property bool endedEarly: false   // the file ended before video was on: with vid=no a file without audio
+    property int endedEntry: -1       // that file's entry in mpv's playlist
     property bool videoRetried: false // vid=auto came after mpv had picked tracks for this file: asked once more
     property bool mixOn: mix
     property real handOverSentMs: 0 // epoch ms of a second launch whose file has not started playing yet
@@ -75,6 +76,16 @@ Window {
     function openFile(file) {
         mpv.setProperty("pause", true)
         mpv.command(["loadfile", file, "replace", -1, root.shotAt >= 0 ? "start=" + root.shotAt : ""])
+    }
+    // A file that ended before it could play (onFileEnded) plays again as its entry of the folder playlist, not by its
+    // path: loaded twice with nothing played in between, mpv takes the folder playlist for a loop ("Infinite playlist
+    // loading loop detected") and stops, and a video without sound never opened. No folder playlist (measuring runs):
+    // the path.
+    function replay(entryId) {
+        const at = root.playlist.findIndex(entry => entry.id === entryId)
+        if (at < 0) { root.openFile(root.file); return }
+        mpv.setProperty("pause", true)
+        mpv.command(["playlist-play-index", at])
     }
     // Every way of opening after the first start: the start screen, a drop, a second launch's hand-over.
     function openPath(path) {
@@ -257,7 +268,7 @@ Window {
             root.videoOn = true
             setProperty("vid", "auto")
             if (!root.file) return
-            if (root.endedEarly) { root.openFile(root.file); return } // nothing to play without video: again, with it
+            if (root.endedEarly) { root.replay(root.endedEntry); return } // nothing to play without video: again, with it
             // Turning video on shows its frame but sends no playback restart; a seek in place does. (While the
             // file still opens, the seek fails and the first restart comes with video anyway.)
             command(["seek", 0, "relative+exact"])
@@ -292,8 +303,12 @@ Window {
         // more. Anything else is a file that cannot play.
         onFileEnded: (reason, error, entryId) => {
             if (reason !== "error") return
-            if (!root.restarted && !root.videoOn) { root.endedEarly = true; root.videoRetried = true; return }
-            if (!root.restarted && !root.videoRetried) { root.videoRetried = true; root.openFile(root.file); return }
+            if (!root.restarted && !root.videoOn) {
+                if (!root.endedEarly) root.endedEntry = entryId // mpv goes on to the folder's next clip: the first one is ours
+                root.endedEarly = root.videoRetried = true
+                return
+            }
+            if (!root.restarted && !root.videoRetried) { root.videoRetried = true; root.replay(entryId); return }
             if (!root.measuring) root.showError(error, entryId)
         }
     }

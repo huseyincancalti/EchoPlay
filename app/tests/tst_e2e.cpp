@@ -1562,6 +1562,53 @@ private slots:
         QTRY_VERIFY(!app.item("mediaInfo"));
     }
 
+    // A video without sound, opened the real way. With nothing to play before the picture is on, the clip ends at once
+    // and is played again; loading its path a second time tripped mpv's playlist loop guard and nothing ever played.
+    // EchoPlay.exe's bench mode (tools/e2e.sh's edge clips) builds no folder playlist and never saw it. Alone in its
+    // folder, and as the first of two: there mpv goes on to the second clip before the first one gets its turn again.
+    void videoWithoutSound()
+    {
+        for (const bool alone : {true, false}) {
+            const QString name = alone ? "silent-alone" : "silent-first";
+            const QString folder = QDir(m_path).filePath(name + "-clips");
+            QVERIFY(QDir().mkpath(QDir(m_path).filePath(name)));
+            QVERIFY(QDir().mkpath(folder));
+            const QString clip = folder + "/a-no-sound.mp4";
+            QProcess ffmpeg;
+            ffmpeg.start("ffmpeg", {"-v", "error", "-y", "-i", m_clip, "-t", "20", "-an", "-c", "copy", clip});
+            QVERIFY2(ffmpeg.waitForFinished(30000) && ffmpeg.exitCode() == 0, ffmpeg.readAllStandardError().constData());
+            if (!alone) QVERIFY(QFile::copy(m_clip, folder + "/b-with-sound.mp4"));
+
+            Launch app(QDir(m_path).filePath(name), clip, QDir(m_path).filePath(name + ".log"));
+            QVERIFY(app.mpv);
+            QVERIFY2(app.playing(), qPrintable(name + ": the clip without sound did not start playing"));
+            QCOMPARE(QFileInfo(app.prop("path")).fileName(), QString("a-no-sound.mp4"));
+            QVERIFY(!app.item("errorScreen"));
+            app.window->close();
+        }
+    }
+
+    // A clip with no picture at all, the real way too: the sound plays (Launch::playing would wait for a picture).
+    void soundWithoutPicture()
+    {
+        const QString folder = QDir(m_path).filePath("sound-only-clips");
+        QVERIFY(QDir().mkpath(QDir(m_path).filePath("sound-only")));
+        QVERIFY(QDir().mkpath(folder));
+        const QString clip = folder + "/sound.m4a";
+        QProcess ffmpeg;
+        ffmpeg.start("ffmpeg", {"-v", "error", "-y", "-i", m_clip, "-t", "20", "-map", "0:a:0", "-c", "copy", clip});
+        QVERIFY2(ffmpeg.waitForFinished(30000) && ffmpeg.exitCode() == 0, ffmpeg.readAllStandardError().constData());
+
+        Launch app(QDir(m_path).filePath("sound-only"), clip, QDir(m_path).filePath("sound-only.log"));
+        QVERIFY(app.mpv);
+        app.mpv->setProperty("mute", true);
+        QTRY_VERIFY_WITH_TIMEOUT(app.prop("pause") == "no" && app.number("time-pos") > 0.3 && app.uiLoaded(), 30000);
+        QCOMPARE(QFileInfo(app.prop("path")).fileName(), QString("sound.m4a"));
+        QVERIFY(!app.item("errorScreen"));
+        app.shot("sound-only");
+        app.window->close();
+    }
+
     // Chapters, as an MP4 carries them (OBS's hybrid MP4 writes chapter markers): gaps in the seek bar, the hovered
     // one's title next to the time, PgUp/PgDown step through them with a toast.
     void chapters()
@@ -1639,6 +1686,7 @@ private slots:
         app.mpv->captureFrame();
         QVERIFY(captured.wait(5000));
         const QImage frame = captured.first().first().value<QImage>();
+        if (const QString dir = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS"); !dir.isEmpty()) frame.save(QDir(dir).filePath("copied-frame.png"));
         QCOMPARE(frame.size(), QSize(1280, 720));
         QVERIFY(frame.pixelColor(20, 20) != frame.pixelColor(1260, 700)); // a picture, not one color
         QTRY_VERIFY(app.item("controlBar"));

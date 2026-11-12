@@ -212,28 +212,55 @@ Item {
         active: ui.chromeUp || flash.shown || resumeLoader.active || ui.window.cardShown
     }
     MouseArea { // the video itself
+        id: picture
         property bool pausedByClick: false
         // Dragging the picture moves the window, as in every player. The move is Windows' own (Aero Snap works from
         // here too) and swallows the release; Qt sends one when it ends, which must not count as a click.
         property point pressedAt
         property bool movedWindow: false
+        // Held down without a move, a playing clip runs at the fixed speed (the G key's) until the button is up, as on
+        // YouTube. That release is not a click either.
+        property bool heldFast: false
+        property real speedBeforeHold: 0 // above 0 while it runs fast
+        function endHold() {
+            hold.stop()
+            if (speedBeforeHold <= 0) return
+            ui.mpv.command(["set", "speed", String(speedBeforeHold)])
+            ui.window.showToast(I18n.strings.speed_now.arg(Number(speedBeforeHold.toFixed(2))), 800)
+            speedBeforeHold = 0
+        }
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: ui.chromeUp ? Qt.ArrowCursor : Qt.BlankCursor
+        Timer {
+            id: hold
+            interval: 500
+            onTriggered: {
+                if (ui.paused || ui.speed >= PlayerSettings.speedFactor) return
+                picture.heldFast = true
+                picture.speedBeforeHold = ui.speed
+                ui.mpv.command(["set", "speed", String(PlayerSettings.speedFactor)])
+                ui.window.showToast(I18n.strings.speed_now.arg(PlayerSettings.speedFactor), 3600000) // until the button is up
+            }
+        }
         onPressed: mouse => {
             pressedAt = Qt.point(mouse.x, mouse.y)
-            movedWindow = false
+            movedWindow = heldFast = false
+            if (mouse.button === Qt.LeftButton) hold.restart()
         }
+        onReleased: endHold()
+        onCanceled: endHold()
         onPositionChanged: mouse => {
-            if (movedWindow || mouse.buttons !== Qt.LeftButton || ui.fullScreen) return
+            if (movedWindow || heldFast || mouse.buttons !== Qt.LeftButton || ui.fullScreen) return
             const far = Application.styleHints.startDragDistance
             if (Math.abs(mouse.x - pressedAt.x) < far && Math.abs(mouse.y - pressedAt.y) < far) return
             movedWindow = true
+            hold.stop()
             ui.window.startSystemMove()
         }
         // A click that closes something, or ends the resume question, does only that.
         onClicked: mouse => {
-            if (movedWindow) return
+            if (movedWindow || heldFast) return
             if (mouse.button === Qt.RightButton) {
                 ui.openMenu(mouse.x, mouse.y, ui.mpv.observed("path") || "", false)
                 return

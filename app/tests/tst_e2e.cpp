@@ -597,6 +597,21 @@ private slots:
             QCOMPARE(app.prop("pause"), QString("no"));
             app.services.player.setClickPauses(true);
 
+            // Held down, the picture plays at the fixed speed (G's) until the button is up, as on YouTube. That release
+            // is no click: the clip plays on, at the speed it had.
+            app.mpv->command({"set", "speed", "1.25"});
+            QTRY_COMPARE(app.number("speed"), 1.25);
+            const double fast = app.services.player.speedFactor();
+            QTest::mousePress(app.window, Qt::LeftButton, Qt::NoModifier, center);
+            QTRY_COMPARE(app.number("speed"), fast);
+            QCOMPARE(toast(), text("speed_now").arg(fast));
+            QTest::mouseRelease(app.window, Qt::LeftButton, Qt::NoModifier, center);
+            QTRY_COMPARE(app.number("speed"), 1.25);
+            QTest::qWait(100);
+            QCOMPARE(app.prop("pause"), QString("no"));
+            app.mpv->command({"set", "speed", "1"});
+            QTRY_COMPARE(app.number("speed"), 1.0);
+
 #ifdef Q_OS_WIN
             // Always on top: T, and the next run comes back with it.
             const auto onTop = [&] { return (GetWindowLongPtrW(HWND(app.window->winId()), GWL_EXSTYLE) & WS_EX_TOPMOST) != 0; };

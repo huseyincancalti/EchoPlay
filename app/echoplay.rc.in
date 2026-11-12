@@ -1,4 +1,6 @@
 // Windows resources of EchoPlay.exe (app/CMakeLists.txt fills in the @...@ values).
+// This file is UTF-8 (the maintainer's name below); without the line the strings are read in the build PC's code page.
+#pragma code_page(65001)
 // IDI_ICON1: the exe icon in Explorer and the taskbar; Qt also uses it as the default window icon.
 IDI_ICON1 ICON "@ECHOPLAY_ICON@"
 
@@ -14,10 +16,10 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName", "Huseyin Can CALTI"
+            VALUE "CompanyName", "Hüseyin Can ÇALTI"
             VALUE "FileDescription", "EchoPlay"
             VALUE "FileVersion", "@ECHOPLAY_VERSION@"
-            VALUE "LegalCopyright", "Copyright (c) 2026 Huseyin Can CALTI, MIT License"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Hüseyin Can ÇALTI, MIT License"
             VALUE "OriginalFilename", "EchoPlay.exe"
             VALUE "ProductName", "EchoPlay"
             VALUE "ProductVersion", "@ECHOPLAY_VERSION@"

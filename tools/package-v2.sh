@@ -2,7 +2,8 @@
 # Builds the v2 Windows installer: a Release build, `cmake --install` into a clean stage, checks on the staged
 # app, then Inno Setup. Output: installer/windows/v2/Output/EchoPlay-Setup.exe
 # Checks: the staged EchoPlay.exe starts with Windows' own PATH only (no Qt, no MinGW, no libmpv elsewhere),
-# then plays a generated clip and saves a screenshot of its window (--shot-at; a window shows for ~2 s).
+# then plays a generated clip and saves a screenshot of its window (--shot-at; a window shows for ~2 s);
+# the app and the setup carry the publisher's name with its Turkish letters.
 # The setup itself is NOT run here: it would replace the EchoPlay (v1) installed on this machine (same AppId).
 # Usage: [VERSION=2.0.0] bash tools/package-v2.sh    (default 0.0.0-dev: a dev build never checks for updates)
 # Needs: tools/setup-dev.sh done, Inno Setup 6 (ISCC; default: per-user install). Log: .out/package-v2.log
@@ -41,4 +42,12 @@ echo "installer"
 # MSYS_NO_PATHCONV: Git Bash would turn the /Q and /D switches into paths.
 MSYS_NO_PATHCONV=1 "$ISCC" /Q /DMyAppVersion="$VERSION" /DMyFileVersion="${VERSION%%-*}" installer/windows/v2/EchoPlay.iss >> "$LOG" 2>&1
 setup=installer/windows/v2/Output/EchoPlay-Setup.exe
+# Both compilers (windres, Inno Setup) must keep the Turkish letters of the publisher's name whatever the build PC's
+# code page is. Compared as code points inside PowerShell, so no console code page is in the way either. Trimmed:
+# Inno Setup pads its version strings with spaces.
+for f in "$STAGE/EchoPlay.exe" "$setup"; do
+  same=$(powershell.exe -NoProfile -Command "(Get-Item '$(cygpath -w "$PWD/$f")').VersionInfo.CompanyName.Trim() -ceq ('H' + [char]0xFC + 'seyin Can ' + [char]0xC7 + 'ALTI')" | tr -d '\r')
+  [ "$same" = True ] || { echo "FAIL: the publisher's name in $f is not \"Hüseyin Can ÇALTI\""; exit 1; }
+done
+echo "  ok    the publisher's name in the app and the setup"
 echo "PACKAGE: $setup ($(du -h "$setup" | cut -f1), staged app $(du -sh "$STAGE" | cut -f1)). Log: $LOG"

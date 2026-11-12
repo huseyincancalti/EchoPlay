@@ -1,4 +1,4 @@
-; EchoPlay v2 installer (Qt + libmpv app). Built by tools/package-v2.sh, which stages the app into
+﻿; EchoPlay v2 installer (Qt + libmpv app). Built by tools/package-v2.sh, which stages the app into
 ; installer\windows\v2\stage\ (cmake --install) and then runs ISCC on this script.
 ;
 ; Same AppId, install folder and "Open with" registration as v1 (installer\windows\EchoPlay.iss): installing
@@ -12,7 +12,8 @@
 #ifndef MyFileVersion
   #define MyFileVersion "0.0.0"
 #endif
-#define MyAppPublisher "Huseyin Can CALTI"
+; This file is UTF-8 with a byte order mark: without the mark Inno Setup reads the name in the build PC's code page.
+#define MyAppPublisher "Hüseyin Can ÇALTI"
 #define MyAppURL "https://github.com/huseyincancalti/EchoPlay"
 #define MyAppExeName "EchoPlay.exe"
 

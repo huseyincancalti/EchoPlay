@@ -104,6 +104,9 @@ add_custom_command(TARGET echoplay POST_BUILD
 install(TARGETS echoplay RUNTIME DESTINATION .)
 install(CODE "set(QT_DEPLOY_BIN_DIR .)") # read by the deploy script below; its default is bin/
 install(FILES "${MPV_DIR}/libmpv-2.dll" theme/theme.json DESTINATION .)
+# libmpv imports vulkan-1.dll, which a graphics driver installs, not Windows: without it next to the exe the
+# app does not start on a Windows that has no such driver (a virtual machine, Windows Sandbox).
+install(FILES "$ENV{VULKAN_DLL}" DESTINATION .)
 install(DIRECTORY lang DESTINATION .)
 # --no-opengl-sw: Qt's 20 MB software OpenGL; EchoPlay renders through Direct3D 11 only.
 qt_generate_deploy_qml_app_script(TARGET echoplay OUTPUT_SCRIPT deploy_script NO_TRANSLATIONS

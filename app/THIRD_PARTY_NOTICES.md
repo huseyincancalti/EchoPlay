@@ -45,6 +45,13 @@ Embedded in `EchoPlay.exe`, unmodified:
 - Material Symbols Rounded (the icons), cut down to the glyphs EchoPlay uses by `tools/make-fonts.sh`: Apache License 2.0
   (`licenses/Apache-2.0.txt`). Source: <https://github.com/google/material-design-icons>.
 
+## Vulkan loader
+
+`vulkan-1.dll`: the Khronos Vulkan loader, unmodified, from LunarG's Vulkan Runtime 1.4.363.0. libmpv needs
+it to start; it is shipped for a Windows whose graphics driver did not install one. Apache License 2.0
+(`licenses/Apache-2.0.txt`). Source: <https://github.com/KhronosGroup/Vulkan-Loader>, binaries from
+<https://vulkan.lunarg.com>.
+
 ## Microsoft D3DCompiler
 
 `D3Dcompiler_47.dll` (Direct3D shader compiler), redistributed as provided by Microsoft with the Windows

@@ -19,6 +19,9 @@ ISCC="${ISCC:-$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe}"
 
 echo "build ($VERSION)"
 cmake -S app -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DECHOPLAY_VERSION="$VERSION" > "$LOG" 2>&1
+# Qt scans the QML files' imports once and never again (its build rule depends on the scanner only), and the
+# deploy step stages what that list names: a module imported later was left out of the stage. Scan every time.
+rm -f "$BUILD/.qt/qml_imports/echoplay_build.cmake"
 cmake --build "$BUILD" --target echoplay >> "$LOG" 2>&1
 rm -rf "$STAGE"
 cmake --install "$BUILD" --prefix "$PWD/$STAGE" >> "$LOG" 2>&1 # Qt's deploy step needs an absolute path
@@ -26,6 +29,12 @@ cmake --install "$BUILD" --prefix "$PWD/$STAGE" >> "$LOG" 2>&1 # Qt's deploy ste
 echo "check the staged app without the dev PATH"
 clean() { env -i PATH="/c/Windows/System32:/c/Windows" SYSTEMROOT='C:\Windows' SYSTEMDRIVE='C:' \
   USERNAME="$USERNAME" LOCALAPPDATA="$LOCALAPPDATA" APPDATA="$APPDATA" USERPROFILE="$USERPROFILE" "$@"; }
+# Every module a QML file imports must be staged: a missing one shows only when that screen loads (the start
+# screen stayed black once, with QtQuick.Shapes missing, while the clip check below passed).
+for module in $(grep -hoE '^import Qt[A-Za-z.]+' app/qml/*.qml | cut -d' ' -f2 | sort -u); do
+  [ -f "$STAGE/qml/${module//.//}/qmldir" ] || { echo "FAIL: QML module $module is not in the stage"; exit 1; }
+done
+echo "  ok    every imported QML module is staged"
 clean "$STAGE/EchoPlay.exe" --smoke
 mkdir -p .out/package
 clip=.out/package/clip.mp4

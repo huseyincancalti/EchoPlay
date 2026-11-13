@@ -4,6 +4,8 @@
 #   venv/    Python venv with aqtinstall, cmake, ninja
 #   qt/      Qt $QT_VERSION, MinGW kit, plus the matching MinGW compiler
 #   libmpv/  libmpv dev package (zhongfly/mpv-winbuild, the same source v1's releases use)
+#   vulkan/  vulkan-1.dll, the Khronos Vulkan loader (LunarG's runtime): libmpv imports it, and only a graphics
+#            driver installs it, so the installer carries it for a Windows without one
 # Then writes .out/devenv.sh, which tools/check.sh and the other tools source.
 # Re-running is safe: finished parts are skipped. Usage: bash tools/setup-dev.sh
 set -euo pipefail
@@ -59,6 +61,19 @@ fetch_mpv() {
 [ -f "$DEV/libmpv/include/mpv/client.h" ] || { echo "libmpv: downloading"; fetch_mpv 'mpv-dev-x86_64-[0-9][^"]*\.7z' "$DEV/libmpv"; }
 [ -f "$DEV/mpv/mpv.exe" ] || { echo "mpv: downloading"; fetch_mpv 'mpv-x86_64-[0-9][^"]*\.7z' "$DEV/mpv"; }
 
+# Pinned, with LunarG's published SHA-256 (https://vulkan.lunarg.com/sdk/files.json).
+VULKAN_VERSION=1.4.363.0
+VULKAN_SHA=a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a
+if [ ! -f "$DEV/vulkan/vulkan-1.dll" ]; then
+  echo "vulkan-1.dll: downloading"
+  zip="VulkanRT-X64-$VULKAN_VERSION-Components.zip"
+  curl -fsSL -o "$DEV/$zip" "https://sdk.lunarg.com/sdk/download/$VULKAN_VERSION/windows/$zip"
+  echo "$VULKAN_SHA  $DEV/$zip" | sha256sum -c - >/dev/null || { echo "FAIL: $zip does not match its SHA-256"; exit 1; }
+  mkdir -p "$DEV/vulkan"
+  unzip -q -j -o "$DEV/$zip" '*/x64/vulkan-1.dll' -d "$DEV/vulkan"
+  rm -f "$DEV/$zip"
+fi
+
 DPI=$(powershell -NoProfile -Command "(Get-ItemProperty 'HKCU:\Control Panel\Desktop\WindowMetrics' -ErrorAction SilentlyContinue).AppliedDPI" | tr -d '\r')
 DPI="${DPI:-96}"
 cat > .out/devenv.sh <<EOF
@@ -67,6 +82,7 @@ export ECHOPLAY_DEV="$(cygpath -m "$DEV")"
 export PATH="$DEV/venv/Scripts:$QT_DIR/bin:$MINGW_DIR/bin:$DEV/libmpv:\$PATH"
 export CMAKE_PREFIX_PATH="$(cygpath -m "$QT_DIR")"
 export MPV_DIR="$(cygpath -m "$DEV/libmpv")"
+export VULKAN_DLL="$(cygpath -m "$DEV/vulkan/vulkan-1.dll")"
 export MPV_EXE="$DEV/mpv/mpv.exe"
 export CMAKE_GENERATOR=Ninja
 # v2's 1280x720 logical window in physical pixels (Qt applies Windows display scaling; mpv's --geometry does not)

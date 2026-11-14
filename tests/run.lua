@@ -126,6 +126,8 @@ do
     update_check.check = orig_check
 end
 
+dofile('tests/language.lua')(check)
+
 print('')
 if failures == 0 then
     print('All checks passed.')

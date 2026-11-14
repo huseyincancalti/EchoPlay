@@ -23,6 +23,7 @@ require 'mp.options'
 
 local util = require 'util'
 local i18n = require 'i18n'
+local config = require 'config'
 local quality = require 'quality'
 local resume = require 'resume'
 local update_check = require 'update_check'
@@ -49,7 +50,6 @@ local THEMES_DIR = mp.command_native({ 'expand-path', '~~/themes' })
 local STATE_PATH = mp.command_native({ 'expand-path', '~~/echoplay-state.json' })
 local RELEASES_URL = 'https://github.com/huseyincancalti/EchoPlay/releases/latest'
 
-i18n.init(OPTS_DIR, o.language)
 local t = i18n.t
 
 -- Open a folder (or URL) with whatever the OS associates it with - Explorer/Finder/xdg-open
@@ -199,6 +199,10 @@ local function load_state()
     end
 end
 load_state()
+-- Saved user choices are authoritative; config supplies first-run defaults. Load
+-- translations only after state, and use the actual fallback for the menu indicator.
+o.language = i18n.init(OPTS_DIR, o.language)
+mp.commandv('change-list', 'script-opts', 'append', 'uosc-languages=' .. o.language .. ',slang,en')
 -- Applied here (top-level, before any file loads) rather than per-file: volume is one
 -- mpv session's global property, not something to re-snap on every playlist entry. Same for
 -- end_mode - keep-open/loop-file are core mpv properties, not something to reset per file.
@@ -307,17 +311,21 @@ local function save_state()
     local gains, monos = {}, {}
     for aid, g in pairs(gain) do if g ~= 1 then gains[tostring(aid)] = g end end
     for aid, v in pairs(mono) do if v then monos[tostring(aid)] = true end end
-    local f = io.open(STATE_PATH, 'w')
+    local f, err = io.open(STATE_PATH, 'w')
     if f then
-        f:write(to_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
+        local written, write_err = f:write(to_json({ _schema = CURRENT_SCHEMA, default_on = don, gains = gains, mono = monos,
             language = o.language, mode = mode, accent = accent, speed_factor = o.speed_factor,
             perf_pref = quality.pref, screenshot_preset = screenshot_preset, menu_hint_shown = menu_hint_shown,
             end_mode = end_mode,
             screenshot_custom_path = screenshot_custom_path, speed_step = speed_step, custom_keys = custom_keys,
             volume = saved_volume, update_last_checked = update_check.last_checked,
             update_seen_version = update_check.seen_version }))
-        f:close()
+        local closed, close_err = f:close()
+        if written and closed then return true end
+        err = write_err or close_err
     end
+    mp.msg.warn('Cannot save EchoPlay state: ' .. tostring(err))
+    return nil, err
 end
 -- Debounced so dragging uosc's volume slider (many rapid property changes) doesn't hammer
 -- the disk with a synchronous write on every pixel of movement.
@@ -704,11 +712,23 @@ local function persist_uosc_language(code)
     local w = io.open(path, 'w'); if w then w:write(c); w:close() end
 end
 local function set_language(code)
+    if not i18n.set(code) then
+        mp.msg.warn('Cannot load language: ' .. tostring(code))
+        return
+    end
     o.language = code
-    i18n.set(code)
     mp.commandv('change-list', 'script-opts', 'append', 'uosc-languages=' .. code .. ',slang,en')
     persist_uosc_language(code)
-    save_state(); osd(string.format(t('lang_osd'), t('lang_name')))
+    local state_ok = save_state()
+    local ok, err = config.set_language(OPTS_DIR .. '/echoplay.conf', code)
+    if not ok then
+        mp.msg.warn('Cannot save echoplay.conf language: ' .. tostring(err))
+        mp.osd_message('Could not update echoplay.conf; check file permissions and the log.', 5)
+    elseif not state_ok then
+        mp.osd_message('Could not save EchoPlay state; language may reset on restart. Check the log.', 5)
+    else
+        osd(string.format(t('lang_osd'), t('lang_name')))
+    end
     update_button(); open_menu()
 end
 

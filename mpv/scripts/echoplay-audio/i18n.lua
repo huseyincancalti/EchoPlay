@@ -81,11 +81,15 @@ local FALLBACK = {
 local opts_dir, STR
 
 function M.load(code)
+    if type(code) ~= 'string' or not code:match('^%w+$') then return nil end
     return util.read_json(opts_dir .. '/echoplay-' .. code .. '.json')
 end
 
 function M.set(code)
-    STR = M.load(code) or STR
+    local strings = M.load(code)
+    if not strings then return nil end
+    STR = strings
+    return true
 end
 
 function M.t(k) return STR[k] or FALLBACK[k] or k end
@@ -104,7 +108,9 @@ end
 
 function M.init(dir, initial_lang)
     opts_dir = dir
-    STR = M.load(initial_lang) or M.load('tr') or {}
+    if M.set(initial_lang) then return initial_lang end
+    STR = M.load('tr') or {}
+    return 'tr'
 end
 
 return M

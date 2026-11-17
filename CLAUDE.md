@@ -51,10 +51,19 @@ no quiet screen (its input goes to the test window only): run it after every v2 
   Exception approved by the maintainer (2026-11-01): `rea` (morluto, MIT) for competitor analysis. NVIDIA App's and
   PotPlayer's licences forbid decompiling: no decompiler on a closed product without the maintainer saying so.
 
+## Branches and pull requests (maintainer, 2026-11-17)
+- `main` is protected: no direct push, no force push, no deletion. Every change goes on its own branch
+  (`fix/...`, `add/...`, `docs/...`, `chore/...`) and reaches `main` only through a pull request.
+- The PR follows `.github/pull_request_template.md`: what changes, how it was checked (check/e2e result lines,
+  screenshots), what the maintainer should try by hand, what is not done. CI (`lint`, `unit-tests`, `smoke-test`)
+  must pass; merges are squash only, the branch is deleted after.
+- Claude opens the PR; the maintainer reads, tests and merges it. Claude never merges its own PR unless told to.
+
 ## Hard rules
 - Never fork or patch mpv/libmpv, uosc, thumbfast or memo source. v2 links upstream libmpv; v1 ships the
   upstream scripts unmodified. If an upstream limit blocks a request, say so plainly instead of faking it.
-- Never create a git tag or publish a GitHub Release without explicit prior approval from the maintainer.
+- Never create a git tag or publish a GitHub Release without explicit prior approval from the maintainer. Release
+  notes are text only: What's new, Remove the old version (when needed), Coming next; visuals go in the README.
 - SOLID / minimal code. No speculative abstractions, no features beyond what's asked, no half-finished work.
 - The single-EXE installer stays plug-and-play: no added prerequisites, no manual steps for the user.
 - Root cause first, measured (verbose mpv logs, exact timestamps), then a surgical fix.

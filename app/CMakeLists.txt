@@ -73,6 +73,9 @@ set_target_properties(echoplay PROPERTIES OUTPUT_NAME EchoPlay WIN32_EXECUTABLE 
 if(UNIX AND NOT APPLE) # Linux names programs in lower case; "EchoPlay" is also the QML module's folder in the build
     set_target_properties(echoplay PROPERTIES OUTPUT_NAME echoplay)
 endif()
+if(APPLE) # EchoPlay.app; a bare "EchoPlay" would clash with the QML module's folder (case-insensitive file system)
+    set_target_properties(echoplay PROPERTIES MACOSX_BUNDLE TRUE)
+endif()
 if(WIN32)
     string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)" _ "${ECHOPLAY_VERSION}")
     set(ECHOPLAY_VERSION_RC "${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0")

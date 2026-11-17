@@ -14,7 +14,9 @@ function trackName(track, strings) {
 }
 
 // The first word of a track's name, with Microphone shortened: "System sounds" + "Microphone" = "System + Mic".
+// Untitled tracks by number: "Track 1 + 2".
 function shortName(track, strings) {
+    if (!track.name) return strings.track_n.arg(track.id)
     const word = trackName(track, strings).split(" ")[0]
     return word === strings.microphone ? strings.mic : word
 }
@@ -24,7 +26,10 @@ function chip(tracks, strings) {
     const on = tracks.filter(t => t.enabled)
     if (on.length === 0) return strings.no_sound
     if (on.length === 1) return trackName(on[0], strings)
-    if (on.length === 2 && tracks.length === 2) return shortName(on[0], strings) + " + " + shortName(on[1], strings)
+    if (on.length === 2 && tracks.length === 2) {
+        if (!on[0].name && !on[1].name) return strings.track_pair.arg(on[0].id).arg(on[1].id)
+        return shortName(on[0], strings) + " + " + shortName(on[1], strings)
+    }
     if (on.length === tracks.length) return strings.all_tracks.arg(tracks.length)
     return strings.n_of_m.arg(on.length).arg(tracks.length)
 }

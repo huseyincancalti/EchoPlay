@@ -55,8 +55,10 @@ private slots:
         m.setTracks({audio(1, "System sounds", "eng"), audio(2, {}, {}, {{"title", "Meta title"}}),
                      audio(3, {}, {}, {{"name", "Meta name"}}), audio(4, {}, {}, {{"NAME", "Upper name"}}),
                      audio(5, {}, "tur"), audio(6, {}, "und"), audio(7)});
-        const QStringList want{"System sounds", "Meta title", "Meta name", "Upper name", "TUR", "", ""};
+        const QStringList want{"System sounds", "Meta title", "Meta name", "Upper name", "Türkçe", "", ""};
         for (int i = 0; i < want.size(); ++i) QCOMPARE(m.tracks()[i].name, want[i]);
+        QCOMPARE(m.tracks()[0].lang, QString("English")); // with a title, the language stays apart for the UI
+        QCOMPARE(m.tracks()[6].lang, QString());
     }
 
     void output_data()

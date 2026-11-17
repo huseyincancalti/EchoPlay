@@ -7,6 +7,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
+#include "Language.h"
 
 // Languages are one flat JSON file each in a folder next to the exe (key lang_name = the language's own
 // name). Adding a language = dropping a file there; the folder is scanned once at start. QML reads every
@@ -27,6 +28,7 @@ public:
     QString language() const { return m_language; }
     // An empty or unknown code picks the system language, else English.
     void setLanguage(const QString &code);
+    Q_INVOKABLE QString trackLanguage(const QString &code) const { return languageName(code); } // Language.h
     // English with the current language on top: a key missing in a translation shows English, never nothing.
     QVariantMap strings() const { return m_strings; }
 

@@ -12,6 +12,7 @@
   "audio_tracks": "音声トラック",
   "tracks_in_clip": "このクリップ内の%1",
   "track_n": "トラック %1",
+  "track_pair": "トラック %1 + %2",
   "track_sub": "トラック %1 · Ctrl+%1",
   "track_silent": "このクリップでは%1は無音です",
   "microphone": "マイク",

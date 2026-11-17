@@ -12,6 +12,7 @@
   "audio_tracks": "Pistas de audio",
   "tracks_in_clip": "%1 en este clip",
   "track_n": "Pista %1",
+  "track_pair": "Pistas %1 + %2",
   "track_sub": "Pista %1 · Ctrl+%1",
   "track_silent": "%1 está en silencio en este clip",
   "microphone": "Micrófono",

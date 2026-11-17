@@ -1,4 +1,5 @@
 #include "Mixer.h"
+#include "Language.h"
 
 #include <QRegularExpression>
 #include <QStringList>
@@ -17,8 +18,7 @@ QString trackName(const QVariantMap &track)
                                 md.value("name").toString(), md.value("NAME").toString()}) {
         if (!name.isEmpty()) return name;
     }
-    const QString lang = track.value("lang").toString();
-    return lang.isEmpty() || lang == "und" ? QString() : lang.toUpper();
+    return languageName(track.value("lang").toString());
 }
 
 } // namespace
@@ -29,7 +29,7 @@ bool Mixer::setTracks(const QVariantList &trackList)
     for (const QVariant &v : trackList) {
         const QVariantMap t = v.toMap();
         if (t.value("type").toString() != "audio") continue;
-        m_tracks.append({t.value("id").toInt(), trackName(t), t.value("codec").toString()});
+        m_tracks.append({t.value("id").toInt(), trackName(t), t.value("codec").toString(), languageName(t.value("lang").toString())});
     }
     return !m_tracks.isEmpty();
 }

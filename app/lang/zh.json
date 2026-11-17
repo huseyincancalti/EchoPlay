@@ -12,6 +12,7 @@
   "audio_tracks": "音轨",
   "tracks_in_clip": "此片段中有 %1",
   "track_n": "音轨 %1",
+  "track_pair": "音轨 %1 + %2",
   "track_sub": "音轨 %1 · Ctrl+%1",
   "track_silent": "%1 在此片段中无声音",
   "microphone": "麦克风",

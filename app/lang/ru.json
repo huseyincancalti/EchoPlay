@@ -12,6 +12,7 @@
   "audio_tracks": "Аудиодорожки",
   "tracks_in_clip": "%1 (в этом клипе)",
   "track_n": "Дорожка %1",
+  "track_pair": "Дорожки %1 + %2",
   "track_sub": "Дорожка %1 · Ctrl+%1",
   "track_silent": "%1 без звука в этом клипе",
   "microphone": "Микрофон",

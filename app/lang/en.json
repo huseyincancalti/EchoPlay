@@ -14,6 +14,7 @@
   "audio_tracks": "Audio tracks",
   "tracks_in_clip": "%1 in this clip",
   "track_n": "Track %1",
+  "track_pair": "Track %1 + %2",
   "track_sub": "Track %1 · Ctrl+%1",
   "track_silent": "%1 is silent in this clip",
   "microphone": "Microphone",

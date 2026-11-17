@@ -129,7 +129,10 @@ Popover {
                     }
                     Label {
                         width: parent.width
-                        text: mixer.strings.track_sub.arg(row.track.id)
+                        // The language too when the name is a title ("Commentary", then "Track 2 · English · Ctrl+2").
+                        text: row.track.lang && row.track.lang !== row.name
+                              ? mixer.strings.track_n.arg(row.track.id) + " · " + row.track.lang + " · Ctrl+" + row.track.id
+                              : mixer.strings.track_sub.arg(row.track.id)
                         color: mixer.glass.textMuted
                         font.pixelSize: Theme.tokens.type.caption
                     }

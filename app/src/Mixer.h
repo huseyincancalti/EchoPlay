@@ -31,6 +31,7 @@ public:
         int id = 0;
         QString name; // from the file; empty when it has none (the UI shows "Track N" then)
         QString codec;
+        QString lang; // the language's own name (I18n::languageName); empty when the file has none
     };
     struct Output
     {

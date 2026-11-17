@@ -79,7 +79,12 @@ Item {
         popover = ""
         popover = "menu" // a second right-click opens it anew, at the new place
     }
-    function trackLabel(track) { return track.title || track.lang || I18n.strings.track_n.arg(track.id) }
+    // A subtitle track: its title and language ("Signs · English"), either one, else "Track N".
+    function trackLabel(track) {
+        const lang = I18n.trackLanguage(track.lang || "")
+        if (track.title && lang && track.title !== lang) return track.title + " · " + lang
+        return track.title || lang || I18n.strings.track_n.arg(track.id)
+    }
     function openSettings() {
         popover = ""
         settingsOpen = true

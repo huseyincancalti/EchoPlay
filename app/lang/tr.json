@@ -14,6 +14,7 @@
   "audio_tracks": "Ses izleri",
   "tracks_in_clip": "Bu klipte %1 iz",
   "track_n": "İz %1",
+  "track_pair": "İz %1 + %2",
   "track_sub": "İz %1 · Ctrl+%1",
   "track_silent": "%1 bu klipte sessiz",
   "microphone": "Mikrofon",

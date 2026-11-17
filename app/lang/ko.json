@@ -12,6 +12,7 @@
   "audio_tracks": "오디오 트랙",
   "tracks_in_clip": "이 클립의 %1",
   "track_n": "트랙 %1",
+  "track_pair": "트랙 %1 + %2",
   "track_sub": "트랙 %1 · Ctrl+%1",
   "track_silent": "이 클립의 %1에는 소리가 없습니다",
   "microphone": "마이크",

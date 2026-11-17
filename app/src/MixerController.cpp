@@ -12,7 +12,7 @@ QVariantList MixerController::tracks() const
     QVariantList out;
     if (!m_applied) return out;
     for (const Mixer::Track &t : m_mixer.tracks()) {
-        out.append(QVariantMap{{"id", t.id}, {"name", t.name}, {"codec", t.codec}, {"enabled", m_mixer.isEnabled(t.id)},
+        out.append(QVariantMap{{"id", t.id}, {"name", t.name}, {"codec", t.codec}, {"lang", t.lang}, {"enabled", m_mixer.isEnabled(t.id)},
                                {"gain", m_mixer.gain(t.id)}, {"mono", m_mixer.isMono(t.id)}});
     }
     return out;

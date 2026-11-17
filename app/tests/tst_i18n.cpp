@@ -119,6 +119,23 @@ private slots:
         QCOMPARE(spy.count(), 2);
     }
 
+    void trackLanguagesReadAsTheirOwnNames()
+    {
+        QCOMPARE(languageName("eng"), QString("English"));
+        QCOMPARE(languageName("en-US"), QString("English"));
+        QCOMPARE(languageName("tur"), QString("Türkçe"));
+        QCOMPARE(languageName("tr"), QString("Türkçe"));
+        QCOMPARE(languageName("jpn"), QString("日本語"));
+        QCOMPARE(languageName("ger"), languageName("deu"));
+        QCOMPARE(languageName("spa"), QString("Español"));
+        QCOMPARE(languageName("chi"), QString("中文"));
+        QCOMPARE(languageName("rus"), QString("Русский"));
+        QCOMPARE(languageName("nor"), QString("Norsk"));
+        QCOMPARE(languageName("und"), QString());
+        QCOMPARE(languageName(""), QString());
+        QCOMPARE(languageName("qqx"), QString("QQX"));
+    }
+
     void shippedFilesParseAndHaveTheSameKeys()
     {
         const QJsonObject en = readJson(QString(ECHOPLAY_LANG_DIR) + "/en.json");

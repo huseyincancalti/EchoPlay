@@ -1688,6 +1688,60 @@ private slots:
 
     // Chapters, as an MP4 carries them (OBS's hybrid MP4 writes chapter markers): gaps in the seek bar, the hovered
     // one's title next to the time, PgUp/PgDown step through them with a toast.
+    // Tracks say what they are: a title and a language ("Commentary", "English"), read the way people write them,
+    // in the mixer and in the subtitles list. Untitled ones (NVIDIA App writes none) go by number: "Track 1 + 2".
+    void trackLabels()
+    {
+        const QString folder = QDir(m_path).filePath("labels-clip");
+        QVERIFY(QDir().mkpath(folder));
+        QFile srt(folder + "/line.srt");
+        QVERIFY(srt.open(QIODevice::WriteOnly));
+        srt.write("1\n00:00:00,000 --> 00:00:09,000\nHello\n");
+        srt.close();
+        const QString labelled = folder + "/labelled.mkv", plain = folder + "/plain.mp4";
+        QProcess ffmpeg;
+        ffmpeg.start("ffmpeg", {"-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=10",
+                                "-f", "lavfi", "-i", "sine=frequency=300:duration=10", "-f", "lavfi", "-i", "sine=frequency=500:duration=10",
+                                "-i", srt.fileName(), "-i", srt.fileName(),
+                                "-map", "0", "-map", "1", "-map", "2", "-map", "3", "-map", "4", "-c:v", "libx264", "-c:a", "aac", "-c:s", "srt",
+                                "-metadata:s:a:0", "title=Commentary", "-metadata:s:a:0", "language=eng", "-metadata:s:a:1", "language=tur",
+                                "-metadata:s:s:0", "title=Signs", "-metadata:s:s:0", "language=eng", "-metadata:s:s:1", "language=jpn", labelled});
+        QVERIFY2(ffmpeg.waitForFinished(60000) && ffmpeg.exitCode() == 0, ffmpeg.readAllStandardError().constData());
+        ffmpeg.start("ffmpeg", {"-v", "error", "-y", "-i", labelled, "-map", "0:v", "-map", "0:a", "-c", "copy", "-map_metadata:s:a", "-1", plain});
+        QVERIFY2(ffmpeg.waitForFinished(60000) && ffmpeg.exitCode() == 0, ffmpeg.readAllStandardError().constData());
+        {
+            Launch app(QDir(m_path).filePath("labels"), labelled, QDir(m_path).filePath("labels.log"));
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            app.services.i18n.setLanguage("en");
+            app.wake();
+            QTRY_VERIFY(app.item("mixerChip") && app.item("mixerChip")->isVisible());
+            QVERIFY(app.click("mixerChip"));
+            QTRY_VERIFY(app.item("mixerRow-2"));
+            QCOMPARE(app.item("mixerRow-1")->property("name").toString(), QString("Commentary"));
+            QCOMPARE(app.item("mixerRow-2")->property("name").toString(), QString("Türkçe"));
+            QVERIFY(Launch::searchVisible(app.item("mixerRow-1"), "mixerRow-1"));
+            app.services.mixer.setAllEnabled(true);
+            QTRY_COMPARE(app.item("mixerChipText")->property("text").toString(), QString("Commentary + Türkçe"));
+            app.shot("labels-mixer");
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("mixerPopover"));
+            app.wake();
+            QVERIFY(app.click("subtitlesButton"));
+            QTRY_VERIFY(app.item("subtitleRow-2"));
+            QCOMPARE(app.item("subtitleRow-1")->property("modelData").toMap().value("label").toString(), QString("Signs · English"));
+            QCOMPARE(app.item("subtitleRow-2")->property("modelData").toMap().value("label").toString(), QString("日本語"));
+            app.shot("labels-subtitles");
+        }
+        {
+            Launch app(QDir(m_path).filePath("labels-plain"), plain, QDir(m_path).filePath("labels-plain.log"));
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            app.services.i18n.setLanguage("en");
+            app.services.mixer.setAllEnabled(true);
+            app.wake();
+            QTRY_COMPARE(app.item("mixerChipText")->property("text").toString(), QString("Track 1 + 2"));
+        }
+    }
+
     void chapters()
     {
         const QString state = QDir(m_path).filePath("chapters");

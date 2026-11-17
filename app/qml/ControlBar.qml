@@ -169,6 +169,7 @@ GlassPanel {
                     visible: !bar.narrow
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(implicitWidth, chip.width - 20 - 20 - 32)
+                    objectName: "mixerChipText"
                     text: Format.chip(bar.ui.tracks, I18n.strings)
                     color: chip.open ? Theme.onAccent : bar.glass.text
                     font.weight: Font.Bold

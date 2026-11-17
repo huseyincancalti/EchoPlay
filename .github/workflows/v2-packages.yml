@@ -85,7 +85,7 @@ jobs:
       - name: A bare desktop (Xvfb, software OpenGL)
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri libegl1 libgl1 libgbm1 libdrm2             libfontconfig1 libfreetype6 libharfbuzz0b fonts-dejavu-core libx11-6 libx11-xcb1 libxcb1 libxkbcommon0             libasound2t64 > /dev/null
+          apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri libegl1 libgl1 libopengl0 libglx0 libgbm1 libdrm2             libfontconfig1 libfreetype6 libharfbuzz0b fonts-dejavu-core libx11-6 libx11-xcb1 libxcb1 libxkbcommon0             libasound2t64 > /dev/null
       - name: Open it
         run: |
           APP=$(ls EchoPlay-*-x86_64.AppImage)

@@ -47,6 +47,10 @@ public:
     bool keepingAwake() const { return m_keepingAwake; }
     mpv_handle *handle() const { return m_mpv; }
     mpv_render_context *renderContext = nullptr;
+    // An HDR frame the renderer draws once more, off screen, at the video's size (renderedFrame). Set on the GUI thread,
+    // taken by the render thread in synchronize(), while the GUI thread waits.
+    struct FrameRequest { quint64 reply = 0; QSize size; };
+    FrameRequest pendingFrame;
 
 signals:
     void renderReady(); // render context exists: only now can a file with video be loaded
@@ -67,10 +71,13 @@ protected:
 
 private slots:
     void drainEvents();
+    void renderedFrame(quint64 reply, const QImage &frame); // null when the renderer could not make it
 
 private:
     void setKeepingAwake(bool on);
     void requestFrame(quint64 reply);
+    bool renderHdrFrame(quint64 reply);
+    void frameReady(quint64 reply, const QImage &frame);
 
     mpv_handle *m_mpv = nullptr;
     bool m_keepingAwake = false;
@@ -83,4 +90,7 @@ private:
     QVariant withNames(const QVariant &trackList) const;
     QVariantMap m_marks;
     QStringList m_recentLog;
+    bool m_hdr = false;        // the video on screen is PQ or HLG
+    QSize m_videoSize;         // as shown: display aspect, rotation applied
+    QString m_screenshotDir;
 };

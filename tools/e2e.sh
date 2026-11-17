@@ -27,8 +27,12 @@ edge=.out/e2e/edge
 [ -f $edge/audio-only.m4a ] || ffmpeg -v error -f lavfi -i sine=frequency=440 -t 10 -c:a aac $edge/audio-only.m4a \
   || { echo "ffmpeg could not make the edge clips"; exit 3; }
 
+# HDR10 (PQ, BT.2020, 10-bit), SDR white coded as 1000 nits: Copy frame and F1 must keep the screen's tone mapping.
+hdr=$edge/hdr10-1000nits.mp4
+[ -f $hdr ] || ffmpeg -v error -f lavfi -i testsrc2=size=1280x720:rate=30 -t 6 -vf "format=gbrpf32le,zscale=tin=709:pin=709:t=linear:p=709,zscale=tin=linear:pin=709:p=2020:t=smpte2084:npl=1000:m=2020_ncl:r=limited,format=yuv420p10le" -c:v libx265 -preset ultrafast -x265-params log-level=error -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc $hdr || { echo "ffmpeg could not make the HDR clip"; exit 3; }
+
 # Qt Test prints nothing to a redirected stdout here (Qt 6.10 MinGW): results go to a file.
-ECHOPLAY_E2E_CLIP="$(pwd)/$clip" ECHOPLAY_E2E_DIR="$(pwd)/.out/e2e/run" .out/build-v2/tst_e2e.exe -o .out/e2e/result.txt,txt
+ECHOPLAY_E2E_CLIP="$(pwd)/$clip" ECHOPLAY_E2E_HDR="$(pwd)/$hdr" ECHOPLAY_E2E_DIR="$(pwd)/.out/e2e/run" .out/build-v2/tst_e2e.exe -o .out/e2e/result.txt,txt
 code=$?
 grep -E "^(PASS|FAIL!|XFAIL|SKIP|QINFO)|^ +(Actual|Expected|Loc)|^Totals" .out/e2e/result.txt
 failed=0

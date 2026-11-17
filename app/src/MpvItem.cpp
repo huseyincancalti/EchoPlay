@@ -4,6 +4,8 @@
 #include <QClipboard>
 #include <QDir>
 #include <QGuiApplication>
+#include <QPointer>
+#include <QThreadPool>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <mpv/client.h>
@@ -15,7 +17,9 @@
 #include <vector>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX // a Qt header may have set it
 #define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
@@ -26,6 +30,8 @@ constexpr quint64 PathReply = 2;
 constexpr quint64 ScreenshotReply = 2; // command() uses 0
 constexpr quint64 CopyFrameReply = 3;
 constexpr quint64 CaptureFrameReply = 4;
+constexpr quint64 OutParamsReply = 5; // observed, like KeepAwakeReply
+constexpr quint64 ShotDirReply = 6;
 constexpr int RecentLogLines = 12;
 
 // QVariant -> mpv_node (strings, numbers, bools, lists). Owns the memory the node points into;
@@ -130,10 +136,11 @@ public:
         QMetaObject::invokeMethod(m_item, "renderReady", Qt::QueuedConnection);
     }
 
-    void synchronize(QQuickRhiItem *) override {}
+    void synchronize(QQuickRhiItem *) override { m_request = std::exchange(m_item->pendingFrame, {}); }
 
     void render(QRhiCommandBuffer *cb) override
     {
+        if (m_request.reply) renderOffScreen(cb, std::exchange(m_request, {}));
         mpv_d3d11_fbo target{reinterpret_cast<void *>(colorTexture()->nativeTexture().object)};
         mpv_render_param params[] = {{MPV_RENDER_PARAM_D3D11_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
         // mpv draws on the immediate context and leaves its state changed; Qt flushes before and resets after.
@@ -143,8 +150,54 @@ public:
     }
 
 private:
+    // The frame once more, into a texture of the video's size, read back as an image: the picture the screen shows,
+    // tone mapping included. The screen's own frame is drawn after it, so it never shows the off-screen size.
+    void renderOffScreen(QRhiCommandBuffer *cb, const MpvItem::FrameRequest &request)
+    {
+        QPointer<MpvItem> item(m_item);
+        const quint64 reply = request.reply;
+        auto fail = [item, reply] { QMetaObject::invokeMethod(item, "renderedFrame", Qt::QueuedConnection, reply, QImage()); };
+        QRhiTexture *texture = rhi()->newTexture(QRhiTexture::RGBA8, request.size, 1,
+                                                 QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource);
+        if (!texture->create()) {
+            delete texture;
+            return fail();
+        }
+        mpv_d3d11_fbo target{reinterpret_cast<void *>(texture->nativeTexture().object)};
+        mpv_render_param params[] = {{MPV_RENDER_PARAM_D3D11_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
+        cb->beginExternal();
+        const int rendered = mpv_render_context_render(m_item->renderContext, params);
+        cb->endExternal();
+        if (rendered < 0) {
+            texture->deleteLater();
+            return fail();
+        }
+        auto *readback = new QRhiReadbackResult;
+        readback->completed = [readback, texture, item, reply] {
+            const QSize size = readback->pixelSize;
+            const QImage frame = QImage(reinterpret_cast<const uchar *>(readback->data.constData()), size.width(), size.height(),
+                                        QImage::Format_RGBA8888).convertToFormat(QImage::Format_RGB32); // a copy
+            QMetaObject::invokeMethod(item, "renderedFrame", Qt::QueuedConnection, reply, frame);
+            texture->deleteLater();
+            delete readback;
+        };
+        QRhiResourceUpdateBatch *batch = rhi()->nextResourceUpdateBatch();
+        batch->readBackTexture({texture}, readback);
+        cb->resourceUpdate(batch);
+    }
+
     MpvItem *m_item;
+    MpvItem::FrameRequest m_request;
 };
+
+// mpv's own name for a screenshot (screenshot-template's default, mpv-shot%n): the first free number.
+QString nextShotPath(const QString &dir)
+{
+    for (int n = 1;; ++n) {
+        const QString path = QDir(dir).filePath(QString("mpv-shot%1.png").arg(n, 4, 10, QChar('0')));
+        if (!QFileInfo::exists(path)) return path;
+    }
+}
 
 } // namespace
 
@@ -197,6 +250,8 @@ void MpvItem::start()
     mpv_request_log_messages(m_mpv, "warn");
     mpv_observe_property(m_mpv, KeepAwakeReply, "core-idle", MPV_FORMAT_FLAG);
     mpv_observe_property(m_mpv, PathReply, "path", MPV_FORMAT_STRING); // for track names mpv cannot read
+    mpv_observe_property(m_mpv, OutParamsReply, "video-out-params", MPV_FORMAT_NODE); // HDR screenshots
+    mpv_observe_property(m_mpv, ShotDirReply, "screenshot-dir", MPV_FORMAT_STRING);
 }
 
 // The same flags as mpv's own window (video/out/w32_common.c). Per thread: always the GUI thread here.
@@ -218,8 +273,43 @@ void MpvItem::command(const QVariantList &args)
     mpv_command_node_async(m_mpv, 0, &node);
 }
 
+// mpv's screenshots of an HDR10 or HLG video convert it in software, which does not tone-map: Copy frame clipped the
+// highlights, F1 wrote a PQ-coded PNG that viewers show pale (Jellyfin's HDR10 test clip, 2026-11-17: PSNR against the
+// window 16.4 and 13.5 dB). Such a frame comes from the renderer instead, as the screen shows it. That picture always
+// has the subtitles shown on screen: for HDR "video" and "window" take it too, at the video's size.
+bool MpvItem::renderHdrFrame(quint64 reply)
+{
+    if (!m_hdr || m_videoSize.isEmpty() || !renderContext) return false;
+    pendingFrame = {reply, m_videoSize};
+    update();
+    return true;
+}
+
+void MpvItem::renderedFrame(quint64 reply, const QImage &frame)
+{
+    if (reply != ScreenshotReply) return frameReady(reply, frame);
+    if (frame.isNull()) return emit screenshotFinished(false);
+    const QString dir = m_screenshotDir;
+    QPointer<MpvItem> self(this);
+    QThreadPool::globalInstance()->start([self, dir, frame] { // a 4K PNG takes a while
+        const bool saved = QDir().mkpath(dir.isEmpty() ? "." : dir) && frame.save(nextShotPath(dir), "PNG");
+        QMetaObject::invokeMethod(self, [self, saved] { if (self) emit self->screenshotFinished(saved); }, Qt::QueuedConnection);
+    });
+}
+
+void MpvItem::frameReady(quint64 reply, const QImage &frame)
+{
+    if (reply == CopyFrameReply) {
+        if (!frame.isNull()) QGuiApplication::clipboard()->setImage(frame);
+        emit frameCopied(!frame.isNull());
+    } else if (reply == CaptureFrameReply) {
+        emit frameCaptured(frame);
+    }
+}
+
 void MpvItem::screenshot(const QString &mode)
 {
+    if (renderHdrFrame(ScreenshotReply)) return;
     NodeBuilder b;
     mpv_node node;
     b.build(QVariantList{"screenshot", mode}, node);
@@ -229,6 +319,7 @@ void MpvItem::screenshot(const QString &mode)
 // Asynchronous like screenshot(): the frame waits for the video output, which waits for the render thread.
 void MpvItem::requestFrame(quint64 reply)
 {
+    if (renderHdrFrame(reply)) return;
     NodeBuilder b;
     mpv_node node;
     b.build(QVariantList{"screenshot-raw", "subtitles", "bgr0"}, node);
@@ -287,12 +378,8 @@ void MpvItem::drainEvents()
         }
         if (e->event_id == MPV_EVENT_START_FILE) emit fileStarted();
         if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == ScreenshotReply) emit screenshotFinished(e->error >= 0);
-        if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == CopyFrameReply) {
-            const QImage frame = frameFromReply(*e);
-            if (!frame.isNull()) QGuiApplication::clipboard()->setImage(frame);
-            emit frameCopied(!frame.isNull());
-        }
-        if (e->event_id == MPV_EVENT_COMMAND_REPLY && e->reply_userdata == CaptureFrameReply) emit frameCaptured(frameFromReply(*e));
+        if (e->event_id == MPV_EVENT_COMMAND_REPLY && (e->reply_userdata == CopyFrameReply || e->reply_userdata == CaptureFrameReply))
+            frameReady(e->reply_userdata, frameFromReply(*e));
         if (e->event_id == MPV_EVENT_LOG_MESSAGE) {
             const auto *message = static_cast<mpv_event_log_message *>(e->data);
             m_recentLog << QString("[%1] %2").arg(message->prefix, QString::fromUtf8(message->text).trimmed());
@@ -311,6 +398,16 @@ void MpvItem::drainEvents()
         if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == KeepAwakeReply) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
             setKeepingAwake(p->format == MPV_FORMAT_FLAG && !*static_cast<int *>(p->data));
+        } else if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == OutParamsReply) {
+            const auto *p = static_cast<mpv_event_property *>(e->data);
+            const QVariantMap params = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)).toMap() : QVariantMap();
+            const QString gamma = params.value("gamma").toString();
+            m_hdr = gamma == "pq" || gamma == "hlg";
+            m_videoSize = QSize(params.value("dw").toInt(), params.value("dh").toInt());
+            if (params.value("rotate").toInt() % 180 == 90) m_videoSize.transpose();
+        } else if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == ShotDirReply) {
+            const auto *p = static_cast<mpv_event_property *>(e->data);
+            m_screenshotDir = p->format == MPV_FORMAT_STRING ? QString::fromUtf8(*static_cast<char **>(p->data)) : QString();
         } else if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == PathReply) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
             const QString path = p->format == MPV_FORMAT_STRING ? QString::fromUtf8(*static_cast<char **>(p->data)) : QString();

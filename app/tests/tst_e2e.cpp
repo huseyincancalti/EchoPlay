@@ -1872,6 +1872,65 @@ private slots:
 #endif
     }
 
+    // HDR10 with highlights up to 1000 nits (tools/e2e.sh): Copy frame and F1 keep the picture the screen shows. mpv's
+    // software screenshot does not tone-map: Copy frame clipped the highlights, F1 wrote a PQ-coded PNG that every viewer
+    // shows pale. Compared with the window's own picture, paused, in the middle (no bars there).
+    void hdrFrame()
+    {
+        const QString clip = qEnvironmentVariable("ECHOPLAY_E2E_HDR");
+        QVERIFY2(QFileInfo::exists(clip), "ECHOPLAY_E2E_HDR must name an HDR10 clip (tools/e2e.sh)");
+        const QString state = QDir(m_path).filePath("hdr");
+        QVERIFY(QDir().mkpath(state));
+        Launch app(state, clip, QDir(m_path).filePath("hdr.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the HDR clip did not start playing");
+        app.mpv->setProperty("pause", true);
+        QTRY_COMPARE(app.prop("pause"), QString("yes"));
+        QTest::qWait(500); // the paused frame reaches the window
+        const QImage screen = app.window->grabWindow();
+        const QRectF video = app.mpv->mapRectToScene(app.mpv->boundingRect());
+        const qreal dpr = app.window->devicePixelRatio();
+        // Mean difference per channel (0..255) between the middle half of `image` and the same part of the window.
+        auto difference = [&](const QImage &image) {
+            const QImage picture = image.convertToFormat(QImage::Format_RGB32);
+            qint64 sum = 0, count = 0;
+            for (int y = picture.height() / 4; y < picture.height() * 3 / 4; y += 2)
+                for (int x = picture.width() / 4; x < picture.width() * 3 / 4; x += 2) {
+                    const QPoint on((video.x() + (x + 0.5) * video.width() / picture.width()) * dpr,
+                                    (video.y() + (y + 0.5) * video.height() / picture.height()) * dpr);
+                    const QRgb a = picture.pixel(x, y), b = screen.pixel(on);
+                    sum += qAbs(qRed(a) - qRed(b)) + qAbs(qGreen(a) - qGreen(b)) + qAbs(qBlue(a) - qBlue(b));
+                    count += 3;
+                }
+            const double mean = double(sum) / count;
+            qInfo("HDR %dx%d: mean difference from the window %.1f", image.width(), image.height(), mean);
+            return mean;
+        };
+        QSignalSpy captured(app.mpv, &MpvItem::frameCaptured);
+        app.mpv->captureFrame();
+        QVERIFY(captured.wait(5000));
+        const QImage frame = captured.first().first().value<QImage>();
+        if (const QString dir = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS"); !dir.isEmpty()) {
+            frame.save(QDir(dir).filePath("hdr-copied-frame.png"));
+            screen.save(QDir(dir).filePath("hdr-window.png"));
+        }
+        QVERIFY(difference(frame) < 6);
+        QCOMPARE(frame.size(), QSize(1280, 720));
+
+        const QDir shots(app.prop("screenshot-dir"));
+        const QStringList before = shots.entryList({"*.png"}, QDir::Files);
+        QSignalSpy saved(app.mpv, &MpvItem::screenshotFinished);
+        app.mpv->screenshot("subtitles");
+        QVERIFY(saved.wait(5000));
+        QVERIFY(saved.first().first().toBool());
+        QStringList added = shots.entryList({"*.png"}, QDir::Files);
+        for (const QString &name : before) added.removeAll(name);
+        QCOMPARE(added.size(), 1);
+        const QImage shot(shots.filePath(added.first()));
+        QVERIFY(difference(shot) < 6);
+        QCOMPARE(shot.size(), QSize(1280, 720));
+    }
+
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.
     void looks()
     {

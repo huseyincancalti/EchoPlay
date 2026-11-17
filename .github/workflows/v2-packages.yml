@@ -80,8 +80,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: echoplay-linux-x86_64
-      - name: A display only (Xvfb, software OpenGL)
-        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri libegl1 > /dev/null
+      # What every desktop has and AppImages leave out on purpose (linuxdeploy's exclude list): fonts, X11/xcb, OpenGL,
+      # sound. Plus a virtual display.
+      - name: A bare desktop (Xvfb, software OpenGL)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri libegl1 libgl1 libgbm1 libdrm2             libfontconfig1 libfreetype6 libharfbuzz0b fonts-dejavu-core libx11-6 libx11-xcb1 libxcb1 libxkbcommon0             libasound2t64 > /dev/null
       - name: Open it
         run: |
           APP=$(ls EchoPlay-*-x86_64.AppImage)
@@ -133,10 +137,14 @@ jobs:
           codesign --verify --deep --strict "$APP"
           du -sh "$APP"
 
+      # libmpv answers, then the window starts and is still up after 10 s (the QML loaded). The runner has a desktop.
       - name: Open it
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: build/EchoPlay.app/Contents/MacOS/EchoPlay --smoke
+        run: |
+          build/EchoPlay.app/Contents/MacOS/EchoPlay --smoke
+          build/EchoPlay.app/Contents/MacOS/EchoPlay > run.log 2>&1 &
+          pid=$!
+          sleep 10
+          if kill -0 $pid 2>/dev/null; then kill $pid; cat run.log; else cat run.log; wait $pid; echo "EchoPlay ended by itself (exit $?)"; exit 1; fi
 
       - name: DMG
         run: |

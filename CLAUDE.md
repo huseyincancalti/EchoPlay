@@ -89,6 +89,7 @@ bash tools/window-live.sh               # resize edges, Aero Snap, snap layouts 
 bash tools/setup-live.sh                # the real setup in a test install: update on close, a clip opened during it, Install now
 bash tools/first-run.sh [clip]          # first start of never-seen files, cold vs warm (needs the stage; windows for a few s)
 bash tools/media-keys.sh                # media keys and Windows' media overlay: a real media session, play/pause through it
+bash tools/explorer-thumbs.sh           # Explorer thumbnails of the common video types, and which handler each type has (headless)
 bash tools/make-clips.sh <recording> [start] [len]   # test clips in .out/clips: 1080p cut + 4K60 upscale, all tracks
 RUNS=3 TOGGLE=1 bash tools/bench.sh <seconds> <videos>  # v1 engine vs v2: startup, dropped frames, live mixer
 bash tools/shot-compare.sh <video> <seconds>         # same paused frame from v1 and v2, SSIM/PSNR

@@ -35,7 +35,7 @@ jobs:
       - name: Qt, libmpv and build tools
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends cmake ninja-build g++ pkg-config libmpv-dev curl ca-certificates \
+          apt-get install -y -qq --no-install-recommends cmake ninja-build g++ pkg-config libmpv-dev ffmpeg curl ca-certificates \
             file imagemagick qt6-base-dev qt6-base-private-dev qt6-declarative-dev qt6-declarative-private-dev \
             qt6-shadertools-dev qt6-qpa-plugins qml6-module-qtquick qml6-module-qtquick-controls \
             qml6-module-qtquick-effects qml6-module-qtquick-layouts qml6-module-qtquick-window \
@@ -93,10 +93,10 @@ jobs:
           cat run.log
           [ "$code" = 124 ] || { echo "EchoPlay ended by itself (exit $code) instead of running"; exit 1; }
 
-  # Apple Silicon, macOS 14 or newer (Homebrew's bottles on this runner are built for 14). Unsigned: ad-hoc signature
-  # only (README says how to open it the first time).
+  # Apple Silicon, macOS 15 or newer (Homebrew's bottles on this runner are built for 15; GitHub retired macos-14).
+  # Unsigned: ad-hoc signature only (README says how to open it the first time).
   dmg:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
       HOMEBREW_NO_INSTALL_CLEANUP: 1

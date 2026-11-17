@@ -58,18 +58,25 @@ add_test(NAME clipinfo-clips COMMAND "${FFMPEG}" -y -v error -f lavfi
          -map 0:v -c:v libx264 -preset ultrafast -g 12 "${CLIPINFO_VIDEO}"
          -map 1:a -c:a aac "${CLIPINFO_AUDIO}")
 set_tests_properties(clipinfo-clips PROPERTIES FIXTURES_SETUP clipinfo-clips)
+# An HDR10 clip (PQ, BT.2020, 10-bit) of flat SDR red: without tone mapping the hidden players' picture came out dull
+# brown (118,69,45), with it red (214,0,3) (HdrTone.h).
+set(HDR_CLIP "${CMAKE_CURRENT_BINARY_DIR}/hdr-red.mp4")
+add_test(NAME hdr-clip COMMAND "${FFMPEG}" -y -v error -f lavfi -i color=c=red:s=640x360:r=30:d=4
+         -vf "format=gbrpf32le,zscale=tin=709:pin=709:t=linear:p=709,zscale=tin=linear:pin=709:p=2020:t=smpte2084:npl=100:m=2020_ncl:r=limited,format=yuv420p10le"
+         -c:v libx264 -preset ultrafast -g 30 -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc "${HDR_CLIP}")
+set_tests_properties(hdr-clip PROPERTIES FIXTURES_SETUP hdr-clip)
 echoplay_test(clipinfo ../src/ClipInfo.h ../src/ClipInfo.cpp)
 target_include_directories(tst_clipinfo PRIVATE "${MPV_INCLUDE}")
 target_link_libraries(tst_clipinfo PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
-target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
+target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_HDR_CLIP="${HDR_CLIP}" ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
                            ECHOPLAY_CLIPINFO_VIDEO="${CLIPINFO_VIDEO}" ECHOPLAY_CLIPINFO_AUDIO="${CLIPINFO_AUDIO}")
-set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED clipinfo-clips)
+set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED "clipinfo-clips;hdr-clip")
 
 echoplay_test(thumbnailer ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
 target_include_directories(tst_thumbnailer PRIVATE "${MPV_INCLUDE}")
 target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
-target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}")
-set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED thumbnailer-clip)
+target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}" ECHOPLAY_HDR_CLIP="${HDR_CLIP}")
+set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED "thumbnailer-clip;hdr-clip")
 
 # SilenceCheck on four audio tracks: a tone, digital silence, a quiet tone (-58 dBFS), silence then a tone.
 set(SILENCE_CLIP "${CMAKE_CURRENT_BINARY_DIR}/silencecheck-clip.mp4")

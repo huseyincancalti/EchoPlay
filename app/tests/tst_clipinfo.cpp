@@ -81,6 +81,20 @@ private slots:
         QVERIFY(two["thumbnail"] != video["thumbnail"]);
     }
 
+    // HDR10 red comes out red, not dull brown; the next, SDR clip gets the plain filter again (its gray stays gray).
+    void hdrIsToneMapped()
+    {
+        ClipInfo c(nullptr);
+        c.request({ECHOPLAY_HDR_CLIP, m_video});
+        QTRY_VERIFY_WITH_TIMEOUT(!pictureOf(c, m_video).isNull(), Slow);
+        const QImage hdr = pictureOf(c, ECHOPLAY_HDR_CLIP);
+        const QColor red = hdr.pixelColor(hdr.width() / 2, hdr.height() / 2);
+        QVERIFY2(red.red() > 180 && red.green() < 40 && red.blue() < 40, qPrintable(red.name()));
+        const QImage sdr = pictureOf(c, m_video);
+        const QColor gray = sdr.pixelColor(sdr.width() / 2, sdr.height() / 2);
+        QVERIFY2(qAbs(gray.red() - gray.green()) < 6 && gray.red() > 120, qPrintable(gray.name()));
+    }
+
     void anAudioFileHasADurationAndNoPicture() // opening one makes a playlist of audio files
     {
         ClipInfo c(nullptr);

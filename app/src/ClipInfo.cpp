@@ -3,6 +3,7 @@
 #include <QQuickImageProvider>
 #include <cstring>
 #include <mpv/client.h>
+#include "HdrTone.h"
 
 namespace {
 
@@ -113,6 +114,11 @@ QImage ClipInfo::image(int id) const
     return m_images.value(id);
 }
 
+QByteArray ClipInfo::scaleFilter()
+{
+    return "scale=w=" + QByteArray::number(ThumbWidth) + ":h=-2"; // -2: even height, same aspect
+}
+
 bool ClipInfo::ensurePlayer()
 {
     if (m_mpv) return true;
@@ -124,7 +130,7 @@ bool ClipInfo::ensurePlayer()
     // position is a keyframe seek. Unlike a seek-bar preview this picture stays on screen, so the scaler is
     // mpv's default, not the fastest. No keep-open: a clip that ends before its picture is grabbed sends
     // END_FILE and the queue goes on.
-    const QByteArray vf = "scale=w=" + QByteArray::number(ThumbWidth) + ":h=-2"; // -2: even height, same aspect
+    const QByteArray vf = scaleFilter();
     const std::pair<const char *, const char *> options[] = {
         {"vo", "null"}, {"ao", "null"}, {"sid", "no"}, {"sub-auto", "no"}, {"audio-file-auto", "no"},
         {"idle", "yes"}, {"pause", "yes"}, {"hr-seek", "no"}, {"hwdec", "no"}, {"vd-lavc-threads", "4"},
@@ -161,6 +167,8 @@ void ClipInfo::startNext()
     m_picture = QImage();
     m_got = 0;
     m_grabbed = false;
+    if (m_toned) mpv_set_property_string(m_mpv, "vf", scaleFilter().constData()); // the last clip was HDR
+    m_toned = m_toneChecked = false;
     m_starting = true;
     ++m_generation;
     const QByteArray file = m_reading.toUtf8();
@@ -212,6 +220,16 @@ void ClipInfo::drainEvents()
             // The seek to 10 % is done (this is the clip's only restart: it starts there). A file without video
             // answers with an error, and has no picture.
             if (m_grabbed) continue;
+            if (!m_toneChecked) { // HDR: the tone-mapping filter goes on, and the picture comes from the seek it needs
+                m_toneChecked = true;
+                if (HdrTone::isHdr(m_mpv)) {
+                    m_toned = true;
+                    mpv_set_property_string(m_mpv, "vf", HdrTone::filter(scaleFilter()).constData());
+                    const char *seek[] = {"seek", "10", "absolute-percent", nullptr};
+                    mpv_command_async(m_mpv, 0, seek);
+                    continue;
+                }
+            }
             m_grabbed = true;
             const char *shot[] = {"screenshot-raw", "video", "bgra", nullptr};
             mpv_command_async(m_mpv, tag(Shot, m_generation), shot);

@@ -2,6 +2,7 @@
 
 #include <QQuickImageProvider>
 #include <mpv/client.h>
+#include "HdrTone.h"
 
 namespace {
 
@@ -104,6 +105,8 @@ void Thumbnailer::request(double seconds)
     if (!m_loaded) {
         // The start position is the first keyframe seek (hr-seek=no).
         const QByteArray file = m_file.toUtf8(), start = "start=" + QByteArray::number(seconds, 'f', 3);
+        if (m_toned) mpv_set_property_string(m_mpv, "vf", scaleFilter().constData()); // the last file was HDR
+        m_toned = m_toneChecked = false;
         const char *load[] = {"loadfile", file.constData(), "replace", "-1", start.constData(), nullptr};
         mpv_command_async(m_mpv, 0, load);
         m_loaded = m_starting = m_busy = true;
@@ -119,6 +122,11 @@ void Thumbnailer::request(double seconds)
     seek(false);                        // also cuts a running exact seek short
 }
 
+QByteArray Thumbnailer::scaleFilter()
+{
+    return QByteArray("scale=w=%1:h=%1:force_original_aspect_ratio=decrease").replace("%1", QByteArray::number(MaxSize));
+}
+
 bool Thumbnailer::ensurePlayer()
 {
     if (m_mpv) return true;
@@ -127,7 +135,7 @@ bool Thumbnailer::ensurePlayer()
     // thumbfast's settings: no window, no audio or subtitles, a small software decode (fast, low quality is
     // fine at this size), scaled in the filter chain so grabbing the frame copies only MaxSize pixels.
     // 4 decoder threads instead of thumbfast's 2: exact seeks ~1.6x faster (measured 2026-10-31).
-    const QByteArray vf = QByteArray("scale=w=%1:h=%1:force_original_aspect_ratio=decrease").replace("%1", QByteArray::number(MaxSize));
+    const QByteArray vf = scaleFilter();
     const std::pair<const char *, const char *> options[] = {
         {"vo", "null"}, {"aid", "no"}, {"sid", "no"}, {"sub-auto", "no"}, {"audio-file-auto", "no"},
         {"idle", "yes"}, {"pause", "yes"}, {"keep-open", "always"}, {"hr-seek", "no"}, {"hwdec", "no"},
@@ -183,8 +191,19 @@ void Thumbnailer::drainEvents()
             // The file could not be opened (or was stopped): the next request opens it again.
             if (!m_starting && m_loaded) m_loaded = m_busy = false;
         } else if (e->event_id == MPV_EVENT_PLAYBACK_RESTART) {
-            // Every restart is grabbed, also one a newer seek overtook: the picture is still recent.
-            if (!m_starting && m_loaded) grab();
+            // Every restart is grabbed, also one a newer seek overtook: the picture is still recent. The file's first
+            // frame tells whether it is HDR: then the tone-mapping filter goes on and the same time is sought again.
+            if (m_starting || !m_loaded) continue;
+            if (!m_toneChecked) {
+                m_toneChecked = true;
+                if (HdrTone::isHdr(m_mpv)) {
+                    m_toned = true;
+                    mpv_set_property_string(m_mpv, "vf", HdrTone::filter(scaleFilter()).constData());
+                    seek(m_busyExact);
+                    continue;
+                }
+            }
+            grab();
         } else if (e->event_id == MPV_EVENT_COMMAND_REPLY) {
             if (e->reply_userdata >> 2 != m_generation) continue;
             const Kind kind = Kind(e->reply_userdata & 3);

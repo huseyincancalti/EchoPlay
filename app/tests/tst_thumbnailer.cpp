@@ -105,6 +105,20 @@ private slots:
         t.request(24.2);
         QTRY_COMPARE_WITH_TIMEOUT(secondShown(t.image()), 24, 10000);
     }
+
+    // HDR10 red comes out red, not dull brown; the next, SDR file gets the plain filter again.
+    void hdrIsToneMapped()
+    {
+        Thumbnailer t(nullptr);
+        t.setFile(ECHOPLAY_HDR_CLIP);
+        t.request(2);
+        QTRY_VERIFY_WITH_TIMEOUT(!t.image().isNull(), 10000);
+        const QColor red = t.image().pixelColor(t.image().width() / 2, t.image().height() / 2);
+        QVERIFY2(red.red() > 180 && red.green() < 40 && red.blue() < 40, qPrintable(red.name()));
+        t.setFile(ECHOPLAY_THUMB_CLIP);
+        t.request(30);
+        QTRY_COMPARE_WITH_TIMEOUT(secondShown(t.image()), 30, 10000); // its brightness tells the second: no tone mapping
+    }
 };
 
 QTEST_GUILESS_MAIN(TestThumbnailer)

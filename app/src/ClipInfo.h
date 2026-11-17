@@ -63,6 +63,7 @@ private:
         int image = 0; // id for image(); 0: no picture
     };
 
+    static QByteArray scaleFilter();
     bool ensurePlayer();
     void startNext();
     void finish();
@@ -74,6 +75,8 @@ private:
     quint64 m_generation = 1; // +1 per clip: replies about an earlier one are dropped
     bool m_starting = false;  // loadfile sent, its START_FILE not seen yet: older events are the previous clip's
     bool m_grabbed = false;   // the picture was asked for
+    bool m_toneChecked = false; // this clip's first frame was looked at for HDR (HdrTone.h)
+    bool m_toned = false;       // the tone-mapping filter is on
     unsigned m_got = 0;       // which of the clip's three answers (duration, tracks, picture) have arrived
     Clip m_clip;              // what is known of the clip being read
     QImage m_picture;

@@ -57,6 +57,7 @@ private slots:
     void unload();
 
 private:
+    static QByteArray scaleFilter();
     bool ensurePlayer();
     void seek(bool exact);
     void grab();
@@ -74,6 +75,8 @@ private:
     double m_target = -1;    // the newest request
     double m_served = -1;    // the time of the last seek started
     bool m_servedExact = false;
+    bool m_toneChecked = false; // this file's first frame was looked at for HDR (HdrTone.h)
+    bool m_toned = false;       // the tone-mapping filter is on
     QTimer m_settle;
     QTimer m_idle;
     mutable QMutex m_imageLock;

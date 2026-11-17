@@ -2005,6 +2005,77 @@ private slots:
     // The real mouse and keyboard, for what only Windows does with the frame. tools/window-live.sh only: it takes them
     // from whoever sits at the PC. The input comes from another thread: Windows' move and resize loops run inside the
     // button press, on this thread, until the button is up. Every check runs and reports, so one run tells everything.
+    // Pictures for the release page (tools/promo.sh): ECHOPLAY_PROMO_CLIP = a recording with game and mic tracks (the
+    // mixer animation, as numbered frames), ECHOPLAY_PROMO_FILM = any film (stills of the panels over it).
+    void promo()
+    {
+        const QString clip = qEnvironmentVariable("ECHOPLAY_PROMO_CLIP"), film = qEnvironmentVariable("ECHOPLAY_PROMO_FILM");
+        const QString out = qEnvironmentVariable("ECHOPLAY_E2E_SHOTS");
+        if (clip.isEmpty() || film.isEmpty() || out.isEmpty()) QSKIP("tools/promo.sh");
+        {
+            Launch app(QDir(m_path).filePath("promo-mix"), clip, QDir(m_path).filePath("promo-mix.log"));
+            QVERIFY(app.playing());
+            app.mpv->setProperty("loop-file", "inf");
+            app.mpv->setProperty("mute", false); // the bar would show the muted icon
+            QDir().mkpath(out + "/frames");
+            QList<QImage> frames; // kept in memory: a PNG written per frame took ~0.5 s each
+            QElapsedTimer clock;
+            QTimer grab;
+            QObject::connect(&grab, &QTimer::timeout, [&] {
+                frames << app.window->grabWindow().scaledToWidth(960, Qt::SmoothTransformation);
+            });
+            const auto toggle = [&](int track) {
+                QQuickItem *row = app.item(qPrintable(QString("mixerRow-%1").arg(track)));
+                QQuickItem *on = row ? Launch::search(row, "trackSwitch") : nullptr;
+                if (on) QTest::mouseClick(app.window, Qt::LeftButton, Qt::NoModifier,
+                                          on->mapToScene(QPointF(on->width() / 2, on->height() / 2)).toPoint());
+            };
+            app.wake();
+            clock.start();
+            grab.start(66);
+            QTest::qWait(1200);
+            QVERIFY(app.click("mixerChip"));
+            QTRY_VERIFY(app.item("mixerRow-1"));
+            QTest::qWait(1300); // the game alone (a new config starts on track 1)
+            toggle(2); // the mic joins: both mixed
+            QTest::qWait(1700);
+            toggle(1); // the game off: the mic alone
+            QTest::qWait(1700);
+            toggle(1); // both again
+            QTest::qWait(1500);
+            grab.stop();
+            qInfo("promo: %lld frames in %lld ms", qint64(frames.size()), clock.elapsed());
+            for (int i = 0; i < frames.size(); ++i) frames[i].save(QString("%1/frames/%2.png").arg(out).arg(i, 4, 10, QChar('0')));
+            app.shot("promo-mixer");
+            app.key(Qt::Key_Escape);
+        }
+        {
+            Launch app(QDir(m_path).filePath("promo-film"), film, QDir(m_path).filePath("promo-film.log"));
+            QVERIFY(app.playing());
+            app.mpv->setProperty("mute", false);
+            app.mpv->command(QVariantList{"seek", 36, "absolute"});
+            QTest::qWait(800);
+            app.mpv->setProperty("pause", true);
+            app.wake();
+            QVERIFY(app.click("gearButton"));
+            QTRY_VERIFY(app.item("quickPopover"));
+            app.shot("promo-quick");
+            app.key(Qt::Key_Escape);
+            QVERIFY(QMetaObject::invokeMethod(app.item("controlBar")->parentItem(), "openSettings"));
+            QTRY_VERIFY(app.click("settingsTab-appearance"));
+            app.shot("promo-settings");
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("settingsOverlay"));
+            app.wake();
+            app.shot("promo-player");
+        }
+        {
+            Launch app(QDir(m_path).filePath("promo-start"), QString(), QDir(m_path).filePath("promo-start.log"));
+            QTRY_VERIFY(app.item("startScreen"));
+            app.shot("promo-start");
+        }
+    }
+
     void realWindowInput()
     {
         if (!qEnvironmentVariableIsSet("ECHOPLAY_E2E_REAL_INPUT")) QSKIP("takes the real mouse and keyboard: tools/window-live.sh");

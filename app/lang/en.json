@@ -211,12 +211,6 @@
   "action_chapter_next": "Next chapter",
   "action_chapter_previous": "Previous chapter",
   "action_ab_loop": "Loop a part: start, end, off",
-  "action_save_cut": "Save the A-B part with this mix",
-  "cut_needs_loop": "Set the part's start and end with L first",
-  "cut_busy": "A part is already being saved",
-  "cut_saving": "Saving the part…",
-  "cut_saved": "Part saved",
-  "cut_failed": "Couldn't save the part",
   "action_always_on_top": "Always on top",
 
   "publisher": "Publisher: %1",

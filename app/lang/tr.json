@@ -211,12 +211,6 @@
   "action_chapter_next": "Sonraki bölüm",
   "action_chapter_previous": "Önceki bölüm",
   "action_ab_loop": "Bir kısmı döngüye al: başlangıç, bitiş, kapat",
-  "action_save_cut": "A-B kısmını bu karışımla kaydet",
-  "cut_needs_loop": "Önce L ile kısmın başını ve sonunu seç",
-  "cut_busy": "Zaten bir kısım kaydediliyor",
-  "cut_saving": "Kısım kaydediliyor…",
-  "cut_saved": "Kısım kaydedildi",
-  "cut_failed": "Kısım kaydedilemedi",
   "action_always_on_top": "Her zaman üstte",
 
   "publisher": "Yayıncı: %1",

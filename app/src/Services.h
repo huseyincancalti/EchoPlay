@@ -3,7 +3,6 @@
 #include <QString>
 #include "AppState.h"
 #include "ClipInfo.h"
-#include "CutSaver.h"
 #include "I18n.h"
 #include "MixerController.h"
 #include "PictureQuality.h"
@@ -35,5 +34,4 @@ struct Services
     Thumbnailer thumbnails;
     ClipInfo clipInfo;
     SilenceCheck silence;
-    CutSaver cuts;
 };

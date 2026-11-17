@@ -7,7 +7,6 @@ chevron_right
 close
 colorize
 content_copy
-content_cut
 contrast
 crop_square
 dark_mode

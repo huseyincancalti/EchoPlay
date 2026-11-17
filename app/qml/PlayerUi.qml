@@ -122,16 +122,6 @@ Item {
         wake()
         mpv.command(["ab-loop"])
     }
-    // The A-B part with what is heard now (the mixer's graph, or its one track), as one file next to the clip.
-    function saveCut() {
-        const path = mpv.observed("path") || ""
-        if (path === "" || /^[a-z][a-z0-9+.-]+:\/\//i.test(path)) return // a link has no folder to save next to
-        if (loopA < 0 || loopB < 0) { window.showToast(I18n.strings.cut_needs_loop, 3000); return }
-        if (CutSaver.state === "saving") { window.showToast(I18n.strings.cut_busy, 2500); return }
-        const aid = mpv.getProperty("aid")
-        CutSaver.save(path, Math.min(loopA, loopB), Math.max(loopA, loopB), String(mpv.getProperty("lavfi-complex") || ""),
-                      typeof aid === "number" ? String(aid) : "no")
-    }
     // mpv's own step: back within 5 s of a chapter's start goes to the one before. The bar comes up to show where it
     // landed, and a toast names it.
     function stepChapter(step) {

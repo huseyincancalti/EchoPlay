@@ -48,7 +48,9 @@ if(WIN32)
 endif()
 qt_add_executable(echoplay src/main.cpp)
 # EchoPlay.exe, as v1's: "Open with", Task Manager and the installer's registry entries use this name.
-set_target_properties(echoplay PROPERTIES OUTPUT_NAME EchoPlay)
+# WIN32_EXECUTABLE: a GUI-subsystem exe. Without it Windows opens a console window next to the player on every
+# start. Redirected output (--smoke, the tools' logs) still works: the inherited handles stay.
+set_target_properties(echoplay PROPERTIES OUTPUT_NAME EchoPlay WIN32_EXECUTABLE TRUE)
 if(WIN32)
     string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)" _ "${ECHOPLAY_VERSION}")
     set(ECHOPLAY_VERSION_RC "${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0")

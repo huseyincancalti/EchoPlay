@@ -585,14 +585,16 @@ private slots:
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             app.key(Qt::Key_Escape);
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
-            // With the title bar gone in full screen, the window's buttons stay in reach: its own way out.
+            // With the title bar gone in full screen, minimize stays in reach, alone (maintainer).
             QVERIFY(!app.item("fullScreenButtons")->isVisible());
             app.key(Qt::Key_F);
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             app.wake();
             QTRY_VERIFY(app.item("fullScreenButtons")->isVisible());
+            QVERIFY(Launch::searchVisible(app.item("fullScreenButtons"), "fullScreenMinimize"));
+            QVERIFY(!app.item("fullScreenExit") && !app.item("fullScreenClose"));
             app.shot("fullscreen-buttons");
-            QVERIFY(app.click("fullScreenExit"));
+            app.key(Qt::Key_Escape);
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
             const QPoint center(app.window->width() / 2, app.window->height() / 2);
             QTest::mouseDClick(app.window, Qt::LeftButton, Qt::NoModifier, center);

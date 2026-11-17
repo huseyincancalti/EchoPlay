@@ -337,7 +337,7 @@ Item {
             font.weight: Font.DemiBold
         }
     }
-    GlassPanel { // full screen: the window's buttons in a pill across from the name, with the title bar gone
+    GlassPanel { // full screen: only minimize across from the name (maintainer: three buttons crowded it; Esc, F and a double-click leave full screen)
         id: fullScreenButtons
         objectName: "fullScreenButtons"
         readonly property bool hovered: buttonsHover.hovered
@@ -366,27 +366,6 @@ Item {
                 iconSize: 20
                 tip: I18n.strings.minimize
                 onClicked: ui.chrome.minimize()
-            }
-            IconButton {
-                objectName: "fullScreenExit"
-                implicitWidth: 40
-                implicitHeight: 40
-                radius: 10
-                icon: "fullscreen_exit"
-                iconSize: 22
-                tip: I18n.strings.exit_full_screen
-                onClicked: ui.toggleFullScreen()
-            }
-            IconButton {
-                objectName: "fullScreenClose"
-                implicitWidth: 40
-                implicitHeight: 40
-                radius: 10
-                icon: "close"
-                iconSize: 20
-                hoverColor: "#C42B1C" // Windows' own close red, as in the title bar
-                tip: I18n.strings.close
-                onClicked: ui.window.close()
             }
         }
     }

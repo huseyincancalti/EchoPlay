@@ -25,6 +25,9 @@ jobs:
           path: ${{ github.workspace }}/../echoplay-dev
           key: echoplay-dev-${{ hashFiles('tools/setup-dev.sh') }}
 
+      - name: FFmpeg (some unit tests make their clips with it)
+        run: choco install ffmpeg -y --no-progress > /dev/null && ffmpeg -version | head -1
+
       - name: Set up the toolchain
         run: bash tools/setup-dev.sh
 

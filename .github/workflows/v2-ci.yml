@@ -41,36 +41,26 @@ jobs:
           name: check-v2-log
           path: .out/check-v2.log
 
-  # Linux: the same build and unit tests (OpenGL render path). Qt from Qt's own archive through aqt, as on Windows:
-  # Ubuntu 24.04 ships Qt 6.4, older than QQuickRhiItem. libmpv and FFmpeg are Ubuntu's. Headless: offscreen platform.
+  # Linux: the same build and unit tests (OpenGL render path), in an Ubuntu 26.04 container: its Qt (6.10) and libmpv
+  # (0.41) are new enough. Ubuntu 24.04's libmpv 0.37 cannot: loadfile's index argument came in mpv 0.38. Headless:
+  # offscreen platform.
   build-and-test-linux:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
     env:
-      QT_VERSION: 6.10.3
       QT_QPA_PLATFORM: offscreen
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Qt
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/../qt
-          key: qt-${{ env.QT_VERSION }}-linux_gcc_64-shadertools
-
-      - name: Qt
+      - name: Qt, libmpv, FFmpeg and build tools
         run: |
-          [ -d "../qt/$QT_VERSION/gcc_64" ] || pipx run aqtinstall install-qt linux desktop "$QT_VERSION" linux_gcc_64 \
-            -m qtshadertools -O ../qt
-
-      - name: libmpv, FFmpeg, OpenGL and build tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends libmpv-dev ffmpeg ninja-build pkg-config libgl-dev \
-            libegl-dev libxkbcommon-dev > /dev/null
-          pkg-config --modversion mpv
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends cmake ninja-build g++ pkg-config libmpv-dev ffmpeg             qt6-base-dev qt6-base-private-dev qt6-declarative-dev qt6-declarative-private-dev qt6-shadertools-dev             qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-effects qml6-module-qtquick-layouts             qml6-module-qtquick-window qml6-module-qtquick-dialogs qml6-module-qtquick-shapes             qml6-module-qtqml-workerscript qml6-module-qtquick-templates qml6-module-qtcore > /dev/null
+          echo "libmpv $(pkg-config --modversion mpv)"
 
       - name: Build and unit tests
-        run: CMAKE_PREFIX_PATH="$(realpath "../qt/$QT_VERSION/gcc_64")" CMAKE_GENERATOR=Ninja bash tools/check.sh v2
+        run: CMAKE_GENERATOR=Ninja bash tools/check.sh v2
 
       - name: Keep the log of a failed run
         if: failure()

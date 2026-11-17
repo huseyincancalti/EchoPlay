@@ -1,6 +1,6 @@
 name: EchoPlay 2
 
-# Every push to main and every pull request: EchoPlay 2 (app/) builds on clean Windows and Linux runners and its unit
+# Every push to main and every pull request: EchoPlay 2 (app/) builds on clean Windows, Linux and macOS runners and its unit
 # tests pass. The same steps as on the maintainer's PC: tools/setup-dev.sh, then tools/check.sh v2 (configure, build, ctest
 # without the e2e suite, which needs a screen). The player-window tests stay local (tools/e2e.sh).
 on:
@@ -67,4 +67,30 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: check-v2-log-linux
+          path: .out/check-v2.log
+
+  # macOS on Apple Silicon: the same build and unit tests (OpenGL render path) with Homebrew's Qt and libmpv.
+  build-and-test-macos:
+    runs-on: macos-15
+    env:
+      QT_QPA_PLATFORM: offscreen
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Qt, libmpv, FFmpeg and build tools
+        run: |
+          brew install --quiet qt mpv ffmpeg ninja pkg-config > /dev/null
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt)" >> "$GITHUB_ENV"
+          echo "Qt $(brew list --versions qt), libmpv $(pkg-config --modversion mpv)"
+
+      - name: Build and unit tests
+        run: CMAKE_GENERATOR=Ninja bash tools/check.sh v2
+
+      - name: Keep the log of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-v2-log-macos
           path: .out/check-v2.log

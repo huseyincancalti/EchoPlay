@@ -21,11 +21,11 @@ env:
   VERSION: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version }}
 
 jobs:
-  # Debian 13: libmpv 0.40 (EchoPlay needs >= 0.38) on an older glibc (2.41) than Ubuntu 26.04's, so the AppImage runs on
-  # more distributions (every one with glibc 2.41 or newer). Qt comes from the same base and travels inside.
+  # Ubuntu 26.04, like the CI build: EchoPlay needs Qt >= 6.9 and libmpv >= 0.38 (Debian 13 has Qt 6.8; Ubuntu 25.10 is
+  # out of support). So the AppImage needs that base's glibc or newer (the build prints it). Qt travels inside.
   appimage:
     runs-on: ubuntu-latest
-    container: debian:trixie
+    container: ubuntu:26.04
     env:
       DEBIAN_FRONTEND: noninteractive
       APPIMAGE_EXTRACT_AND_RUN: 1 # no FUSE in a container
@@ -72,7 +72,7 @@ jobs:
   appimage-runs:
     needs: appimage
     runs-on: ubuntu-latest
-    container: debian:trixie-slim
+    container: ubuntu:26.04
     env:
       APPIMAGE_EXTRACT_AND_RUN: 1
       DEBIAN_FRONTEND: noninteractive

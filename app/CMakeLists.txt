@@ -119,7 +119,8 @@ else()
     set(ECHOPLAY_DATA_DIR "$<TARGET_FILE_DIR:echoplay>")
 endif()
 add_custom_command(TARGET echoplay POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "${ECHOPLAY_DATA_DIR}")
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ECHOPLAY_DATA_DIR}" # macOS: Resources does not exist yet
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "${ECHOPLAY_DATA_DIR}/theme.json")
 
 # Language files are loaded from a folder next to the exe (new languages are dropped in there, no rebuild).
 add_custom_command(TARGET echoplay POST_BUILD

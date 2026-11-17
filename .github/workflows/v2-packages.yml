@@ -1,0 +1,172 @@
+name: EchoPlay 2 packages
+
+# The Linux AppImage and the macOS DMG of EchoPlay 2. The Windows setup is still built and published by hand
+# (tools/package-v2.sh). Started by hand (Actions > Run workflow) the packages are only kept as the run's artifacts; on a
+# v2 tag they are also added to that tag's GitHub release when it exists. Each package is opened once on a clean machine
+# before it counts.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v (0.0.0-dev never checks for updates)"
+        default: "0.0.0-dev"
+  push:
+    tags:
+      - 'v2.*.*'
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version }}
+
+jobs:
+  # Debian 13: libmpv 0.40 (EchoPlay needs >= 0.38) on an older glibc (2.41) than Ubuntu 26.04's, so the AppImage runs on
+  # more distributions (every one with glibc 2.41 or newer). Qt comes from the same base and travels inside.
+  appimage:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      APPIMAGE_EXTRACT_AND_RUN: 1 # no FUSE in a container
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Qt, libmpv and build tools
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends cmake ninja-build g++ pkg-config libmpv-dev curl ca-certificates \
+            file imagemagick qt6-base-dev qt6-base-private-dev qt6-declarative-dev qt6-declarative-private-dev \
+            qt6-shadertools-dev qt6-qpa-plugins qml6-module-qtquick qml6-module-qtquick-controls \
+            qml6-module-qtquick-effects qml6-module-qtquick-layouts qml6-module-qtquick-window \
+            qml6-module-qtquick-dialogs qml6-module-qtquick-shapes qml6-module-qtqml-workerscript \
+            qml6-module-qtquick-templates qml6-module-qtcore > /dev/null
+          echo "Qt $(qmake6 -query QT_VERSION), libmpv $(pkg-config --modversion mpv), $(ldd --version | head -1)"
+
+      - name: Build
+        run: |
+          VER="${VERSION#v}"
+          cmake -S app -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DECHOPLAY_VERSION="$VER" -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build --target echoplay
+          DESTDIR="$PWD/AppDir" cmake --install build
+          echo "VER=$VER" >> "$GITHUB_ENV"
+
+      - name: AppImage
+        run: |
+          curl -sfL -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
+          curl -sfL -o linuxdeploy-plugin-qt https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
+          $(command -v magick || echo convert) assets/logo.png -resize 256x256 echoplay.png # ImageMagick 7 or 6
+          export QMAKE=/usr/lib/qt6/bin/qmake QML_SOURCES_PATHS="$PWD/app/qml" PATH="$PWD:$PATH" LDAI_OUTPUT="EchoPlay-$VER-x86_64.AppImage"
+          ./linuxdeploy --appdir AppDir --executable AppDir/usr/bin/echoplay --desktop-file app/linux/echoplay.desktop \
+            --icon-file echoplay.png --plugin qt --output appimage
+          ls -la *.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echoplay-linux-x86_64
+          path: EchoPlay-*-x86_64.AppImage
+
+  # The AppImage on a machine that has never seen Qt or mpv: libmpv answers (--smoke), then the window starts and is
+  # still up after 10 s (the QML loaded; a missing module ends the process at once).
+  appimage-runs:
+    needs: appimage
+    runs-on: ubuntu-latest
+    container: debian:trixie-slim
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: 1
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: echoplay-linux-x86_64
+      - name: A display only (Xvfb, software OpenGL)
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri libegl1 > /dev/null
+      - name: Open it
+        run: |
+          APP=$(ls EchoPlay-*-x86_64.AppImage)
+          chmod +x "$APP"
+          "./$APP" --smoke
+          set +e
+          timeout 10 xvfb-run -a "./$APP" > run.log 2>&1
+          code=$?
+          cat run.log
+          [ "$code" = 124 ] || { echo "EchoPlay ended by itself (exit $code) instead of running"; exit 1; }
+
+  # Apple Silicon, macOS 14 or newer (Homebrew's bottles on this runner are built for 14). Unsigned: ad-hoc signature
+  # only (README says how to open it the first time).
+  dmg:
+    runs-on: macos-14
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Qt, libmpv and build tools
+        run: |
+          brew install --quiet qt mpv ninja pkg-config > /dev/null
+          echo "Qt $(brew list --versions qt), libmpv $(pkg-config --modversion mpv)"
+
+      - name: Build
+        run: |
+          VER="${VERSION#v}"
+          cmake -S app -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DECHOPLAY_VERSION="$VER" -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+          cmake --build build --target echoplay
+          echo "VER=$VER" >> "$GITHUB_ENV"
+
+      - name: EchoPlay.app with Qt and libmpv inside
+        run: |
+          APP=build/EchoPlay.app
+          mkdir -p icon.iconset
+          for size in 16 32 128 256 512; do
+            sips -z $size $size assets/logo.png --out icon.iconset/icon_${size}x${size}.png > /dev/null
+            sips -z $((size * 2)) $((size * 2)) assets/logo.png --out icon.iconset/icon_${size}x${size}@2x.png > /dev/null
+          done
+          iconutil -c icns icon.iconset -o "$APP/Contents/Resources/icon.icns"
+          "$(brew --prefix qt)/bin/macdeployqt" "$APP" -qmldir=app/qml -verbose=1
+          # Everything must come from inside the app: a path into Homebrew works on this runner only.
+          if find "$APP" -type f \( -perm -u+x -o -name '*.dylib' \) -exec otool -L {} + 2>/dev/null | grep -E '^\s+/(opt/homebrew|usr/local)/'; then
+            echo "These libraries still point outside the app"; exit 1
+          fi
+          codesign --force --deep -s - "$APP"
+          codesign --verify --deep --strict "$APP"
+          du -sh "$APP"
+
+      - name: Open it
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: build/EchoPlay.app/Contents/MacOS/EchoPlay --smoke
+
+      - name: DMG
+        run: |
+          mkdir dmg
+          cp -R build/EchoPlay.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname EchoPlay -srcfolder dmg -ov -format UDZO "EchoPlay-$VER-arm64.dmg"
+          ls -la *.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echoplay-macos-arm64
+          path: EchoPlay-*-arm64.dmg
+
+  # A v2 tag: the packages join the release the maintainer published for it. Nothing is created here.
+  release:
+    if: github.ref_type == 'tag'
+    needs: [appimage-runs, dmg]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+      - name: Add to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" > /dev/null; then
+            gh release upload "$GITHUB_REF_NAME" packages/* -R "$GITHUB_REPOSITORY" --clobber
+          else
+            echo "No release for $GITHUB_REF_NAME yet: the packages stay in this run's artifacts"
+          fi

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=EchoPlay
+Comment=Video player for recordings with separate game and mic tracks: mix them live
+Exec=echoplay %f
+Icon=echoplay
+Terminal=false
+Categories=AudioVideo;Video;Player;
+MimeType=video/mp4;video/x-matroska;video/x-msvideo;video/quicktime;video/webm;video/x-m4v;video/x-ms-wmv;video/mp2t;video/x-flv;video/3gpp;video/ogg;audio/mpeg;audio/flac;audio/mp4;audio/x-wav;audio/ogg;audio/opus;

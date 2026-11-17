@@ -59,7 +59,9 @@ add_test(NAME clipinfo-clips COMMAND "${FFMPEG}" -y -v error -f lavfi
          -map 1:a -c:a aac "${CLIPINFO_AUDIO}")
 set_tests_properties(clipinfo-clips PROPERTIES FIXTURES_SETUP clipinfo-clips)
 # HdrTone needs FFmpeg's zscale (zimg). Homebrew's FFmpeg, which Homebrew's libmpv uses too, has none (macOS CI,
-# 2026-11-17): there the HDR cases skip, with the reason in the log. The macOS package must bundle a libmpv with zimg.
+# 2026-11-17): there the HDR clip cannot be made and the HDR cases skip, with the reason in the log. Such a libmpv still
+# gives a picture: the tone-mapping filter fails to build and mpv keeps the plain scale (measured on Windows with the
+# filter's name broken: "No such filter", "Creating filter 'lavfi' failed", then the preview as before).
 execute_process(COMMAND "${FFMPEG}" -hide_banner -filters OUTPUT_VARIABLE FFMPEG_FILTERS ERROR_QUIET)
 string(FIND "${FFMPEG_FILTERS}" " zscale " ZSCALE_AT)
 set(HDR_TESTS "")

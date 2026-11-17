@@ -74,7 +74,8 @@ if(UNIX AND NOT APPLE) # Linux names programs in lower case; "EchoPlay" is also 
     set_target_properties(echoplay PROPERTIES OUTPUT_NAME echoplay)
 endif()
 if(APPLE) # EchoPlay.app; a bare "EchoPlay" would clash with the QML module's folder (case-insensitive file system)
-    set_target_properties(echoplay PROPERTIES MACOSX_BUNDLE TRUE)
+    set_target_properties(echoplay PROPERTIES MACOSX_BUNDLE TRUE
+                          MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos/Info.plist.in")
 endif()
 if(WIN32)
     string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)" _ "${ECHOPLAY_VERSION}")
@@ -110,17 +111,30 @@ qt_add_resources(echoplay_lib theme PREFIX "/theme" BASE "${CMAKE_CURRENT_SOURCE
 qt_add_resources(echoplay_lib fonts PREFIX "/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/fonts" FILES
                  fonts/Geist.ttf fonts/Manrope.ttf fonts/PlusJakartaSans.ttf fonts/Icons.ttf fonts/IconsFilled.ttf)
 qt_add_resources(echoplay_lib images PREFIX "/images" BASE "${CMAKE_CURRENT_SOURCE_DIR}/images" FILES images/logo.png)
+# lang/ and theme.json sit next to the exe; on macOS in EchoPlay.app/Contents/Resources (main.cpp), where a signed app
+# keeps its data: Contents/MacOS is for code only.
+if(APPLE)
+    set(ECHOPLAY_DATA_DIR "$<TARGET_BUNDLE_CONTENT_DIR:echoplay>/Resources")
+else()
+    set(ECHOPLAY_DATA_DIR "$<TARGET_FILE_DIR:echoplay>")
+endif()
 add_custom_command(TARGET echoplay POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "$<TARGET_FILE_DIR:echoplay>")
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/theme/theme.json" "${ECHOPLAY_DATA_DIR}")
 
 # Language files are loaded from a folder next to the exe (new languages are dropped in there, no rebuild).
 add_custom_command(TARGET echoplay POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CMAKE_CURRENT_SOURCE_DIR}/lang" "$<TARGET_FILE_DIR:echoplay>/lang")
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CMAKE_CURRENT_SOURCE_DIR}/lang" "${ECHOPLAY_DATA_DIR}/lang")
 
 # Packaging: `cmake --install <build> --prefix <stage>` lays out a self-contained app (exe, Qt and MinGW
 # runtime, QML modules, libmpv, lang/, theme.json) for the installer (tools/package-v2.sh). Flat, like v1:
 # EchoPlay.exe at the root, where the "Open with" registration points, and Qt's runtime next to it.
-# Linux and macOS packages come later (NOW.md: AppImage, DMG).
+# Linux: bin/echoplay with lang/ and theme.json next to it, the AppDir that linuxdeploy completes (v2-packages.yml).
+# macOS: the build's EchoPlay.app already holds everything of ours; macdeployqt adds Qt and libmpv (v2-packages.yml).
+if(UNIX AND NOT APPLE)
+    install(TARGETS echoplay RUNTIME DESTINATION bin)
+    install(FILES theme/theme.json DESTINATION bin)
+    install(DIRECTORY lang DESTINATION bin)
+endif()
 if(WIN32)
     install(TARGETS echoplay RUNTIME DESTINATION .)
     install(CODE "set(QT_DEPLOY_BIN_DIR .)") # read by the deploy script below; its default is bin/

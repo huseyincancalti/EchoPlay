@@ -108,8 +108,12 @@ int main(int argc, char *argv[])
     }
 
     // Declared before the engine so it outlives it. QML reaches it through the singletons' create().
-    Services services(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation),
-                      QCoreApplication::applicationDirPath(), ECHOPLAY_VERSION);
+#ifdef Q_OS_MACOS
+    const QString dataDir = QCoreApplication::applicationDirPath() + "/../Resources"; // EchoPlay.app/Contents/Resources
+#else
+    const QString dataDir = QCoreApplication::applicationDirPath();
+#endif
+    Services services(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation), dataDir, ECHOPLAY_VERSION);
     // 4 s after launch, so the TLS start-up never competes with the first frame. Bench and shot runs stay
     // offline (comparable measurements).
     if (!cli.isSet(bench) && cli.value(shotAt).toDouble() < 0)

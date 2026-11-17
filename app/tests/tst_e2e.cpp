@@ -1740,6 +1740,21 @@ private slots:
             app.wake();
             QTRY_COMPARE(app.item("mixerChipText")->property("text").toString(), QString("Track 1 + 2"));
         }
+        // ECHOPLAY_NVIDIA_CLIP=<an NVIDIA App recording>: the names it keeps where mpv does not look (Mp4TrackNames).
+        const QString nvidia = qEnvironmentVariable("ECHOPLAY_NVIDIA_CLIP");
+        if (!nvidia.isEmpty()) {
+            Launch app(QDir(m_path).filePath("labels-nvidia"), nvidia, QDir(m_path).filePath("labels-nvidia.log"));
+            QVERIFY2(app.playing(), "the clip did not start playing");
+            app.services.i18n.setLanguage("en");
+            app.services.mixer.setAllEnabled(true);
+            app.wake();
+            QTRY_COMPARE(app.item("mixerChipText")->property("text").toString(), QString("System + Mic"));
+            QVERIFY(app.click("mixerChip"));
+            QTRY_VERIFY(app.item("mixerRow-2"));
+            QCOMPARE(app.item("mixerRow-1")->property("name").toString(), QString("System sounds"));
+            QCOMPARE(app.item("mixerRow-2")->property("name").toString(), QString("Microphone"));
+            app.shot("labels-nvidia");
+        }
     }
 
     void chapters()

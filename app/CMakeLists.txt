@@ -32,7 +32,7 @@ qt_add_qml_module(echoplay_lib
               qml/SettingsOverlay.qml qml/SettingsContent.qml qml/UpdateCard.qml qml/WhatsNewCard.qml qml/ErrorScreen.qml qml/UpdateNotice.qml
               qml/Toast.qml qml/ResumeCard.qml qml/HintCard.qml qml/NoSoundCard.qml qml/PlaylistPanel.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
-            src/I18n.h src/I18n.cpp src/Language.h src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
+            src/I18n.h src/I18n.cpp src/Language.h src/Mp4TrackNames.h src/Mp4TrackNames.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/Updater.h src/Updater.cpp src/SetupLock.h src/SetupLock.cpp
             src/ResumeStore.h src/ResumeStore.cpp
             src/Mixer.h src/Mixer.cpp src/MixerController.h src/MixerController.cpp

@@ -15,6 +15,7 @@ echoplay_test(mixercontroller ../src/MixerController.h ../src/MixerController.cp
               ../src/AppState.h ../src/AppState.cpp)
 echoplay_test(picturequality ../src/PictureQuality.h ../src/PictureQuality.cpp ../src/AppState.h
               ../src/AppState.cpp ../src/Mixer.h ../src/Mixer.cpp)
+echoplay_test(mp4tracknames ../src/Mp4TrackNames.h ../src/Mp4TrackNames.cpp)
 echoplay_test(singleinstance ../src/SingleInstance.h ../src/SingleInstance.cpp)
 target_link_libraries(tst_singleinstance PRIVATE Qt6::Network)
 echoplay_test(i18n ../src/I18n.h ../src/I18n.cpp)

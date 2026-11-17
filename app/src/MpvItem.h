@@ -76,6 +76,11 @@ private:
     bool m_keepingAwake = false;
     QSet<QString> m_observedNames;
     QVariantMap m_observed;
+    QVariant m_rawTrackList;   // mpv's own, before withNames()
+    QString m_namesPath;       // the file m_names belong to
+    QVariantMap m_names;       // {"audio": [...], "sub": [...]} from Mp4TrackNames
+    static QVariantMap readTrackNames(const QString &path);
+    QVariant withNames(const QVariant &trackList) const;
     QVariantMap m_marks;
     QStringList m_recentLog;
 };

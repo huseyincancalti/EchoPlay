@@ -1,4 +1,5 @@
 #include "MpvItem.h"
+#include "Mp4TrackNames.h"
 
 #include <QClipboard>
 #include <QDir>
@@ -21,6 +22,7 @@
 namespace {
 
 constexpr quint64 KeepAwakeReply = 1; // observeProperty() uses 0
+constexpr quint64 PathReply = 2;
 constexpr quint64 ScreenshotReply = 2; // command() uses 0
 constexpr quint64 CopyFrameReply = 3;
 constexpr quint64 CaptureFrameReply = 4;
@@ -194,6 +196,7 @@ void MpvItem::start()
     // core-idle: paused, or no file. Its own reply id keeps it out of propertyChanged/observed().
     mpv_request_log_messages(m_mpv, "warn");
     mpv_observe_property(m_mpv, KeepAwakeReply, "core-idle", MPV_FORMAT_FLAG);
+    mpv_observe_property(m_mpv, PathReply, "path", MPV_FORMAT_STRING); // for track names mpv cannot read
 }
 
 // The same flags as mpv's own window (video/out/w32_common.c). Per thread: always the GUI thread here.
@@ -308,12 +311,56 @@ void MpvItem::drainEvents()
         if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == KeepAwakeReply) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
             setKeepingAwake(p->format == MPV_FORMAT_FLAG && !*static_cast<int *>(p->data));
+        } else if (e->event_id == MPV_EVENT_PROPERTY_CHANGE && e->reply_userdata == PathReply) {
+            const auto *p = static_cast<mpv_event_property *>(e->data);
+            const QString path = p->format == MPV_FORMAT_STRING ? QString::fromUtf8(*static_cast<char **>(p->data)) : QString();
+            if (path == m_namesPath) continue;
+            m_namesPath = path;
+            m_names = path.isEmpty() || path.contains("://") ? QVariantMap() : readTrackNames(path);
+            // The track list may have come first: send it again with the names.
+            if (m_observed.contains("track-list")) {
+                const QVariant tracks = withNames(m_rawTrackList);
+                m_observed.insert("track-list", tracks);
+                emit propertyChanged("track-list", tracks);
+            }
         } else if (e->event_id == MPV_EVENT_PROPERTY_CHANGE) {
             const auto *p = static_cast<mpv_event_property *>(e->data);
-            const QVariant value = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)) : QVariant();
+            QVariant value = p->format == MPV_FORMAT_NODE ? fromNode(*static_cast<mpv_node *>(p->data)) : QVariant();
             const QString name = QString::fromUtf8(p->name);
+            if (name == "track-list") {
+                m_rawTrackList = value;
+                value = withNames(value);
+            }
             m_observed.insert(name, value);
             emit propertyChanged(name, value);
         }
     }
+}
+
+QVariantMap MpvItem::readTrackNames(const QString &path)
+{
+    const Mp4TrackNames names = Mp4TrackNames::read(path);
+    return {{"audio", names.audio}, {"sub", names.subtitles}};
+}
+
+// A track without a title gets the name its file keeps where mpv does not look (Mp4TrackNames): the n-th audio track
+// the n-th audio name. External subtitle files are not in the container: they are skipped.
+QVariant MpvItem::withNames(const QVariant &trackList) const
+{
+    if (m_names.isEmpty()) return trackList;
+    QVariantList tracks = trackList.toList();
+    QHash<QString, int> seen;
+    for (QVariant &entry : tracks) {
+        QVariantMap track = entry.toMap();
+        const QString type = track.value("type").toString();
+        if (type != "audio" && type != "sub") continue;
+        if (track.value("external").toBool()) continue;
+        const QStringList names = m_names.value(type).toStringList();
+        const int index = seen[type]++;
+        if (track.value("title").toString().isEmpty() && index < names.size() && !names[index].isEmpty()) {
+            track.insert("title", names[index]);
+            entry = track;
+        }
+    }
+    return tracks;
 }

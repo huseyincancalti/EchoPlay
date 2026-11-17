@@ -9,6 +9,7 @@
   "quick_settings": "Quick settings",
   "full_screen": "Full screen",
   "minimize": "Minimize",
+  "exit_full_screen": "Exit full screen",
 
   "audio_tracks": "Audio tracks",
   "tracks_in_clip": "%1 in this clip",

@@ -585,16 +585,15 @@ private slots:
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             app.key(Qt::Key_Escape);
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
-            // With the title bar gone in full screen, minimize stays in reach, alone (maintainer).
+            // With the title bar gone in full screen, one button stays in reach: back to the window (maintainer).
             QVERIFY(!app.item("fullScreenButtons")->isVisible());
             app.key(Qt::Key_F);
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             app.wake();
             QTRY_VERIFY(app.item("fullScreenButtons")->isVisible());
-            QVERIFY(Launch::searchVisible(app.item("fullScreenButtons"), "fullScreenMinimize"));
-            QVERIFY(!app.item("fullScreenExit") && !app.item("fullScreenClose"));
+            QVERIFY(!app.item("fullScreenMinimize") && !app.item("fullScreenClose"));
             app.shot("fullscreen-buttons");
-            app.key(Qt::Key_Escape);
+            QVERIFY(app.click("fullScreenExit"));
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
             const QPoint center(app.window->width() / 2, app.window->height() / 2);
             QTest::mouseDClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
@@ -842,8 +841,10 @@ private slots:
         QVERIFY(app.click("allSettings"));
         QTRY_VERIFY(app.item("settingsOverlay") && app.item("settingsOverlay")->isVisible());
         const qint64 openedIn = opening.elapsed();
-        QTest::qWait(300);
+        QTest::qWait(1500 - openedIn); // its rows lay out after it shows: a stall can come later than the panel
         qInfo("settings: on screen after %lld ms, longest frame gap while opening %lld ms", openedIn, qint64(longestGap));
+        // ~40 ms here when nothing blocks. A character the UI font lacks once cost ~300-450 ms (Windows' font fallback).
+        QVERIFY2(longestGap < 150, "opening settings stalled the playing video");
         QObject::disconnect(frames);
         QVERIFY(!app.item("quickPopover"));
         QTRY_VERIFY(!app.item("controlBar")->isVisible());

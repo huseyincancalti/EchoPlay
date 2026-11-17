@@ -43,11 +43,12 @@ Item {
             objectName: "settingDescription"
             visible: row.description !== ""
             width: parent.width
-            // A folder path has no spaces: it may break after a separator (a zero-width space), and anywhere as a last resort.
+            // A folder path has no spaces: Text.Wrap breaks it anywhere when it does not fit. No zero-width space after
+            // its separators: the UI font lacks one, and Windows' font fallback for it froze the video ~300 ms to 1.5 s.
             wrapMode: Text.Wrap
             lineHeight: 18
             lineHeightMode: Text.FixedHeight
-            text: row.description.replace(/[\\/]/g, "$&​")
+            text: row.description
             color: row.descriptionColor
             font.pixelSize: Theme.tokens.type.small
         }

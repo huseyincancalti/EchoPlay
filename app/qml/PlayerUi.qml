@@ -337,7 +337,7 @@ Item {
             font.weight: Font.DemiBold
         }
     }
-    GlassPanel { // full screen: only minimize across from the name (maintainer: three buttons crowded it; Esc, F and a double-click leave full screen)
+    GlassPanel { // full screen: only "exit full screen" across from the name (maintainer: three buttons crowded it)
         id: fullScreenButtons
         objectName: "fullScreenButtons"
         readonly property bool hovered: buttonsHover.hovered
@@ -358,14 +358,14 @@ Item {
             x: 4
             anchors.verticalCenter: parent.verticalCenter
             IconButton {
-                objectName: "fullScreenMinimize"
+                objectName: "fullScreenExit"
                 implicitWidth: 40
                 implicitHeight: 40
                 radius: 10
-                icon: "remove"
-                iconSize: 20
-                tip: I18n.strings.minimize
-                onClicked: ui.chrome.minimize()
+                icon: "fullscreen_exit"
+                iconSize: 22
+                tip: I18n.strings.exit_full_screen
+                onClicked: ui.toggleFullScreen()
             }
         }
     }

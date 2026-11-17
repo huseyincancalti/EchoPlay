@@ -8,6 +8,7 @@
   "quick_settings": "Быстрые настройки",
   "full_screen": "Полный экран",
   "minimize": "Свернуть",
+  "exit_full_screen": "Выйти из полноэкранного режима",
   "audio_tracks": "Аудиодорожки",
   "tracks_in_clip": "%1 (в этом клипе)",
   "track_n": "Дорожка %1",

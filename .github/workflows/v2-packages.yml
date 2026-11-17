@@ -59,7 +59,8 @@ jobs:
           $(command -v magick || echo convert) assets/logo.png -resize 256x256 echoplay.png # ImageMagick 7 or 6
           export QMAKE=/usr/lib/qt6/bin/qmake QML_SOURCES_PATHS="$PWD/app/qml" PATH="$PWD:$PATH" LDAI_OUTPUT="EchoPlay-$VER-x86_64.AppImage"
           ./linuxdeploy --appdir AppDir --executable AppDir/usr/bin/echoplay --desktop-file app/linux/echoplay.desktop \
-            --icon-file echoplay.png --plugin qt --output appimage
+            --icon-file echoplay.png --plugin qt --output appimage \
+            --library "$(ldconfig -p | grep -m1 -o "/.*/libjack.so.0$")" # libmpv needs it; linuxdeploy leaves JACK out, many desktops lack it
           ls -la *.AppImage
 
       - uses: actions/upload-artifact@v4

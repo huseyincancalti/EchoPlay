@@ -1,0 +1,42 @@
+name: EchoPlay 2
+
+# Every push to main and every pull request: EchoPlay 2 (app/) builds on a clean Windows runner and its unit tests
+# pass. The same steps as on the maintainer's PC: tools/setup-dev.sh, then tools/check.sh v2 (configure, build, ctest
+# without the e2e suite, which needs a screen). The player-window tests stay local (tools/e2e.sh).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      ECHOPLAY_DEV: ${{ github.workspace }}/../echoplay-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the toolchain (Qt, MinGW, libmpv, Vulkan loader)
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../echoplay-dev
+          key: echoplay-dev-${{ hashFiles('tools/setup-dev.sh') }}
+
+      - name: FFmpeg (some unit tests make their clips with it)
+        run: choco install ffmpeg -y --no-progress > /dev/null && ffmpeg -version | head -1
+
+      - name: Set up the toolchain
+        run: bash tools/setup-dev.sh
+
+      - name: Build and unit tests
+        run: bash tools/check.sh v2
+
+      - name: Keep the log of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-v2-log
+          path: .out/check-v2.log

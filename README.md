@@ -1,121 +1,87 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="EchoPlay — video player for NVIDIA ShadowPlay and OBS Studio dual audio track recordings on Windows, macOS, and Linux" width="160" />
+<img src="assets/logo.png" alt="EchoPlay — video player for NVIDIA ShadowPlay, NVIDIA App and OBS Studio recordings with separate game and mic audio tracks" width="160" />
 
 # EchoPlay
 
-**The video player for dual-audio-track recordings — NVIDIA ShadowPlay, NVIDIA App, and OBS
-Studio clips with separate game/mic tracks, mixed live. Windows, macOS, and Linux.**
+**The video player for recordings with separate audio tracks: NVIDIA ShadowPlay, NVIDIA App and OBS Studio clips
+with the game sound and your mic on their own tracks. Play either one, or both mixed, live.**
 
 [![Latest release](https://img.shields.io/github/v/release/huseyincancalti/EchoPlay?label=download&color=ff7d26)](https://github.com/huseyincancalti/EchoPlay/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D6)](#download--install)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)](#download--install)
+
+<img src="docs/media/mixer.gif" alt="EchoPlay's mixer: the game sound and the microphone switched on and off while a Counter-Strike 2 clip plays" width="640" />
 
 </div>
 
 ---
 
-## What is EchoPlay? A player built for NVIDIA ShadowPlay & OBS dual audio tracks
+## What is EchoPlay?
 
-EchoPlay is a curated **distribution of [mpv](https://mpv.io)** — *not a fork*. It wraps the
-upstream engine with a modern [uosc](https://github.com/tomasklaen/uosc) interface and a single
-small script, so you get a clean, YouTube-style player that adds the features mpv leaves to you.
+**NVIDIA ShadowPlay**, the **NVIDIA App** and **OBS Studio** (with multi-track audio) save your clips with **two
+separate audio tracks**: the game and your microphone. Most players make you pick one, or send you to an editor to
+mix them. EchoPlay plays **any mix of the tracks, live, without reopening the video**, and remembers your choice for
+the next clip.
 
-It was born from one annoyance: **NVIDIA ShadowPlay**, the **NVIDIA App** overlay, and **OBS
-Studio** (recording with "Track 1 = desktop/game audio, Track 2 = microphone") all save clips with
-**two separate audio tracks** instead of one mixed track. Most players force you to pick a single
-track, or make you re-encode the file in an editor just to mix them. EchoPlay mixes any combination
-of tracks **live, with no re-encode and no reloading the video** — and remembers your choice for
-next time.
-
-### Who EchoPlay is for
-
-- 🎮 **NVIDIA ShadowPlay / NVIDIA App users** whose Instant Replay or manual recordings capture
-  game and mic audio on separate tracks.
-- 🎥 **OBS Studio streamers & recorders** using multi-track audio output (desktop + mic on
-  separate tracks) who want to remix a clip after recording without re-exporting from OBS.
-- ✂️ **Editors and YouTubers** who receive dual-track clips from someone else and just need to
-  balance, mute, or re-center a track before uploading.
-- 🎧 Anyone with a **quiet or channel-imbalanced recording** who wants louder, centered audio
-  without opening Audacity or Premiere.
+EchoPlay 2 is its own player: a Qt Quick interface on [libmpv](https://mpv.io), the engine behind mpv.
 
 ### Highlights
 
-- 🎚️ **Live audio mixer** — toggle each track on/off, set per-track volume, and merge them in real
-  time. A per-track **Mono** switch re-centers a channel-imbalanced track (e.g. a mic that only
-  comes through the left speaker).
-- 🔊 **Built-in loudness boost** — quiet recordings come out strong (`dynaudnorm`); turning the
-  volume up is already a powerful boost.
-- 🪟 **Modern UI** — YouTube-style timeline, hover thumbnails ([thumbfast](https://github.com/po5/thumbfast)),
-  watch history & resume ([memo](https://github.com/po5/memo)), a right-edge volume slider, and clean
-  keyboard feedback (your own volume / seek indicators, never the system's white bar).
-- ⚙️ **One searchable Settings menu** — right-click: audio sources, video speed, picture quality,
-  theme, language, and file/subtitle/playlist shortcuts, grouped into clear, color-coded sections.
-- 🎨 **Theming** — clean Dark / Light modes plus an accent color, switched live. Drop-in community
-  theme & language packs (see below).
-- ⌨️ **Every shortcut is yours to remap** — click any shortcut in Settings and press the key or
-  combo you want (up to 3 keys at once); only right-click into the menu itself stays fixed.
-- 🖥️ **Three real picture-quality tiers** — Ultra (zero compromise), Normal (balanced default),
-  Low (weak hardware), or Auto to let EchoPlay pick and adapt live as playback runs.
-- 💾 **Persistent, and it asks before resuming** — your mixer, mono, accent, language, speed, and
-  shortcut choices survive restarts. Playback always starts at 0:00 and offers to jump back to
-  where you left off — it never silently skips ahead.
-- 🔔 **Tells you when a new version is out** — checks GitHub in the background (at most once a
-  day) and adds a one-click download link under Settings → Help once a newer release exists.
-  No account, no background service — just a quiet check next time you open a video.
+- 🎚️ **The mixer, on the control bar.** One button shows what you hear (*System + Mic*). Each track has its own
+  switch, volume up to 400% and a Mono switch for a mic that is only in one ear. Ctrl+1, Ctrl+2 from the keyboard.
+- 🏷️ **Tracks say what they are:** the names your recorder wrote ("System sounds", "Microphone", "Commentary") and
+  their language ("English", "Türkçe", "日本語"), for audio and subtitles.
+- ⚡ **Starts in under a second** and plays 4K60 recordings without dropped frames. A second clip opens in the window
+  that is already running.
+- 🪟 **A modern look:** dark glass panels over the video, a floating control bar, light and dark themes, your accent
+  color (or Windows'), your font. Every color and size lives in one theme file.
+- 🎬 **Everything a player should have:** seek-bar previews, chapters, A-B loop, frame step, press and hold for fast
+  playback, the folder as a playlist, resume where you left off, screenshots and copy frame, media keys and taskbar
+  buttons, subtitles with delay, size and position, audio delay, picture adjustments, media info.
+- 🌍 **7 languages:** English, Türkçe, Español, Русский, 简体中文, 日本語, 한국어. A new language is one file.
+- 🔔 **Updates itself:** a small card when a new version is out; install now, or when you close the player.
 
-### EchoPlay vs. VLC, PotPlayer & vanilla mpv for dual-audio-track video
+![Settings over the playing video](docs/media/settings.png)
 
-| | VLC / PotPlayer | Vanilla mpv | **EchoPlay** |
+### EchoPlay vs. VLC, PotPlayer and mpv for clips with two audio tracks
+
+| | VLC / PotPlayer | mpv | **EchoPlay** |
 |---|---|---|---|
-| Play a specific audio track | ✅ (pick one) | ✅ (pick one) | ✅ |
-| **Mix multiple tracks together, live** | ❌ | ⚙️ manual `lavfi-complex` | ✅ one click |
-| Per-track volume / mute | ❌ | ⚙️ manual | ✅ |
-| Fix a mic that's only in one ear (mono) | ❌ | ⚙️ manual | ✅ one click |
-| Remembers your mix per file | ❌ | ❌ | ✅ |
-| Setup | Install only | Install + hand-written config | **One installer, ready to go** |
+| Play one audio track | ✅ | ✅ | ✅ |
+| **Mix several tracks together, live** | ❌ | ⚙️ by hand (`lavfi-complex`) | ✅ one click |
+| Volume and mute per track | ❌ | ⚙️ by hand | ✅ |
+| Fix a mic that is only in one ear (mono) | ❌ | ⚙️ by hand | ✅ one click |
+| Remembers your mix | ❌ | ❌ | ✅ |
+| Setup | Install | Install + config files | **One installer** |
 
 ## Download & Install
 
-**No prerequisites, no terminal.** Everything (player engine, UI, fonts) is bundled — pick your
-platform below. Windows, macOS, and Linux downloads are all on the
-[latest release](https://github.com/huseyincancalti/EchoPlay/releases/latest) page.
+| System | Download |
+|---|---|
+| **Windows 10 / 11** | **EchoPlay-Setup.exe** from the [latest release](https://github.com/huseyincancalti/EchoPlay/releases/latest) (EchoPlay 2) |
+| macOS (Apple silicon or Intel) | the `.dmg` from the [1.4.0 release](https://github.com/huseyincancalti/EchoPlay/releases/tag/v1.4.0) |
+| Linux | the `.AppImage` from the [1.4.0 release](https://github.com/huseyincancalti/EchoPlay/releases/tag/v1.4.0) |
+
+EchoPlay 2 is Windows only for now; macOS and Linux keep 1.4.0 until their version 2 is ready.
 
 <details open>
 <summary><strong>Windows</strong></summary>
 
-1. Download **EchoPlay-Setup.exe** from the latest release.
-2. Double-click it and click through the wizard (no admin rights needed — it installs to your
-   user folder).
-3. To make it your default player: right-click any video → **Open with → EchoPlay → Always**.
+1. Download **EchoPlay-Setup.exe** and run it. No admin rights and nothing else to install: it goes into your user
+   folder.
+2. To make it your default player: **Settings → Playback → Default player** in EchoPlay, or right-click a video →
+   **Open with → EchoPlay → Always**.
 
-That's it — open a video, right-click for **Settings**. "EchoPlay" is what Windows
-shows everywhere: the taskbar, Task Manager, and the "Open with" list — never "mpv".
+Coming from 1.x? The setup replaces it in place. The 2.0.0 release notes have a one-time cleanup command if you want
+every trace of the old version gone first.
 
-<details>
-<summary>Advanced: portable / scripted install (<code>install.ps1</code>)</summary>
-
-If you already manage your own mpv (e.g. via scoop) or want a portable, no-installer layout,
-download the source zip ("Code → Download ZIP") and run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1
-```
-
-The script: detects mpv (or downloads a portable build automatically if you don't have one),
-copies the EchoPlay config in, downloads uosc / thumbfast / memo, and registers the file
-association. Flags: `-ConfigDir "C:\path"` to choose the config dir · `-Portable` to force a
-portable layout · `-SkipMpvDownload` to never auto-download mpv · `-SkipAssoc` to skip the file
-association.
-
-</details>
 </details>
 
 <details>
 <summary><strong>macOS</strong></summary>
 
 1. Download **EchoPlay-\<version\>-arm64.dmg** (Apple Silicon: M1/M2/M3/M4) or
-   **EchoPlay-\<version\>-x86_64.dmg** (Intel Mac) from the latest release.
+   **EchoPlay-\<version\>-x86_64.dmg** (Intel Mac) from the [1.4.0 release](https://github.com/huseyincancalti/EchoPlay/releases/tag/v1.4.0).
 2. Open the DMG and drag **EchoPlay** into **Applications**.
 3. **First launch only:** macOS will say the app "is damaged" or that it "cannot verify the
    developer" — this is expected, EchoPlay isn't notarized by Apple (that requires a paid Apple
@@ -144,7 +110,7 @@ Windows has one). Flag: `--config-dir <path>` to choose a different config dir.
 <details>
 <summary><strong>Linux</strong></summary>
 
-1. Download **EchoPlay-\<version\>-x86_64.AppImage** from the latest release.
+1. Download **EchoPlay-\<version\>-x86_64.AppImage** from the [1.4.0 release](https://github.com/huseyincancalti/EchoPlay/releases/tag/v1.4.0).
 2. Make it executable: `chmod +x EchoPlay-*.AppImage`, then double-click it (or run it from a
    terminal). Some file managers need "Allow executing file as program" checked in the file's
    Properties first.
@@ -169,86 +135,55 @@ prints the manual "Open With" steps. Flag: `--config-dir <path>` to choose a dif
 
 ### Keyboard shortcuts
 
-Every shortcut below is a default — click it in **Settings → Help → Keyboard Shortcuts** and
-press whatever key or combo (1 to 3 keys) you'd rather use instead. Right-click is the one
-exception, kept fixed as the guaranteed way into the menu.
+Every shortcut can be changed in **Settings → Shortcuts**.
 
 | Key | Action |
 |-----|--------|
-| Right-click | Settings menu (not remappable) |
-| `↑` / `↓` | Volume up / down (hold to ramp) |
-| `←` / `→` | Seek 10s back / forward |
-| `m` | Mute |
-| `Space` | Pause / play |
-| `g` | Toggle fixed speed (factor set in the menu) |
-| `s` / `d` | Slow down / speed up (step is customizable in the menu) |
-| `Ctrl`+`1/2/3` | Toggle audio track 1 / 2 / 3 |
-| `F1` | Screenshot (with subtitles) |
-| `Shift`+`s` | Screenshot (video only) |
-| `Ctrl`+`s` | Screenshot (full window) |
-
-Screenshot save location (including a "choose folder" picker) is also available from the
-Settings menu.
+| `Space` | Play / pause (a click on the picture too) |
+| `←` / `→` | Seek back / forward (the step is a setting); `Shift` for a fine step |
+| `↑` / `↓` | Volume up / down (up to 300%) |
+| `M` | Mute |
+| `Ctrl`+`1` / `2` / `3` | Track 1 / 2 / 3 on or off |
+| `F` or double-click | Full screen |
+| `G` | Fixed speed on or off; `S` / `D` slower / faster |
+| `,` / `.` | Previous / next frame |
+| `PgUp` / `PgDown` | Next / previous chapter |
+| `L` | A-B loop |
+| `<` / `>` | Previous / next file |
+| `0`–`9` | Jump to 0%–90% of the clip |
+| `F1` / `Shift`+`S` / `Ctrl`+`S` | Screenshot with subtitles / video only / the window |
+| `Ctrl`+`C` | Copy the frame |
+| `I` | Media info |
+| `T` | Always on top |
 
 ### FAQ
 
 **Why does my NVIDIA ShadowPlay / OBS recording have two audio tracks?**
-NVIDIA's recorder and OBS Studio (with multi-track audio enabled) both save game/system sound and
-your microphone as two independent audio tracks in the same video file, instead of mixing them
-into one. Most players only let you pick a single track to play.
+NVIDIA's recorder and OBS Studio (with multi-track audio) save the game sound and your microphone as two tracks in the
+same file instead of mixing them. Most players let you pick only one of them.
 
-**How do I play a video with 2 audio tracks on Windows, macOS, or Linux?**
-Set EchoPlay as your default player (see [Download & Install](#download--install) above), then
-open the file — every audio track is auto-detected and shown in the mixer, and EchoPlay mixes
-them for you by default.
+**Can I mix the two tracks without re-encoding the video?**
+Yes, that's the point: EchoPlay rebuilds only the audio filter graph (`lavfi-complex`) while the video keeps playing.
+Nothing is exported or re-encoded.
 
-**Can I merge two audio tracks without re-encoding the video?**
-Yes — that's the whole point. EchoPlay rebuilds mpv's audio filter graph live (`lavfi-complex`),
-so the video stream is never touched and there's no export or re-encode step.
-
-**Does EchoPlay work with OBS Studio recordings?**
-Yes. Any file with multiple audio tracks — OBS multi-track output, ShadowPlay, NVIDIA App, or
-manually muxed files — is handled the same way.
+**Why are my tracks called "System sounds" and "Microphone"?**
+That's how the NVIDIA recorder names them inside the file. EchoPlay shows whatever name the recorder, or whoever made
+the file, wrote; a track without a name is "Track 1", "Track 2".
 
 ---
 
 ## For the curious: how it works
 
-EchoPlay is deliberately thin. The only original code is one Lua script
-([`mpv/scripts/echoplay-audio/`](mpv/scripts/echoplay-audio/)); everything else is upstream
-mpv, uosc, thumbfast and memo, wired together by config files. That makes it easy to extend — and
-easy to keep close to upstream.
+| Path | What it is |
+|------|------------|
+| [`app/`](app/) | EchoPlay 2: C++ (`src/`) and Qt Quick (`qml/`) on libmpv's render API (Direct3D 11 on Windows) |
+| [`app/lang/*.json`](app/lang) | One file per language: copy `en.json`, translate the values, set `lang_name`. No rebuild. |
+| [`app/theme/theme.json`](app/theme/theme.json) | Every color, radius, blur and font, as tokens |
+| [`installer/windows/v2/`](installer/windows/v2) | The Inno Setup script for `EchoPlay-Setup.exe` |
+| [`tools/`](tools) | Build, test and measure: `check.sh`, `e2e.sh`, `package-v2.sh`, `bench.sh` |
+| [`mpv/`](mpv), [`installer/`](installer) | EchoPlay 1.x (mpv + uosc + one Lua script), still the macOS and Linux build |
 
-### Adding or editing a language
-
-The entire UI is built from JSON string files, so translating EchoPlay needs **no code**:
-
-1. In the player, open **Settings → Language → Open language folder** (this is `script-opts/`).
-2. Copy `echoplay-en.json` and rename it `echoplay-<code>.json` (e.g. `echoplay-de.json`).
-3. Translate the values and set `"lang_name"` to the language's own name (e.g. `"Deutsch"`).
-4. Restart mpv — your language now appears in the **Language** menu automatically.
-
-To make it official, open a pull request adding the file under `mpv/script-opts/`.
-
-### Adding or editing a theme
-
-Built-in **Dark / Light + accent color** cover the basics and live in **Settings → Theme**. For a
-fuller custom look, a theme pack can override *any* uosc option (colors, opacity, corner radius…):
-
-1. Open **Settings → Theme → Open theme folder** (this is `themes/`).
-2. Copy [`amoled.conf`](mpv/themes/amoled.conf), rename it, and edit the values. The first
-   `# Comment` line is the name shown in the menu; every other line is a uosc option, e.g.
-   `color=foreground=ff5500`, `border_radius=14`, `opacity=menu=0.85`. Full option list:
-   <https://github.com/tomasklaen/uosc>.
-3. Save — it shows up under **Custom Themes** and applies live.
-
-Share it with a pull request under `mpv/themes/`. See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
-
-### The audio engine
-
-The trick is mpv's **`lavfi-complex`** property. Setting it at runtime rebuilds only the *audio*
-filter graph — the video path is never touched, so switching tracks is instant and seamless. From
-the set of enabled tracks the script builds a filter and assigns it live:
+The mixer turns the enabled tracks into one filter graph and hands it to mpv while the clip plays:
 
 ```text
 # two tracks enabled, track 2 boosted to 200% and forced mono:
@@ -257,41 +192,20 @@ the set of enabled tracks the script builds a filter and assigns it live:
 [ev1][ev2]amix=inputs=2:normalize=0[ao]
 ```
 
-- **One track at default volume** → no filter at all (native `aid=N`), zero overhead.
-- **One track, custom volume or mono** → a single `volume` / `pan` chain.
-- **Two or more** → each track gets its own `volume`(`+pan`) stage, then `amix` blends them.
+One track at its normal volume needs no filter at all (`aid=N`).
 
-Loudness is handled separately by `af=dynaudnorm=...` in [`mpv.conf`](mpv/mpv.conf), and master
-volume goes up to 300%. The settings menu, mixer, theming and persistence (a small
-`echoplay-state.json`) are all driven from the one Lua script via uosc's menu API.
-
-### Project layout
-
-| Path | Purpose |
-|------|---------|
-| [`mpv/scripts/echoplay-audio/`](mpv/scripts/echoplay-audio/) | EchoPlay's only original code — `main.lua` (mixer, menus, theming, shortcuts) + `i18n.lua`/`quality.lua`/`resume.lua` |
-| [`mpv/script-opts/echoplay-*.json`](mpv/script-opts) | Language packs |
-| [`mpv/themes/*.conf`](mpv/themes) | Community theme packs |
-| [`mpv/mpv.conf`](mpv/mpv.conf), [`mpv/input.conf`](mpv/input.conf) | Player settings & shortcuts (shared across all 3 platforms) |
-| [`installer/windows/EchoPlay.iss`](installer/windows/EchoPlay.iss) | Inno Setup script that builds `EchoPlay-Setup.exe` |
-| [`installer/macos/Info.plist.template`](installer/macos/Info.plist.template), [`entitlements.plist`](installer/macos/entitlements.plist) | macOS `.app` bundle identity (file associations, icon) + ad-hoc signing entitlements |
-| [`installer/linux/echoplay.desktop`](installer/linux/echoplay.desktop), [`AppRun`](installer/linux/AppRun) | Linux AppImage desktop entry (name/icon/mime types) + launcher |
-| [`.github/workflows/release.yml`](.github/workflows/release.yml) | CI: builds and publishes `EchoPlay-Setup.exe`, macOS `.dmg` (arm64 + x86_64), and the Linux `.AppImage` in one release |
-| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: lint (luacheck) + headless smoke test on every push/PR |
-| [`install.ps1`](install.ps1) | Windows advanced/portable installer (no GUI wizard) |
-| [`install.sh`](install.sh) | Linux/macOS advanced/portable installer |
-| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/`](licenses/) | Bundled upstream license notices (uosc, memo, thumbfast, mpv) |
+Translations and themes are welcome as pull requests; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits & license
 
-EchoPlay's own code (`mpv/scripts/echoplay-audio/` + config/JSON/theme files) is **MIT** — see
-[LICENSE](LICENSE). It downloads and bundles, under their own licenses:
-[uosc](https://github.com/tomasklaen/uosc) (LGPL-2.1) ·
-[memo](https://github.com/po5/memo) (GPL-3.0) ·
-[thumbfast](https://github.com/po5/thumbfast) (MPL-2.0) ·
-and of course [mpv](https://mpv.io) itself (GPL-2.0/LGPL-2.1). Full license texts
-are in [`licenses/`](licenses/) — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-for details.
+EchoPlay's own code is **MIT** ([LICENSE](LICENSE)). EchoPlay 2 for Windows ships [libmpv](https://mpv.io) built with
+GPL parts, so the Windows program as a whole is under the **GPL v3**; it also ships [Qt](https://www.qt.io) (LGPL v3)
+and the Vulkan loader (Apache 2.0). Details and full texts: [app/THIRD_PARTY_NOTICES.md](app/THIRD_PARTY_NOTICES.md),
+[`licenses/`](licenses/). EchoPlay 1.x bundles mpv, [uosc](https://github.com/tomasklaen/uosc),
+[thumbfast](https://github.com/po5/thumbfast) and [memo](https://github.com/po5/memo):
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Film in the screenshots: *Sintel* © Blender Foundation, [durian.blender.org](https://durian.blender.org), CC BY 3.0.
 
 ---
 

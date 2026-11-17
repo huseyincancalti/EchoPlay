@@ -1,0 +1,60 @@
+name: v2 clean-machine install
+
+# EchoPlay 2's setup on a Windows with nothing of ours installed (GitHub's runner: no EchoPlay, no Qt, no mpv, no
+# graphics driver's Vulkan). Run it by hand on a release, draft or published, before it goes out:
+#   gh workflow run v2-clean-install.yml -f tag=v2.0.0
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose EchoPlay-Setup.exe to install
+        required: true
+
+permissions:
+  contents: write # gh reads draft releases only with write access
+
+jobs:
+  install:
+    runs-on: windows-latest
+    steps:
+      - name: Download the setup
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --pattern EchoPlay-Setup.exe --dir setup
+          Get-FileHash setup\EchoPlay-Setup.exe -Algorithm SHA256 | Format-List
+
+      - name: Install silently, as the in-app update does
+        shell: pwsh
+        run: |
+          $p = Start-Process setup\EchoPlay-Setup.exe '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=setup.log' -Wait -PassThru
+          Get-Content setup.log -Tail 25
+          if ($p.ExitCode -ne 0) { throw "setup exit code $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\EchoPlay\EchoPlay.exe"
+          if (-not (Test-Path $exe)) { throw "EchoPlay.exe is not installed" }
+          (Get-Item $exe).VersionInfo | Format-List ProductVersion, CompanyName
+
+      - name: Start EchoPlay (libmpv, every DLL it imports)
+        shell: pwsh
+        run: |
+          $exe = "$env:LOCALAPPDATA\Programs\EchoPlay\EchoPlay.exe"
+          $p = Start-Process $exe '--smoke' -Wait -PassThru -RedirectStandardError smoke.err -RedirectStandardOutput smoke.out
+          Get-Content smoke.out, smoke.err -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "EchoPlay --smoke exit code $($p.ExitCode) (0xC0000135 = a DLL is missing)" }
+
+      - name: The "Open with" registration
+        shell: pwsh
+        run: |
+          $cmd = (Get-ItemProperty 'HKCU:\Software\Classes\Applications\EchoPlay.exe\shell\open\command').'(default)'
+          if ($cmd -notlike '*EchoPlay.exe*') { throw "no Open with entry: $cmd" }
+          $cmd
+
+      - name: Uninstall leaves nothing behind
+        shell: pwsh
+        run: |
+          $dir = "$env:LOCALAPPDATA\Programs\EchoPlay"
+          Start-Process "$dir\unins000.exe" '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait
+          for ($i = 0; $i -lt 60 -and (Test-Path "$dir\unins000.exe"); $i++) { Start-Sleep -Milliseconds 500 }
+          if (Test-Path "$dir\EchoPlay.exe") { throw "EchoPlay.exe is still there after the uninstall" }
+          'uninstalled'

@@ -3,7 +3,7 @@ name: Build installer & release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v1.*.*' # v1 only (mpv bundle); v2 releases are built by tools/package-v2.sh and published by hand
 
 permissions:
   contents: write

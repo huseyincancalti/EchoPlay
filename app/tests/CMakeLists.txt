@@ -64,6 +64,13 @@ target_link_libraries(tst_clipinfo PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
 target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
                            ECHOPLAY_CLIPINFO_VIDEO="${CLIPINFO_VIDEO}" ECHOPLAY_CLIPINFO_AUDIO="${CLIPINFO_AUDIO}")
 set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED clipinfo-clips)
+# CutSaver encodes parts of the two-track clip; ffprobe reads the result back.
+find_program(FFPROBE ffprobe REQUIRED)
+echoplay_test(cutsaver ../src/CutSaver.h ../src/CutSaver.cpp)
+target_include_directories(tst_cutsaver PRIVATE "${MPV_INCLUDE}")
+target_link_libraries(tst_cutsaver PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
+target_compile_definitions(tst_cutsaver PRIVATE ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}" ECHOPLAY_FFPROBE="${FFPROBE}")
+set_tests_properties(cutsaver PROPERTIES FIXTURES_REQUIRED clipinfo-clips)
 
 echoplay_test(thumbnailer ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
 target_include_directories(tst_thumbnailer PRIVATE "${MPV_INCLUDE}")

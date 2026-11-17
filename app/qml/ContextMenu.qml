@@ -153,6 +153,15 @@ Popover {
             onClicked: menu.run(() => menu.ui.mpv.screenshot("subtitles"))
         }
         MenuRow {
+            objectName: "menuSaveCut"
+            visible: !menu.forRow
+            icon: "content_cut"
+            text: menu.strings.action_save_cut
+            key: menu.keyOf("save_cut")
+            available: menu.local && menu.ui.loopA >= 0 && menu.ui.loopB >= 0 && CutSaver.state !== "saving"
+            onClicked: menu.run(() => menu.ui.saveCut())
+        }
+        MenuRow {
             objectName: "menuCopyFrame"
             visible: !menu.forRow
             icon: "content_copy"

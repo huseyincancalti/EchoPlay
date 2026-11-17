@@ -1867,6 +1867,67 @@ private slots:
 #endif
     }
 
+    // Save part: the A-B loop with the mix heard now, one file next to the clip, while the clip plays on.
+    void saveCut()
+    {
+        const QString state = QDir(m_path).filePath("cut");
+        const QString clips = QDir(m_path).filePath("cut-clips");
+        QVERIFY(QDir().mkpath(state));
+        QDir(clips).removeRecursively();
+        QVERIFY(QDir().mkpath(clips));
+        const QString clip = clips + "/clip.mp4";
+        QProcess ffmpeg;
+        ffmpeg.start("ffmpeg", {"-v", "error", "-y", "-i", m_clip, "-t", "20", "-map", "0", "-c", "copy", clip});
+        QVERIFY2(ffmpeg.waitForFinished(30000) && ffmpeg.exitCode() == 0, ffmpeg.readAllStandardError().constData());
+        Launch app(state, clip, QDir(m_path).filePath("cut.log"));
+        QVERIFY(app.mpv);
+        QVERIFY2(app.playing(), "the clip did not start playing");
+        QTRY_VERIFY(app.item("controlBar"));
+        const auto text = [&](const char *key) { return app.services.i18n.strings().value(key).toString(); };
+        const auto toast = [&] { return app.item("toastText")->property("text").toString(); };
+
+        // No part yet: it says how to mark one.
+        app.key(Qt::Key_E, Qt::ControlModifier);
+        QTRY_COMPARE(toast(), text("cut_needs_loop"));
+        QCOMPARE(app.services.cuts.state(), QString("idle"));
+
+        // Both tracks, a part from 0:10 to 0:12, saved from the menu.
+        app.key(Qt::Key_2, Qt::ControlModifier);
+        QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
+        app.mpv->command({"seek", 10, "absolute+exact"});
+        QTRY_VERIFY(std::abs(app.number("time-pos") - 10) < 0.1);
+        app.key(Qt::Key_L);
+        app.mpv->command({"seek", 12, "absolute+exact"});
+        QTRY_VERIFY(std::abs(app.number("time-pos") - 12) < 0.1);
+        app.key(Qt::Key_L);
+        QTRY_VERIFY(app.mpv->observed("ab-loop-b").typeId() == QMetaType::Double);
+        QTest::mouseClick(app.window, Qt::RightButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
+        QTRY_VERIFY(app.item("contextMenu"));
+        QVERIFY(Launch::searchVisible(app.item("contextMenu"), "menuSaveCut"));
+        QVERIFY(app.click("menuSaveCut"));
+        QTRY_VERIFY(app.item("cutCard"));
+        QTRY_VERIFY_WITH_TIMEOUT(app.services.cuts.state() != "saving", 30000);
+        QVERIFY2(app.services.cuts.state() == "done", qPrintable(app.services.cuts.error()));
+        QCOMPARE(app.services.cuts.output(), clips + "/clip 0.10-0.12.mp4");
+        app.shot("cut-saved");
+        QCOMPARE(app.prop("pause"), QString("no")); // the clip played on
+
+        QProcess probe;
+        probe.start("ffprobe", {"-v", "error", "-show_entries", "stream=codec_type:format=duration", "-of", "csv=p=0",
+                                app.services.cuts.output()});
+        QVERIFY(probe.waitForFinished(30000));
+        QStringList lines = QString::fromUtf8(probe.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
+        for (QString &line : lines) line = line.trimmed();
+        const double duration = lines.takeLast().toDouble();
+        lines.sort();
+        QCOMPARE(lines, (QStringList{"audio", "video"})); // the mix is one track
+        QVERIFY2(std::abs(duration - 2) < 0.15, qPrintable(QString::number(duration)));
+
+        QVERIFY(app.click("cutClose"));
+        QTRY_VERIFY(!app.item("cutCard"));
+        QCOMPARE(app.services.cuts.state(), QString("idle"));
+    }
+
     // Looks with no behavior of their own, only for ECHOPLAY_E2E_SHOTS: compare them by eye with the design boards.
     void looks()
     {

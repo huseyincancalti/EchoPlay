@@ -11,6 +11,7 @@ const glyph = {
     close: "\ue5cd",
     colorize: "\ue3b8",
     content_copy: "\ue14d",
+    content_cut: "\ue14e",
     contrast: "\ueb37",
     crop_square: "\ue3c6",
     dark_mode: "\ue51c",

@@ -439,6 +439,7 @@ Window {
         {id: "chapter_next", key: "PgUp", run: () => { if (ui.item) ui.item.stepChapter(1) }}, // mpv's own keys
         {id: "chapter_previous", key: "PgDown", run: () => { if (ui.item) ui.item.stepChapter(-1) }},
         {id: "ab_loop", key: "L", run: () => { if (ui.item) ui.item.cycleLoop() }},
+        {id: "save_cut", key: "Ctrl+E", run: () => { if (ui.item) ui.item.saveCut() }},
         {id: "track_1", key: "Ctrl+1", run: () => MixerController.toggle(1)},
         {id: "track_2", key: "Ctrl+2", run: () => MixerController.toggle(2)},
         {id: "track_3", key: "Ctrl+3", run: () => MixerController.toggle(3)},
@@ -632,7 +633,7 @@ Window {
         target: Updater
         function onQuitRequested() { root.close() } // the setup is running and replaces the files
     }
-    readonly property bool cardShown: updateNotice.active || whatsNew.active // they outlast the chrome: PlayerUi's glass stays live
+    readonly property bool cardShown: updateNotice.active || whatsNew.active || cutCard.active // they outlast the chrome: PlayerUi's glass stays live
     Loader { // bottom right, above the bar when there is one; not over settings, whose About has it too
         id: updateNotice
         readonly property var player: ui.item
@@ -650,6 +651,16 @@ Window {
         x: parent.width - chrome.inset - (item ? item.width : 0) - 16
         y: (item && player ? chrome.inset + player.bar.y - item.height - 12 : parent.height - chrome.inset - (item ? item.height : 0) - 16)
         onActiveChanged: if (active) setSource("WhatsNewCard.qml", {player: Qt.binding(() => player), backdrop: Qt.binding(() => player ? player.backdrop : null)})
+    }
+    Loader { // a part being saved: the same corner, above the cards there
+        id: cutCard
+        readonly property var player: ui.item
+        readonly property var below: updateNotice.active ? updateNotice : whatsNew.active ? whatsNew : null
+        active: !root.measuring && !root.fileError && !(player && player.settingsOpen) && CutSaver.state !== "idle"
+        x: parent.width - chrome.inset - (item ? item.width : 0) - 16
+        y: below ? below.y - (item ? item.height : 0) - 8
+                 : (item && player ? chrome.inset + player.bar.y - item.height - 12 : parent.height - chrome.inset - (item ? item.height : 0) - 16)
+        onActiveChanged: if (active) setSource("CutCard.qml", {backdrop: Qt.binding(() => player ? player.backdrop : null)})
     }
     Toast {
         id: toast

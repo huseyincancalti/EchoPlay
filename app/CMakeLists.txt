@@ -30,7 +30,7 @@ qt_add_qml_module(echoplay_lib
               qml/StartScreen.qml qml/DashedFrame.qml qml/DropOverlay.qml qml/OpenDialogs.qml qml/Stepper.qml qml/HoverTip.qml
               qml/QuickSettings.qml qml/PicturePopover.qml qml/MediaInfoPanel.qml qml/ContextMenu.qml qml/SubtitlesPopover.qml qml/SettingRow.qml qml/Dropdown.qml qml/ColorPicker.qml
               qml/SettingsOverlay.qml qml/SettingsContent.qml qml/UpdateCard.qml qml/WhatsNewCard.qml qml/ErrorScreen.qml qml/UpdateNotice.qml
-              qml/Toast.qml qml/ResumeCard.qml qml/HintCard.qml qml/NoSoundCard.qml qml/PlaylistPanel.qml
+              qml/Toast.qml qml/ResumeCard.qml qml/HintCard.qml qml/NoSoundCard.qml qml/PlaylistPanel.qml qml/CutCard.qml
     SOURCES src/MpvItem.h src/MpvItem.cpp src/SingleInstance.h src/SingleInstance.cpp
             src/I18n.h src/I18n.cpp src/Language.h src/Mp4TrackNames.h src/Mp4TrackNames.cpp src/Theme.h src/Theme.cpp src/AppState.h src/AppState.cpp
             src/UpdateCheck.h src/UpdateCheck.cpp src/Updater.h src/Updater.cpp src/SetupLock.h src/SetupLock.cpp
@@ -39,7 +39,7 @@ qt_add_qml_module(echoplay_lib
             src/PictureQuality.h src/PictureQuality.cpp src/Thumbnailer.h src/Thumbnailer.cpp
             src/SilenceCheck.h src/SilenceCheck.cpp src/PlayerSettings.h src/PlayerSettings.cpp
             src/Services.h src/Services.cpp src/WindowChrome.h src/WindowChrome.cpp src/MediaFiles.h src/MediaFiles.cpp
-            src/ErrorReport.h src/ErrorReport.cpp src/ClipInfo.h src/ClipInfo.cpp
+            src/ErrorReport.h src/ErrorReport.cpp src/ClipInfo.h src/ClipInfo.cpp src/CutSaver.h src/CutSaver.cpp
             src/TaskbarButtons.h src/TaskbarButtons.cpp
 )
 qt_add_shaders(echoplay_lib "shaders" PREFIX "/shaders" BASE "${CMAKE_CURRENT_SOURCE_DIR}/shaders" FILES shaders/glass.frag)

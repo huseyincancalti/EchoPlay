@@ -20,7 +20,8 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
               [](const QString &setupPath) { return SetupLock::startSetup(setupPath, true); }),
       thumbnails(nullptr),
       clipInfo(nullptr),
-      silence(nullptr)
+      silence(nullptr),
+      cuts(nullptr)
 {
     i18n.setLanguage(state.language()); // empty: the system language, and nothing is saved until the user picks one
     QObject::connect(&i18n, &I18n::languageChanged, &state, [this] { state.setLanguage(i18n.language()); });
@@ -46,4 +47,5 @@ Services::Services(const QString &configDir, const QString &appDir, const QStrin
     Thumbnailer::setInstance(&thumbnails);
     ClipInfo::setInstance(&clipInfo);
     SilenceCheck::setInstance(&silence);
+    CutSaver::setInstance(&cuts);
 }

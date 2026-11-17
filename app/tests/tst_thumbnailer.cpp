@@ -109,6 +109,9 @@ private slots:
     // HDR10 red comes out red, not dull brown; the next, SDR file gets the plain filter again.
     void hdrIsToneMapped()
     {
+#ifndef ECHOPLAY_HDR_CLIP
+        QSKIP("FFmpeg here has no zscale (zimg): HDR previews cannot be tone-mapped");
+#else
         Thumbnailer t(nullptr);
         t.setFile(ECHOPLAY_HDR_CLIP);
         t.request(2);
@@ -118,6 +121,7 @@ private slots:
         t.setFile(ECHOPLAY_THUMB_CLIP);
         t.request(30);
         QTRY_COMPARE_WITH_TIMEOUT(secondShown(t.image()), 30, 10000); // its brightness tells the second: no tone mapping
+#endif
     }
 };
 

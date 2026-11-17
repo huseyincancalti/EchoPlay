@@ -84,6 +84,9 @@ private slots:
     // HDR10 red comes out red, not dull brown; the next, SDR clip gets the plain filter again (its gray stays gray).
     void hdrIsToneMapped()
     {
+#ifndef ECHOPLAY_HDR_CLIP
+        QSKIP("FFmpeg here has no zscale (zimg): HDR previews cannot be tone-mapped");
+#else
         ClipInfo c(nullptr);
         c.request({ECHOPLAY_HDR_CLIP, m_video});
         QTRY_VERIFY_WITH_TIMEOUT(!pictureOf(c, m_video).isNull(), Slow);
@@ -93,6 +96,7 @@ private slots:
         const QImage sdr = pictureOf(c, m_video);
         const QColor gray = sdr.pixelColor(sdr.width() / 2, sdr.height() / 2);
         QVERIFY2(qAbs(gray.red() - gray.green()) < 6 && gray.red() > 120, qPrintable(gray.name()));
+#endif
     }
 
     void anAudioFileHasADurationAndNoPicture() // opening one makes a playlist of audio files

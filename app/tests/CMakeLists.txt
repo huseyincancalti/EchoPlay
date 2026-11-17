@@ -58,23 +58,35 @@ add_test(NAME clipinfo-clips COMMAND "${FFMPEG}" -y -v error -f lavfi
          -map 0:v -c:v libx264 -preset ultrafast -g 12 "${CLIPINFO_VIDEO}"
          -map 1:a -c:a aac "${CLIPINFO_AUDIO}")
 set_tests_properties(clipinfo-clips PROPERTIES FIXTURES_SETUP clipinfo-clips)
-# An HDR10 clip (PQ, BT.2020, 10-bit) of flat SDR red: without tone mapping the hidden players' picture came out dull
-# brown (118,69,45), with it red (214,0,3) (HdrTone.h).
-set(HDR_CLIP "${CMAKE_CURRENT_BINARY_DIR}/hdr-red.mp4")
-add_test(NAME hdr-clip COMMAND "${FFMPEG}" -y -v error -f lavfi -i color=c=red:s=640x360:r=30:d=4
-         -vf "format=gbrpf32le,zscale=tin=709:pin=709:t=linear:p=709,zscale=tin=linear:pin=709:p=2020:t=smpte2084:npl=100:m=2020_ncl:r=limited,format=yuv420p10le"
-         -c:v libx264 -preset ultrafast -g 30 -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc "${HDR_CLIP}")
-set_tests_properties(hdr-clip PROPERTIES FIXTURES_SETUP hdr-clip)
+# HdrTone needs FFmpeg's zscale (zimg). Homebrew's FFmpeg, which Homebrew's libmpv uses too, has none (macOS CI,
+# 2026-11-17): there the HDR cases skip, with the reason in the log. The macOS package must bundle a libmpv with zimg.
+execute_process(COMMAND "${FFMPEG}" -hide_banner -filters OUTPUT_VARIABLE FFMPEG_FILTERS ERROR_QUIET)
+string(FIND "${FFMPEG_FILTERS}" " zscale " ZSCALE_AT)
+set(HDR_TESTS "")
+if(ZSCALE_AT GREATER -1)
+    # An HDR10 clip (PQ, BT.2020, 10-bit) of flat SDR red: without tone mapping the hidden players' picture came out dull
+    # brown (118,69,45), with it red (214,0,3) (HdrTone.h).
+    set(HDR_CLIP "${CMAKE_CURRENT_BINARY_DIR}/hdr-red.mp4")
+    add_test(NAME hdr-clip COMMAND "${FFMPEG}" -y -v error -f lavfi -i color=c=red:s=640x360:r=30:d=4
+             -vf "format=gbrpf32le,zscale=tin=709:pin=709:t=linear:p=709,zscale=tin=linear:pin=709:p=2020:t=smpte2084:npl=100:m=2020_ncl:r=limited,format=yuv420p10le"
+             -c:v libx264 -preset ultrafast -g 30 -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc "${HDR_CLIP}")
+    set_tests_properties(hdr-clip PROPERTIES FIXTURES_SETUP hdr-clip)
+    set(HDR_TESTS hdr-clip)
+endif()
 echoplay_test(clipinfo ../src/ClipInfo.h ../src/ClipInfo.cpp)
 target_link_libraries(tst_clipinfo PRIVATE Qt6::Quick libmpv)
-target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_HDR_CLIP="${HDR_CLIP}" ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
+target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
                            ECHOPLAY_CLIPINFO_VIDEO="${CLIPINFO_VIDEO}" ECHOPLAY_CLIPINFO_AUDIO="${CLIPINFO_AUDIO}")
-set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED "clipinfo-clips;hdr-clip")
+set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED "clipinfo-clips;${HDR_TESTS}")
 
 echoplay_test(thumbnailer ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
 target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick libmpv)
-target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}" ECHOPLAY_HDR_CLIP="${HDR_CLIP}")
-set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED "thumbnailer-clip;hdr-clip")
+target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}")
+set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED "thumbnailer-clip;${HDR_TESTS}")
+if(HDR_TESTS)
+    target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_HDR_CLIP="${HDR_CLIP}")
+    target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_HDR_CLIP="${HDR_CLIP}")
+endif()
 
 # SilenceCheck on four audio tracks: a tone, digital silence, a quiet tone (-58 dBFS), silence then a tone.
 set(SILENCE_CLIP "${CMAKE_CURRENT_BINARY_DIR}/silencecheck-clip.mp4")

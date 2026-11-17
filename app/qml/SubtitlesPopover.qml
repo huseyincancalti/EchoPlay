@@ -23,6 +23,7 @@ Popover {
         property alias lessName: stepper.lessName
         property alias moreName: stepper.moreName
         property alias stepperName: stepper.objectName
+        property alias tip: hint.text
         signal less()
         signal more()
         width: parent.width
@@ -33,6 +34,11 @@ Popover {
             anchors.verticalCenter: parent.verticalCenter
             color: subtitles.glass.text
             font.weight: Font.DemiBold
+            HoverTip {
+                id: hint
+                width: parent.implicitWidth
+                height: parent.height
+            }
         }
         Stepper {
             id: stepper
@@ -140,6 +146,7 @@ Popover {
                 StepRow {
                     stepperName: "subtitleDelay"
                     text: subtitles.strings.subtitle_delay
+                    tip: subtitles.strings.subtitle_delay_tip
                     value: (subtitles.ui.subDelay > 0.04 ? "+" : "") + subtitles.ui.subDelay.toFixed(1) + " s"
                     lessName: subtitles.strings.earlier
                     moreName: subtitles.strings.later

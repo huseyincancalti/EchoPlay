@@ -51,12 +51,14 @@ Popover {
             id: column
             width: rows.width
             Repeater {
-                model: mixer.ui.tracks
+                // By count, not by the list: every gain written while a slider drags gives a new list, and new rows
+                // would drop the slider from under the held-down pointer.
+                model: mixer.ui.tracks.length
                 MixerRow {
-                    required property var modelData
+                    required property int index
                     width: column.width
-                    track: modelData
-                    silent: SilenceCheck.silent.includes(modelData.id)
+                    track: mixer.ui.tracks[index]
+                    silent: SilenceCheck.silent.includes(track.id)
                 }
             }
         }

@@ -27,7 +27,7 @@ qt_add_qml_module(echoplay_lib
               qml/TextButton.qml qml/ToggleSwitch.qml qml/Segmented.qml qml/TrackSlider.qml qml/GlassBackdrop.qml
               qml/GlassPanel.qml qml/RoundedImage.qml qml/Popover.qml qml/PlayerUi.qml qml/TitleBar.qml qml/ControlBar.qml
               qml/SeekBar.qml qml/VolumeSlider.qml qml/VolumeFlash.qml qml/ArrowSweep.qml qml/MixerPopover.qml
-              qml/StartScreen.qml qml/DashedFrame.qml qml/DropOverlay.qml qml/OpenDialogs.qml qml/Stepper.qml
+              qml/StartScreen.qml qml/DashedFrame.qml qml/DropOverlay.qml qml/OpenDialogs.qml qml/Stepper.qml qml/HoverTip.qml
               qml/QuickSettings.qml qml/PicturePopover.qml qml/MediaInfoPanel.qml qml/ContextMenu.qml qml/SubtitlesPopover.qml qml/SettingRow.qml qml/Dropdown.qml qml/ColorPicker.qml
               qml/SettingsOverlay.qml qml/SettingsContent.qml qml/UpdateCard.qml qml/WhatsNewCard.qml qml/ErrorScreen.qml qml/UpdateNotice.qml
               qml/Toast.qml qml/ResumeCard.qml qml/HintCard.qml qml/NoSoundCard.qml qml/PlaylistPanel.qml

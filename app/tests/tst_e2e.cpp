@@ -418,6 +418,21 @@ private slots:
             app.shot("mixer-none");
             QVERIFY(app.click("allOnButton"));
             QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
+            // A slider held down follows the pointer anywhere: dragged far past its end, off the popover, it is full.
+            {
+                QQuickItem *row = app.item("mixerRow-1"); // the rows are new after "all on"
+                QVERIFY(row);
+                QQuickItem *gain = Launch::search(row, "trackGain");
+                QVERIFY(gain);
+                const QPoint from = gain->mapToScene(QPointF(gain->width() / 2, gain->height() / 2)).toPoint();
+                QTest::mousePress(app.window, Qt::LeftButton, Qt::NoModifier, from);
+                for (int step = 1; step <= 6; ++step)
+                    QTest::mouseMove(app.window, from + QPoint(step * 120, -step * 40));
+                QTest::mouseRelease(app.window, Qt::LeftButton, Qt::NoModifier, from + QPoint(720, -240));
+                QTRY_COMPARE(app.item("mixerRow-1")->property("shownGain").toDouble(), app.services.mixer.gainMax());
+                app.services.mixer.setGain(1, 1);
+                QTRY_COMPARE(app.item("mixerRow-1")->property("shownGain").toDouble(), 1.0);
+            }
             app.key(Qt::Key_Escape); // the popover closes first
             QTRY_VERIFY(!app.item("mixerPopover"));
             QCOMPARE(app.window->visibility(), QWindow::Windowed);
@@ -569,6 +584,15 @@ private slots:
             app.key(Qt::Key_F);
             QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
             app.key(Qt::Key_Escape);
+            QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
+            // With the title bar gone in full screen, the window's buttons stay in reach: its own way out.
+            QVERIFY(!app.item("fullScreenButtons")->isVisible());
+            app.key(Qt::Key_F);
+            QTRY_COMPARE(app.window->visibility(), QWindow::FullScreen);
+            app.wake();
+            QTRY_VERIFY(app.item("fullScreenButtons")->isVisible());
+            app.shot("fullscreen-buttons");
+            QVERIFY(app.click("fullScreenExit"));
             QTRY_COMPARE(app.window->visibility(), QWindow::Windowed);
             const QPoint center(app.window->width() / 2, app.window->height() / 2);
             QTest::mouseDClick(app.window, Qt::LeftButton, Qt::NoModifier, center);
@@ -771,6 +795,17 @@ private slots:
         QVERIFY(app.click("gearButton"));
         QTRY_VERIFY(app.item("quickPopover"));
         app.shot("quick");
+        // A name that may not say enough explains itself when the pointer rests on it.
+        {
+            QQuickItem *heading = app.item("audioDelayHeading");
+            QVERIFY(heading);
+            QVERIFY(!Launch::searchVisible(app.window->contentItem(), "hoverTip"));
+            QTest::mouseMove(app.window, heading->mapToScene(QPointF(40, heading->height() / 2)).toPoint());
+            QTRY_VERIFY(Launch::searchVisible(app.window->contentItem(), "hoverTip"));
+            app.shot("quick-tip");
+            QTest::mouseMove(app.window, QPoint(app.window->width() / 2, app.window->height() / 3));
+            QTRY_VERIFY(!Launch::searchVisible(app.window->contentItem(), "hoverTip"));
+        }
         QVERIFY(app.click("speedMore"));
         QTRY_COMPARE(app.number("speed"), 1.1);
         QVERIFY(app.click("speedLess"));
@@ -790,8 +825,24 @@ private slots:
         QVERIFY(app.click("gearButton"));
         QTRY_VERIFY(app.item("quickPopover"));
 
+        // Opening settings over a playing clip: the longest time between two frames on screen (a stall shows there).
+        std::atomic<qint64> lastFrame{0}, longestGap{0};
+        QElapsedTimer frameClock;
+        frameClock.start();
+        const auto frames = QObject::connect(app.window, &QQuickWindow::frameSwapped, app.window, [&] {
+            const qint64 now = frameClock.elapsed(), last = lastFrame.exchange(now);
+            if (last > 0 && now - last > longestGap) longestGap = now - last;
+        }, Qt::DirectConnection);
+        QTest::qWait(300);
+        longestGap = 0;
+        QElapsedTimer opening;
+        opening.start();
         QVERIFY(app.click("allSettings"));
-        QTRY_VERIFY(app.item("settingsOverlay"));
+        QTRY_VERIFY(app.item("settingsOverlay") && app.item("settingsOverlay")->isVisible());
+        const qint64 openedIn = opening.elapsed();
+        QTest::qWait(300);
+        qInfo("settings: on screen after %lld ms, longest frame gap while opening %lld ms", openedIn, qint64(longestGap));
+        QObject::disconnect(frames);
         QVERIFY(!app.item("quickPopover"));
         QTRY_VERIFY(!app.item("controlBar")->isVisible());
         app.shot("settings-audio");
@@ -824,6 +875,17 @@ private slots:
         QTRY_COMPARE(app.services.i18n.language(), QString("tr"));
         QTest::qWait(50);
         app.shot("settings-tr");
+        // Every shipped language: its words fit their rows, and the shot shows its script is drawn (CJK, Cyrillic).
+        for (const QVariant &entry : app.services.i18n.languages()) {
+            const QString code = entry.toMap().value("code").toString();
+            app.services.i18n.setLanguage(code);
+            QTRY_COMPARE(app.services.i18n.language(), code);
+            QTest::qWait(50);
+            for (QQuickItem *text : Launch::searchAllVisible(app.window->contentItem(), "settingDescription"))
+                QVERIFY2(text->property("contentWidth").toDouble() <= text->width(), qPrintable(code + ": " + text->property("text").toString()));
+            app.shot("lang-" + code);
+        }
+        app.services.i18n.setLanguage("tr");
         QVERIFY(app.click("languageList"));
         QTRY_VERIFY(app.item("option-en"));
         app.key(Qt::Key_Escape); // the list closes first, settings stay
@@ -1027,7 +1089,7 @@ private slots:
                                                 QString::fromLatin1(QCryptographicHash::hash(setup, QCryptographicHash::Sha256).toHex()), "99.0.0");
             QVERIFY(QMetaObject::invokeMethod(app.item("controlBar")->parentItem(), "openSettings"));
             QTRY_VERIFY(app.item("settingsOverlay"));
-            QVERIFY(app.click("settingsTab-about"));
+            QTRY_VERIFY(app.click("settingsTab-about")); // the overlay is built in steps (asynchronous)
             QTRY_COMPARE(app.services.updater.received(), qint64(1048576));
             QCOMPARE(app.services.updater.total(), qint64(setup.size())); // known from the first bytes, or the text says "1 / 0 MB"
             app.shot("about-quiet-download");
@@ -2044,6 +2106,55 @@ private slots:
         const auto caption = [&] { return QPoint(rect().center().x() - 100, rect().top() + 18); };
 
         click(caption()); // brings the window forward: Win+Left needs that
+
+        // Sliders held down follow the real pointer anywhere: dragged far past the end, off the bar and off the window,
+        // the volume is at its maximum; dragged far left, at 0. Then a mixer gain the same way.
+        {
+            const auto onScreen = [&](QQuickItem *item, qreal fx) {
+                const QPointF scene = item->mapToScene(QPointF(item->width() * fx, item->height() / 2));
+                return rect().topLeft() + (scene * ratio).toPoint();
+            };
+            const auto realDrag = [&](QPoint from, std::initializer_list<QPoint> path) {
+                fromOutside([&] {
+                    glideTo(from);
+                    button(MOUSEEVENTF_LEFTDOWN);
+                    QPoint last = from;
+                    for (QPoint to : path) {
+                        for (int i = 1; i <= 6; ++i) glideTo(last + (to - last) * i / 6);
+                        last = to;
+                    }
+                    QThread::msleep(300);
+                    button(MOUSEEVENTF_LEFTUP);
+                });
+                QTest::qWait(400);
+            };
+            app.mpv->setProperty("volume", 50);
+            QTRY_COMPARE(app.number("volume"), 50.0);
+            glideTo(rect().center());
+            QTRY_VERIFY(app.item("volumeSlider") && app.item("volumeSlider")->isVisible());
+            const QPoint volume = onScreen(app.item("volumeSlider"), 0.3);
+            realDrag(volume, {volume + QPoint(150, -60), volume + QPoint(rect().width(), -300)});
+            check("volume dragged far right, off the window: maximum", [&] { return app.number("volume") == app.services.player.volumeMax(); });
+            qInfo("volume after the drag right: %g", app.number("volume"));
+            realDrag(onScreen(app.item("volumeSlider"), 0.5), {volume + QPoint(-600, -120)});
+            check("volume dragged far left: 0", [&] { return app.number("volume") == 0; });
+            qInfo("volume after the drag left: %g", app.number("volume"));
+            app.mpv->setProperty("volume", 100);
+
+            QVERIFY(app.click("mixerChip"));
+            QTRY_VERIFY(app.item("mixerRow-1"));
+            QTest::qWait(400);
+            QQuickItem *gain = Launch::search(app.item("mixerRow-1"), "trackGain");
+            QVERIFY(gain);
+            const QPoint at = onScreen(gain, 0.2);
+            realDrag(at, {at + QPoint(200, 80), at + QPoint(900, 400)});
+            check("mixer gain dragged far right, off the popover: maximum",
+                  [&] { return app.item("mixerRow-1") && app.item("mixerRow-1")->property("shownGain").toDouble() == app.services.mixer.gainMax(); });
+            qInfo("gain after the drag: %g", app.item("mixerRow-1") ? app.item("mixerRow-1")->property("shownGain").toDouble() : -1);
+            app.services.mixer.setGain(1, 1);
+            app.key(Qt::Key_Escape);
+            QTRY_VERIFY(!app.item("mixerPopover"));
+        }
 
         // The resize edges. The window follows the pointer; the picture follows the window.
         const QRect start = rect();

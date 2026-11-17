@@ -101,6 +101,7 @@ Item {
     // The top thing closes first. False: nothing was open.
     function closeTop() {
         if (settings.item) return settings.item.closeTop()
+        if (settingsOpen) { settingsOpen = false; return true } // still being built (asynchronous): Esc closes it all the same
         if (popover !== "") { popover = ""; return true }
         if (playlistOpen) { playlistOpen = false; return true }
         return false
@@ -178,6 +179,7 @@ Item {
     onSubtitleMarginChanged: mpv.setProperty("sub-margin-y", String(subtitleMargin))
     // The maximize button is Windows' (non-client, for snap layouts): QML sees no hover there, WindowChrome does.
     readonly property bool overControls: controlBar.hovered || (titleBar.visible && (titleBar.hovered || ui.chrome.maximizeHovered))
+                                       || (fullScreenButtons.visible && fullScreenButtons.hovered)
     readonly property bool chromeUp: forceChrome || pointerMoving || paused || popover !== "" || playlistOpen || settingsOpen || hintShown || overControls
 
     function wake() {
@@ -313,7 +315,7 @@ Item {
         backdrop: glassBackdrop
         x: 24
         y: 24
-        width: Math.min(900, pillText.implicitWidth + 32, parent.width - 48)
+        width: Math.min(900, pillText.implicitWidth + 32, parent.width - 48 - fullScreenButtons.width - 12)
         height: pillText.implicitHeight + 20
         radius: 14
         shadow: false
@@ -328,6 +330,59 @@ Item {
             color: Theme.tokens.glass.text
             font.pixelSize: Theme.tokens.type.label
             font.weight: Font.DemiBold
+        }
+    }
+    GlassPanel { // full screen: the window's buttons in a pill across from the name, with the title bar gone
+        id: fullScreenButtons
+        objectName: "fullScreenButtons"
+        readonly property bool hovered: buttonsHover.hovered
+        visible: opacity > 0 && ui.fullScreen
+        opacity: ui.chromeUp ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.tokens.motion.base } }
+        backdrop: glassBackdrop
+        x: parent.width - width - 24
+        y: 24
+        width: captionRow.width + 8
+        height: 48
+        radius: 14
+        shadow: false
+        fillOpacity: Theme.barOpacity
+        HoverHandler { id: buttonsHover }
+        Row {
+            id: captionRow
+            x: 4
+            anchors.verticalCenter: parent.verticalCenter
+            IconButton {
+                objectName: "fullScreenMinimize"
+                implicitWidth: 40
+                implicitHeight: 40
+                radius: 10
+                icon: "remove"
+                iconSize: 20
+                tip: I18n.strings.minimize
+                onClicked: ui.chrome.minimize()
+            }
+            IconButton {
+                objectName: "fullScreenExit"
+                implicitWidth: 40
+                implicitHeight: 40
+                radius: 10
+                icon: "fullscreen_exit"
+                iconSize: 22
+                tip: I18n.strings.exit_full_screen
+                onClicked: ui.toggleFullScreen()
+            }
+            IconButton {
+                objectName: "fullScreenClose"
+                implicitWidth: 40
+                implicitHeight: 40
+                radius: 10
+                icon: "close"
+                iconSize: 20
+                hoverColor: "#C42B1C" // Windows' own close red, as in the title bar
+                tip: I18n.strings.close
+                onClicked: ui.window.close()
+            }
         }
     }
 
@@ -466,6 +521,7 @@ Item {
         z: 1
         anchors.fill: parent
         active: ui.settingsOpen
+        asynchronous: true // built in steps between frames: built at once, it froze the playing video for ~850 ms
         // By name, not by type: its parts import QtQuick.Shapes, and most launches never open settings.
         onActiveChanged: if (active) setSource("SettingsOverlay.qml", {ui: ui})
     }

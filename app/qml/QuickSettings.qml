@@ -16,9 +16,11 @@ Popover {
     implicitHeight: Math.min(maxHeight, column.height + 16)
 
     component Heading: Item {
+        id: heading
         property string icon
         property string text
         property string note
+        property string tip // what it does, when the name alone may not say it
         x: 10
         width: parent.width - 20
         height: 22
@@ -29,12 +31,18 @@ Popover {
             color: quick.glass.text
         }
         Label {
+            id: headingText
             x: 34
             anchors.verticalCenter: parent.verticalCenter
             text: parent.text
             color: quick.glass.text
             font.pixelSize: Theme.tokens.type.label
             font.weight: Font.DemiBold
+        }
+        HoverTip {
+            width: headingText.x + headingText.implicitWidth
+            height: parent.height
+            text: heading.tip
         }
         Label {
             anchors.right: parent.right
@@ -128,8 +136,10 @@ Popover {
                 height: 52
                 Heading {
                     anchors.verticalCenter: parent.verticalCenter
+                    objectName: "audioDelayHeading"
                     icon: "history"
                     text: quick.strings.audio_delay
+                    tip: quick.strings.audio_delay_tip
                 }
                 Stepper {
                     objectName: "audioDelay"
@@ -152,6 +162,7 @@ Popover {
                 Heading {
                     icon: "hd"
                     text: quick.strings.picture
+                    tip: quick.strings.picture_tip
                     note: PictureQuality.pref === "auto"
                           ? quick.strings.picture_auto_on.arg(quick.strings["tier_" + PictureQuality.active]) : ""
                 }

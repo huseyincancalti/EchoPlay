@@ -845,7 +845,6 @@ private slots:
         qInfo("settings: on screen after %lld ms, longest frame gap while opening %lld ms", openedIn, qint64(longestGap));
         // ~40 ms here when nothing blocks. A character the UI font lacks once cost ~300-450 ms (Windows' font fallback).
         QVERIFY2(longestGap < 150, "opening settings stalled the playing video");
-        QObject::disconnect(frames);
         QVERIFY(!app.item("quickPopover"));
         QTRY_VERIFY(!app.item("controlBar")->isVisible());
         app.shot("settings-audio");
@@ -871,8 +870,14 @@ private slots:
         QTRY_COMPARE(app.services.player.seekStep(), 30);
         QVERIFY(app.click("segment-10"));
         QVERIFY(app.click("settingsTab-language"));
+        QTest::qWait(300);
+        longestGap = 0;
         QVERIFY(app.click("languageList"));
         QTRY_VERIFY(app.item("option-tr"));
+        QTest::qWait(1000); // its names in Chinese, Japanese and Korean script draw once it shows
+        qInfo("language list: longest frame gap while opening %lld ms", qint64(longestGap));
+        QVERIFY2(longestGap < 150, "opening the language list stalled the playing video");
+        QObject::disconnect(frames);
         app.shot("settings-list");
         QVERIFY(app.click("option-tr"));
         QTRY_COMPARE(app.services.i18n.language(), QString("tr"));

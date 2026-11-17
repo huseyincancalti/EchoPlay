@@ -65,6 +65,18 @@ double contrast(const QColor &a, const QColor &b)
 
 const QStringList BundledFonts = {"Geist", "Manrope", "Plus Jakarta Sans"};
 
+// The UI fonts have no Chinese, Japanese or Korean letters. Without a hint Windows' font fallback lookup finds one, at
+// ~300 ms-1 s on the GUI thread the first time (the language list's names froze the video 970 ms, e2e). Naming the
+// system's own fonts for those scripts as substitutes skips that lookup.
+void addScriptFallbacks(const QString &family)
+{
+#ifdef Q_OS_WIN
+    QFont::insertSubstitutions(family, {"Microsoft YaHei UI", "Yu Gothic UI", "Malgun Gothic"});
+#else
+    Q_UNUSED(family)
+#endif
+}
+
 // The bundled font's file in the resources: the family name without spaces.
 QString bundledFile(const QString &family)
 {
@@ -231,6 +243,8 @@ void Theme::startGui()
     QFontDatabase::addApplicationFont(":/fonts/IconsFilled.ttf");
 
     const QString family = fontFamily();
+    for (const QString &each : BundledFonts) addScriptFallbacks(each);
+    addScriptFallbacks(family);
     const QString tokenFile = m_tokens.value("font").toMap().value("file").toString();
     if (!tokenFile.isEmpty() && m_state->fontFamily().isEmpty())
         QFontDatabase::addApplicationFont(QDir(m_userDir).filePath(tokenFile));

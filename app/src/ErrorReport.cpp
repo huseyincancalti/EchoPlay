@@ -51,7 +51,7 @@ QString redacted(QString text, const QString &homeFolder)
     if (cut <= 0) return text;
     const QString safe = home.left(cut) + "/<user>";
     text.replace(home, safe, Qt::CaseInsensitive);
-    text.replace(QDir::toNativeSeparators(home), QDir::toNativeSeparators(safe), Qt::CaseInsensitive);
+    text.replace(QString(home).replace('/', '\\'), QString(safe).replace('/', '\\'), Qt::CaseInsensitive);
     return text;
 }
 

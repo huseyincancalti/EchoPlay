@@ -69,9 +69,13 @@ QString MediaFiles::pathToOpen(const QUrl &url)
     if (!QFileInfo(path).isDir()) return path;
 
     QDir folder(path);
-    QStringList videos = folder.entryList(globs(VideoExtensions), QDir::Files | QDir::Readable);
+    // By suffix in any case: Linux and macOS name filters are case-sensitive, and cameras write .MP4.
+    QStringList videos;
+    for (const QString &name : folder.entryList(QDir::Files | QDir::Readable))
+        if (VideoExtensions.contains(QFileInfo(name).suffix(), Qt::CaseInsensitive)) videos << name;
     if (videos.isEmpty()) return {};
-    QCollator natural;
+    // The C locale (LANG=C.UTF-8 on a bare Linux) has no numeric collation: clip10 came before clip2 there.
+    QCollator natural(QLocale().language() == QLocale::C ? QLocale(QLocale::English) : QLocale());
     natural.setNumericMode(true);
     natural.setCaseSensitivity(Qt::CaseInsensitive);
     std::sort(videos.begin(), videos.end(), natural);

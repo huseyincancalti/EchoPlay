@@ -2621,7 +2621,11 @@ private:
 
 int main(int argc, char *argv[])
 {
+#ifdef Q_OS_WIN
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11); // as main.cpp: MpvItem needs D3D11
+#else
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL); // as main.cpp
+#endif
     QGuiApplication app(argc, argv);
     std::setlocale(LC_NUMERIC, "C"); // libmpv requires it
     TestE2E test;

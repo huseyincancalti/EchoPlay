@@ -1,7 +1,7 @@
 name: EchoPlay 2
 
-# Every push to main and every pull request: EchoPlay 2 (app/) builds on a clean Windows runner and its unit tests
-# pass. The same steps as on the maintainer's PC: tools/setup-dev.sh, then tools/check.sh v2 (configure, build, ctest
+# Every push to main and every pull request: EchoPlay 2 (app/) builds on clean Windows and Linux runners and its unit
+# tests pass. The same steps as on the maintainer's PC: tools/setup-dev.sh, then tools/check.sh v2 (configure, build, ctest
 # without the e2e suite, which needs a screen). The player-window tests stay local (tools/e2e.sh).
 on:
   push:
@@ -39,4 +39,42 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: check-v2-log
+          path: .out/check-v2.log
+
+  # Linux: the same build and unit tests (OpenGL render path). Qt from Qt's own archive through aqt, as on Windows:
+  # Ubuntu 24.04 ships Qt 6.4, older than QQuickRhiItem. libmpv and FFmpeg are Ubuntu's. Headless: offscreen platform.
+  build-and-test-linux:
+    runs-on: ubuntu-24.04
+    env:
+      QT_VERSION: 6.10.3
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../qt
+          key: qt-${{ env.QT_VERSION }}-linux_gcc_64-shadertools
+
+      - name: Qt
+        run: |
+          [ -d "../qt/$QT_VERSION/gcc_64" ] || pipx run aqtinstall install-qt linux desktop "$QT_VERSION" linux_gcc_64 \
+            -m qtshadertools -O ../qt
+
+      - name: libmpv, FFmpeg, OpenGL and build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libmpv-dev ffmpeg ninja-build pkg-config libgl-dev \
+            libegl-dev libxkbcommon-dev > /dev/null
+          pkg-config --modversion mpv
+
+      - name: Build and unit tests
+        run: CMAKE_PREFIX_PATH="$(realpath "../qt/$QT_VERSION/gcc_64")" CMAKE_GENERATOR=Ninja bash tools/check.sh v2
+
+      - name: Keep the log of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-v2-log-linux
           path: .out/check-v2.log

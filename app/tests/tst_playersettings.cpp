@@ -66,8 +66,8 @@ private slots:
     void screenshotFolders()
     {
         m_settings->setScreenshotFolder("video_folder");
-        QCOMPARE(m_settings->mpvOptions("C:/Videos/Clips/a.mp4").value("screenshot-dir").toString(),
-                 QString("C:/Videos/Clips"));
+        QCOMPARE(m_settings->mpvOptions(QDir::rootPath() + "Videos/Clips/a.mp4").value("screenshot-dir").toString(),
+                 QDir::rootPath() + "Videos/Clips"); // C:/ on Windows, / elsewhere
         // Where the chosen place does not apply, EchoPlay's folder gets the shot
         QCOMPARE(m_settings->mpvOptions("https://example.com/a.mp4").value("screenshot-dir").toString(), appShots());
         m_settings->setScreenshotFolder("custom"); // no folder picked yet

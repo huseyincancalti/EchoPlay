@@ -9,11 +9,29 @@ set(ECHOPLAY_VERSION "0.0.0-dev" CACHE STRING "Release version without the v; th
 
 find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Gui GuiPrivate Network Test ShaderTools)
 qt_standard_project_setup(REQUIRES 6.7)
+# Every program in the build folder's root, next to lang/ and theme.json (Qt already does this on Windows).
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
-# libmpv dev package: include/mpv/*.h, libmpv.dll.a, libmpv-2.dll (tools/setup-dev.sh fetches it).
-set(MPV_DIR "$ENV{MPV_DIR}" CACHE PATH "libmpv dev package directory")
-if(NOT EXISTS "${MPV_DIR}/include/mpv/render.h")
-    message(FATAL_ERROR "libmpv not found in MPV_DIR='${MPV_DIR}'. Run tools/setup-dev.sh and source .out/devenv.sh.")
+# libmpv as one target, `libmpv`. Windows: the dev package (include/mpv/*.h, libmpv.dll.a, libmpv-2.dll; tools/setup-dev.sh
+# fetches it) plus upstream render_d3d11.h that it does not ship yet (third_party/mpv/README.md); render_d3d11.h
+# includes "render.h" from its own folder. Linux and macOS: the system's libmpv through pkg-config.
+add_library(libmpv INTERFACE)
+if(WIN32)
+    set(MPV_DIR "$ENV{MPV_DIR}" CACHE PATH "libmpv dev package directory")
+    if(NOT EXISTS "${MPV_DIR}/include/mpv/render.h")
+        message(FATAL_ERROR "libmpv not found in MPV_DIR='${MPV_DIR}'. Run tools/setup-dev.sh and source .out/devenv.sh.")
+    endif()
+    set(MPV_INCLUDE "${CMAKE_BINARY_DIR}/mpv-include")
+    file(COPY "${MPV_DIR}/include/mpv" DESTINATION "${MPV_INCLUDE}")
+    if(NOT EXISTS "${MPV_INCLUDE}/mpv/render_d3d11.h")
+        file(COPY third_party/mpv/mpv/render_d3d11.h DESTINATION "${MPV_INCLUDE}/mpv")
+    endif()
+    target_include_directories(libmpv INTERFACE "${MPV_INCLUDE}")
+    target_link_libraries(libmpv INTERFACE "${MPV_DIR}/libmpv.dll.a")
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
+    target_link_libraries(libmpv INTERFACE PkgConfig::MPV)
 endif()
 
 # The player (QML module: Main.qml and every C++ type) as a static library, so the app and the end-to-end
@@ -51,6 +69,9 @@ qt_add_executable(echoplay src/main.cpp)
 # WIN32_EXECUTABLE: a GUI-subsystem exe. Without it Windows opens a console window next to the player on every
 # start. Redirected output (--smoke, the tools' logs) still works: the inherited handles stay.
 set_target_properties(echoplay PROPERTIES OUTPUT_NAME EchoPlay WIN32_EXECUTABLE TRUE)
+if(UNIX AND NOT APPLE) # Linux names programs in lower case; "EchoPlay" is also the QML module's folder in the build
+    set_target_properties(echoplay PROPERTIES OUTPUT_NAME echoplay)
+endif()
 if(WIN32)
     string(REGEX MATCH "^([0-9]+)[.]([0-9]+)[.]([0-9]+)" _ "${ECHOPLAY_VERSION}")
     set(ECHOPLAY_VERSION_RC "${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0")
@@ -61,26 +82,18 @@ if(WIN32)
     set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/echoplay.rc" PROPERTIES OBJECT_DEPENDS "${ECHOPLAY_MANIFEST}")
 endif()
 
-# libmpv headers in one folder: the dev package's, plus upstream render_d3d11.h that it does not ship
-# yet (third_party/mpv/README.md). render_d3d11.h includes "render.h" from its own folder.
-set(MPV_INCLUDE "${CMAKE_BINARY_DIR}/mpv-include")
-file(COPY "${MPV_DIR}/include/mpv" DESTINATION "${MPV_INCLUDE}")
-if(NOT EXISTS "${MPV_INCLUDE}/mpv/render_d3d11.h")
-    file(COPY third_party/mpv/mpv/render_d3d11.h DESTINATION "${MPV_INCLUDE}/mpv")
-endif()
 # src/ for the generated QML type registration, which includes MpvItem.h by bare name.
-target_include_directories(echoplay_lib PUBLIC src "${MPV_INCLUDE}")
+target_include_directories(echoplay_lib PUBLIC src)
 # Qt6::GuiPrivate: QRhi native handles (rhi/qrhi.h), to hand Qt's D3D11 device to libmpv.
-target_link_libraries(echoplay_lib PUBLIC Qt6::Quick Qt6::GuiPrivate Qt6::Network "${MPV_DIR}/libmpv.dll.a")
+target_link_libraries(echoplay_lib PUBLIC Qt6::Quick Qt6::GuiPrivate Qt6::Network libmpv)
 target_compile_definitions(echoplay PRIVATE ECHOPLAY_VERSION="${ECHOPLAY_VERSION}")
 target_link_libraries(echoplay PRIVATE echoplay_lib echoplay_libplugin) # main.cpp: Q_IMPORT_QML_PLUGIN(EchoPlayPlugin)
 
-add_custom_command(TARGET echoplay POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MPV_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:echoplay>")
-
-# Qt and MinGW runtime DLLs + QML modules next to the exe, so the dev build starts from Explorer
+# libmpv, Qt and MinGW runtime DLLs + QML modules next to the exe, so the dev build starts from Explorer
 # (double-click, or drop a video on it) without the dev PATH from .out/devenv.sh.
 if(WIN32)
+    add_custom_command(TARGET echoplay POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${MPV_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:echoplay>")
     add_custom_command(TARGET echoplay POST_BUILD
         COMMAND Qt6::windeployqt --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml" --no-translations --verbose 0
                 "$<TARGET_FILE:echoplay>")
@@ -103,17 +116,20 @@ add_custom_command(TARGET echoplay POST_BUILD
 # Packaging: `cmake --install <build> --prefix <stage>` lays out a self-contained app (exe, Qt and MinGW
 # runtime, QML modules, libmpv, lang/, theme.json) for the installer (tools/package-v2.sh). Flat, like v1:
 # EchoPlay.exe at the root, where the "Open with" registration points, and Qt's runtime next to it.
-install(TARGETS echoplay RUNTIME DESTINATION .)
-install(CODE "set(QT_DEPLOY_BIN_DIR .)") # read by the deploy script below; its default is bin/
-install(FILES "${MPV_DIR}/libmpv-2.dll" theme/theme.json DESTINATION .)
-# libmpv imports vulkan-1.dll, which a graphics driver installs, not Windows: without it next to the exe the
-# app does not start on a Windows that has no such driver (a virtual machine, Windows Sandbox).
-install(FILES "$ENV{VULKAN_DLL}" DESTINATION .)
-install(DIRECTORY lang DESTINATION .)
-# --no-opengl-sw: Qt's 20 MB software OpenGL; EchoPlay renders through Direct3D 11 only.
-qt_generate_deploy_qml_app_script(TARGET echoplay OUTPUT_SCRIPT deploy_script NO_TRANSLATIONS
-                                  NO_UNSUPPORTED_PLATFORM_ERROR DEPLOY_TOOL_OPTIONS --no-opengl-sw)
-install(SCRIPT "${deploy_script}")
+# Linux and macOS packages come later (NOW.md: AppImage, DMG).
+if(WIN32)
+    install(TARGETS echoplay RUNTIME DESTINATION .)
+    install(CODE "set(QT_DEPLOY_BIN_DIR .)") # read by the deploy script below; its default is bin/
+    install(FILES "${MPV_DIR}/libmpv-2.dll" theme/theme.json DESTINATION .)
+    # libmpv imports vulkan-1.dll, which a graphics driver installs, not Windows: without it next to the exe the
+    # app does not start on a Windows that has no such driver (a virtual machine, Windows Sandbox).
+    install(FILES "$ENV{VULKAN_DLL}" DESTINATION .)
+    install(DIRECTORY lang DESTINATION .)
+    # --no-opengl-sw: Qt's 20 MB software OpenGL; EchoPlay renders through Direct3D 11 only.
+    qt_generate_deploy_qml_app_script(TARGET echoplay OUTPUT_SCRIPT deploy_script NO_TRANSLATIONS
+                                      NO_UNSUPPORTED_PLATFORM_ERROR DEPLOY_TOOL_OPTIONS --no-opengl-sw)
+    install(SCRIPT "${deploy_script}")
+endif()
 
 enable_testing()
 add_test(NAME libmpv-smoke COMMAND echoplay --smoke)

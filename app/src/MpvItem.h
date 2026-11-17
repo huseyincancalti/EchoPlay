@@ -10,7 +10,8 @@ struct mpv_handle;
 struct mpv_render_context;
 
 // A QML item that shows libmpv's video through the render API, inside the Qt Quick scene,
-// so other items (glass panels) can sample and blur it. Windows: Direct3D 11 on Qt's own device.
+// so other items (glass panels) can sample and blur it. Windows: Direct3D 11 on Qt's own device; Linux and macOS:
+// Qt's OpenGL context.
 class MpvItem : public QQuickRhiItem
 {
     Q_OBJECT

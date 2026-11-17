@@ -66,15 +66,13 @@ add_test(NAME hdr-clip COMMAND "${FFMPEG}" -y -v error -f lavfi -i color=c=red:s
          -c:v libx264 -preset ultrafast -g 30 -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc "${HDR_CLIP}")
 set_tests_properties(hdr-clip PROPERTIES FIXTURES_SETUP hdr-clip)
 echoplay_test(clipinfo ../src/ClipInfo.h ../src/ClipInfo.cpp)
-target_include_directories(tst_clipinfo PRIVATE "${MPV_INCLUDE}")
-target_link_libraries(tst_clipinfo PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
+target_link_libraries(tst_clipinfo PRIVATE Qt6::Quick libmpv)
 target_compile_definitions(tst_clipinfo PRIVATE ECHOPLAY_HDR_CLIP="${HDR_CLIP}" ECHOPLAY_CLIPINFO_TWO="${CLIPINFO_TWO}"
                            ECHOPLAY_CLIPINFO_VIDEO="${CLIPINFO_VIDEO}" ECHOPLAY_CLIPINFO_AUDIO="${CLIPINFO_AUDIO}")
 set_tests_properties(clipinfo PROPERTIES FIXTURES_REQUIRED "clipinfo-clips;hdr-clip")
 
 echoplay_test(thumbnailer ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
-target_include_directories(tst_thumbnailer PRIVATE "${MPV_INCLUDE}")
-target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick "${MPV_DIR}/libmpv.dll.a")
+target_link_libraries(tst_thumbnailer PRIVATE Qt6::Quick libmpv)
 target_compile_definitions(tst_thumbnailer PRIVATE ECHOPLAY_THUMB_CLIP="${THUMB_CLIP}" ECHOPLAY_HDR_CLIP="${HDR_CLIP}")
 set_tests_properties(thumbnailer PROPERTIES FIXTURES_REQUIRED "thumbnailer-clip;hdr-clip")
 
@@ -86,8 +84,7 @@ add_test(NAME silencecheck-clip COMMAND "${FFMPEG}" -y -v error -f lavfi -i sine
          -t 20 -map 0 -map 1 -map 2 -map 3 -c:a aac "${SILENCE_CLIP}")
 set_tests_properties(silencecheck-clip PROPERTIES FIXTURES_SETUP silencecheck-clip)
 echoplay_test(silencecheck ../src/SilenceCheck.h ../src/SilenceCheck.cpp)
-target_include_directories(tst_silencecheck PRIVATE "${MPV_INCLUDE}")
-target_link_libraries(tst_silencecheck PRIVATE "${MPV_DIR}/libmpv.dll.a")
+target_link_libraries(tst_silencecheck PRIVATE libmpv)
 target_compile_definitions(tst_silencecheck PRIVATE ECHOPLAY_SILENCE_CLIP="${SILENCE_CLIP}")
 set_tests_properties(silencecheck PROPERTIES FIXTURES_REQUIRED silencecheck-clip)
 
@@ -103,7 +100,10 @@ endif()
 add_test(NAME e2e COMMAND tst_e2e)
 set_tests_properties(e2e PROPERTIES LABELS e2e)
 
-# Thumbnailer latency bench: a console tool on a real video, run by tools/thumbs-bench.sh, not by ctest.
-add_executable(bench_thumbnailer bench_thumbnailer.cpp ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
-target_include_directories(bench_thumbnailer PRIVATE ../src "${MPV_INCLUDE}")
-target_link_libraries(bench_thumbnailer PRIVATE Qt6::Test Qt6::Qml Qt6::Quick "${MPV_DIR}/libmpv.dll.a" psapi)
+# Thumbnailer latency bench: a console tool on a real video, run by tools/thumbs-bench.sh, not by ctest. Windows only
+# (it reads the process's memory through psapi).
+if(WIN32)
+    add_executable(bench_thumbnailer bench_thumbnailer.cpp ../src/Thumbnailer.h ../src/Thumbnailer.cpp)
+    target_include_directories(bench_thumbnailer PRIVATE ../src)
+    target_link_libraries(bench_thumbnailer PRIVATE Qt6::Test Qt6::Qml Qt6::Quick libmpv psapi)
+endif()

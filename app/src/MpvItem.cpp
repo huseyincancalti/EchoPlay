@@ -10,7 +10,10 @@
 #include <QStandardPaths>
 #include <mpv/client.h>
 #include <mpv/render.h>
-#include <mpv/render_d3d11.h>
+#include <mpv/render_gl.h>
+#include <QOpenGLContext>
+#include <QOpenGLFunctions>
+#include <QQuickOpenGLUtils>
 #include <rhi/qrhi.h>
 #include <deque>
 #include <stdexcept>
@@ -21,6 +24,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <mpv/render_d3d11.h>
 #endif
 
 namespace {
@@ -110,24 +114,51 @@ QImage frameFromReply(const mpv_event &e)
     return QImage(static_cast<const uchar *>(pixels->data), int(w), int(h), qsizetype(stride), QImage::Format_RGB32).copy();
 }
 
-// Renders mpv into the item's color texture on Qt's own D3D11 device (no OpenGL driver to load,
-// d3d11va decodes on the same device). Runs on Qt's render thread.
+void *glProcAddress(void *, const char *name)
+{
+    QOpenGLContext *context = QOpenGLContext::currentContext();
+    return context ? reinterpret_cast<void *>(context->getProcAddress(name)) : nullptr;
+}
+
+// Renders mpv into the item's color texture on Qt's own device. Windows: Direct3D 11 (no OpenGL driver to load,
+// d3d11va decodes on the same device). Linux and macOS: Qt's OpenGL context. Runs on Qt's render thread.
 class MpvRenderer : public QQuickRhiItemRenderer
 {
 public:
     explicit MpvRenderer(MpvItem *item) : m_item(item) {}
+    ~MpvRenderer() override
+    {
+        if (QOpenGLContext *context = QOpenGLContext::currentContext(); context && m_fbo)
+            context->functions()->glDeleteFramebuffers(1, &m_fbo);
+    }
 
     void initialize(QRhiCommandBuffer *) override
     {
         if (m_item->renderContext) return;
+        std::vector<mpv_render_param> params;
+#ifdef Q_OS_WIN
         if (rhi()->backend() != QRhi::D3D11) throw std::runtime_error("MpvItem needs Qt's Direct3D 11 backend");
         auto *native = static_cast<const QRhiD3D11NativeHandles *>(rhi()->nativeHandles());
         mpv_d3d11_init_params init{native->dev};
-        mpv_render_param params[] = {
-            {MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_D3D11)},
-            {MPV_RENDER_PARAM_D3D11_INIT_PARAMS, &init},
-            {MPV_RENDER_PARAM_INVALID, nullptr}};
-        if (mpv_render_context_create(&m_item->renderContext, m_item->handle(), params) < 0)
+        params = {{MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_D3D11)},
+                  {MPV_RENDER_PARAM_D3D11_INIT_PARAMS, &init}};
+#else
+        if (rhi()->backend() != QRhi::OpenGLES2) throw std::runtime_error("MpvItem needs Qt's OpenGL backend");
+        mpv_opengl_init_params init{glProcAddress, nullptr};
+        params = {{MPV_RENDER_PARAM_API_TYPE, const_cast<char *>(MPV_RENDER_API_TYPE_OPENGL)},
+                  {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &init}};
+        // The display connection lets mpv share hardware-decoded frames with OpenGL (VA-API, VDPAU).
+#if QT_CONFIG(xcb)
+        if (auto *x11 = qGuiApp->nativeInterface<QNativeInterface::QX11Application>())
+            params.push_back({MPV_RENDER_PARAM_X11_DISPLAY, x11->display()});
+#endif
+#if QT_CONFIG(wayland)
+        if (auto *wayland = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>())
+            params.push_back({MPV_RENDER_PARAM_WL_DISPLAY, wayland->display()});
+#endif
+#endif
+        params.push_back({MPV_RENDER_PARAM_INVALID, nullptr});
+        if (mpv_render_context_create(&m_item->renderContext, m_item->handle(), params.data()) < 0)
             throw std::runtime_error("mpv_render_context_create failed");
         mpv_render_context_set_update_callback(
             m_item->renderContext,
@@ -141,15 +172,35 @@ public:
     void render(QRhiCommandBuffer *cb) override
     {
         if (m_request.reply) renderOffScreen(cb, std::exchange(m_request, {}));
-        mpv_d3d11_fbo target{reinterpret_cast<void *>(colorTexture()->nativeTexture().object)};
-        mpv_render_param params[] = {{MPV_RENDER_PARAM_D3D11_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
-        // mpv draws on the immediate context and leaves its state changed; Qt flushes before and resets after.
-        cb->beginExternal();
-        mpv_render_context_render(m_item->renderContext, params);
-        cb->endExternal();
+        renderInto(cb, colorTexture());
     }
 
 private:
+    // mpv draws on the device's immediate context and leaves its state changed; Qt flushes before and resets after.
+    int renderInto(QRhiCommandBuffer *cb, QRhiTexture *texture)
+    {
+        cb->beginExternal();
+#ifdef Q_OS_WIN
+        mpv_d3d11_fbo target{reinterpret_cast<void *>(texture->nativeTexture().object)};
+        mpv_render_param params[] = {{MPV_RENDER_PARAM_D3D11_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
+#else
+        // mpv expects OpenGL's default state (render_gl.h); Qt leaves its own (buffers, blending, program) bound. Without
+        // the reset the video came out black, or flat magenta with hardware decoding (WSLg, 2026-11-17).
+        QQuickOpenGLUtils::resetOpenGLState();
+        // OpenGL renders into a framebuffer: ours, with the texture attached.
+        QOpenGLFunctions *gl = QOpenGLContext::currentContext()->functions();
+        if (!m_fbo) gl->glGenFramebuffers(1, &m_fbo);
+        gl->glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+        gl->glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                   GLuint(texture->nativeTexture().object), 0);
+        mpv_opengl_fbo target{int(m_fbo), texture->pixelSize().width(), texture->pixelSize().height(), 0};
+        mpv_render_param params[] = {{MPV_RENDER_PARAM_OPENGL_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
+#endif
+        const int result = mpv_render_context_render(m_item->renderContext, params);
+        cb->endExternal();
+        return result;
+    }
+
     // The frame once more, into a texture of the video's size, read back as an image: the picture the screen shows,
     // tone mapping included. The screen's own frame is drawn after it, so it never shows the off-screen size.
     void renderOffScreen(QRhiCommandBuffer *cb, const MpvItem::FrameRequest &request)
@@ -163,12 +214,7 @@ private:
             delete texture;
             return fail();
         }
-        mpv_d3d11_fbo target{reinterpret_cast<void *>(texture->nativeTexture().object)};
-        mpv_render_param params[] = {{MPV_RENDER_PARAM_D3D11_FBO, &target}, {MPV_RENDER_PARAM_INVALID, nullptr}};
-        cb->beginExternal();
-        const int rendered = mpv_render_context_render(m_item->renderContext, params);
-        cb->endExternal();
-        if (rendered < 0) {
+        if (renderInto(cb, texture) < 0) {
             texture->deleteLater();
             return fail();
         }
@@ -188,6 +234,7 @@ private:
 
     MpvItem *m_item;
     MpvItem::FrameRequest m_request;
+    GLuint m_fbo = 0; // OpenGL only
 };
 
 // mpv's own name for a screenshot (screenshot-template's default, mpv-shot%n): the first free number.
@@ -204,6 +251,11 @@ QString nextShotPath(const QString &dir)
 MpvItem::MpvItem(QQuickItem *parent) : QQuickRhiItem(parent)
 {
     m_marks.insert("item_ms", processAgeMsNow());
+#ifndef Q_OS_WIN
+    // mpv's OpenGL picture starts at the bottom row, Qt's textures at the top: the video showed upside down. Qt's own
+    // read-back already turns OpenGL's rows over, so the off-screen frame needs nothing.
+    setMirrorVertically(true);
+#endif
     m_mpv = mpv_create();
     if (!m_mpv) throw std::runtime_error("mpv_create failed");
     m_marks.insert("mpv_created_ms", processAgeMsNow());

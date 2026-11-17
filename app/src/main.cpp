@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QSurfaceFormat>
 #include <QTimer>
 #include <clocale>
 #include <cstdio>
@@ -56,7 +57,18 @@ int main(int argc, char *argv[])
     const qint64 tMain = MpvItem::processAgeMsNow();
     // MpvItem renders through libmpv's D3D11 render API on Qt's device. OpenGL was ~750 ms slower to start:
     // the NVIDIA OpenGL driver init alone took that long before the first frame (measured 2026-10-31).
+#ifdef Q_OS_WIN
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
+#else
+    // libmpv's render API has no Vulkan or Metal path: Linux and macOS render through OpenGL.
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+#ifdef Q_OS_MACOS
+    QSurfaceFormat format = QSurfaceFormat::defaultFormat(); // macOS gives a 2.1 context unless asked for core
+    format.setVersion(4, 1);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(format);
+#endif
+#endif
     QGuiApplication app(argc, argv);
     const qint64 tApp = MpvItem::processAgeMsNow();
     QCoreApplication::setApplicationName("EchoPlay"); // config folder: %LOCALAPPDATA%/EchoPlay on Windows

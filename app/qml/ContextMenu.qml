@@ -156,9 +156,9 @@ Popover {
             objectName: "menuSaveCut"
             visible: !menu.forRow
             icon: "content_cut"
-            text: menu.strings.action_save_cut
+            text: menu.ui.loopA < 0 ? menu.strings.cut_menu_start : menu.ui.loopB < 0 ? menu.strings.cut_menu_end : menu.strings.action_save_cut
             key: menu.keyOf("save_cut")
-            available: menu.local && menu.ui.loopA >= 0 && menu.ui.loopB >= 0 && CutSaver.state !== "saving"
+            available: menu.local && CutSaver.state !== "saving"
             onClicked: menu.run(() => menu.ui.saveCut())
         }
         MenuRow {

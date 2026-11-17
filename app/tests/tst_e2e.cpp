@@ -1886,25 +1886,33 @@ private slots:
         const auto text = [&](const char *key) { return app.services.i18n.strings().value(key).toString(); };
         const auto toast = [&] { return app.item("toastText")->property("text").toString(); };
 
-        // No part yet: it says how to mark one.
-        app.key(Qt::Key_E, Qt::ControlModifier);
-        QTRY_COMPARE(toast(), text("cut_needs_loop"));
-        QCOMPARE(app.services.cuts.state(), QString("idle"));
-
-        // Both tracks, a part from 0:10 to 0:12, saved from the menu.
+        // Both tracks. The menu's first use marks the start (the row says so), Ctrl+E at 0:12 marks the end and saves.
         app.key(Qt::Key_2, Qt::ControlModifier);
         QTRY_COMPARE(app.prop("lavfi-complex"), Mix);
         app.mpv->command({"seek", 10, "absolute+exact"});
         QTRY_VERIFY(std::abs(app.number("time-pos") - 10) < 0.1);
-        app.key(Qt::Key_L);
+        const auto rightClick = [&] {
+            QTest::mouseClick(app.window, Qt::RightButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
+            QTRY_VERIFY(app.item("contextMenu"));
+        };
+        const auto rowText = [&] {
+            QQuickItem *row = Launch::search(app.item("contextMenu"), "menuSaveCut");
+            return row ? row->property("text").toString() : QString();
+        };
+        rightClick();
+        QCOMPARE(rowText(), text("cut_menu_start"));
+        app.shot("menu-cut-start");
+        QVERIFY(app.click("menuSaveCut"));
+        QTRY_VERIFY(app.mpv->observed("ab-loop-a").typeId() == QMetaType::Double);
+        QTRY_COMPARE(toast(), text("cut_start").arg("0:10"));
+        QCOMPARE(app.services.cuts.state(), QString("idle"));
         app.mpv->command({"seek", 12, "absolute+exact"});
         QTRY_VERIFY(std::abs(app.number("time-pos") - 12) < 0.1);
-        app.key(Qt::Key_L);
-        QTRY_VERIFY(app.mpv->observed("ab-loop-b").typeId() == QMetaType::Double);
-        QTest::mouseClick(app.window, Qt::RightButton, Qt::NoModifier, QPoint(app.window->width() / 2, app.window->height() / 2));
-        QTRY_VERIFY(app.item("contextMenu"));
-        QVERIFY(Launch::searchVisible(app.item("contextMenu"), "menuSaveCut"));
-        QVERIFY(app.click("menuSaveCut"));
+        rightClick();
+        QCOMPARE(rowText(), text("cut_menu_end"));
+        app.key(Qt::Key_Escape);
+        QTRY_VERIFY(!app.item("contextMenu"));
+        app.key(Qt::Key_E, Qt::ControlModifier);
         QTRY_VERIFY(app.item("cutCard"));
         QTRY_VERIFY_WITH_TIMEOUT(app.services.cuts.state() != "saving", 30000);
         QVERIFY2(app.services.cuts.state() == "done", qPrintable(app.services.cuts.error()));

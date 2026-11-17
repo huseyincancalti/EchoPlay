@@ -52,12 +52,9 @@ no quiet screen (its input goes to the test window only): run it after every v2 
   PotPlayer's licences forbid decompiling: no decompiler on a closed product without the maintainer saying so.
 
 ## Branches and pull requests (maintainer, 2026-11-17)
-- `main` is protected: no direct push, no force push, no deletion. Every change goes on its own branch
-  (`fix/...`, `add/...`, `docs/...`, `chore/...`) and reaches `main` only through a pull request.
-- The PR follows `.github/pull_request_template.md`: what changes, how it was checked (check/e2e result lines,
-  screenshots), what the maintainer should try by hand, what is not done. CI (`lint`, `unit-tests`, `smoke-test`)
-  must pass; merges are squash only, the branch is deleted after.
-- Claude opens the PR; the maintainer reads, tests and merges it. Claude never merges its own PR unless told to.
+- The maintainer and Claude commit and push straight to `main`. Pull requests are for outside contributors: the
+  "Protect main" ruleset makes everyone else open one (CI must pass, squash merge); the repo admin bypasses it.
+- Never force-push or delete `main`.
 
 ## Hard rules
 - Never fork or patch mpv/libmpv, uosc, thumbfast or memo source. v2 links upstream libmpv; v1 ships the

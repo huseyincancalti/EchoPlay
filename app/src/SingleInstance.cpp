@@ -1,5 +1,8 @@
 #include "SingleInstance.h"
 
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QFileOpenEvent>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalSocket>
@@ -47,12 +50,21 @@ bool SingleInstance::sendToRunning(const QString &file, qint64 sentAtEpochMs)
 
 bool SingleInstance::listen()
 {
+    if (QCoreApplication *app = QCoreApplication::instance()) app->installEventFilter(this);
     if (m_server.listen(m_name)) return true;
     if (m_server.serverError() != QAbstractSocket::AddressInUseError) return false;
     // Unix: a crashed instance leaves its socket file behind. Only called after sendToRunning found no
     // live instance, so the name is stale.
     QLocalServer::removeServer(m_name);
     return m_server.listen(m_name);
+}
+
+bool SingleInstance::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() != QEvent::FileOpen) return QObject::eventFilter(watched, event);
+    const QString file = static_cast<QFileOpenEvent *>(event)->file();
+    if (!file.isEmpty()) emit fileRequested(file, QDateTime::currentMSecsSinceEpoch());
+    return true;
 }
 
 void SingleInstance::onNewConnection()

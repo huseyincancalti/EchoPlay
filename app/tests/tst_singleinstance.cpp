@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QFileOpenEvent>
 #include <QLocalSocket>
 #include <QThread>
 #include <QUuid>
@@ -90,6 +91,18 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
         QCOMPARE(spy.at(0).at(0).toString(), QString());
         QCOMPARE(spy.at(0).at(1).toLongLong(), qint64(7));
+    }
+
+    void fileOpenEventIsRequested() // macOS: Finder's Open With
+    {
+        SingleInstance running(uniqueName());
+        QVERIFY(running.listen());
+        QSignalSpy spy(&running, &SingleInstance::fileRequested);
+        QFileOpenEvent event(QString("/Users/me/Movies/clip 1.mp4"));
+        QCoreApplication::sendEvent(QCoreApplication::instance(), &event);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).toString(), QString("/Users/me/Movies/clip 1.mp4"));
+        QVERIFY(spy.at(0).at(1).toLongLong() > 0);
     }
 
     void malformedMessagesAreIgnored()

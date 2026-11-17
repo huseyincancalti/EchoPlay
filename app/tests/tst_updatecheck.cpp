@@ -94,11 +94,27 @@ private slots:
 
     void setupAssetGivesUrlAndLowercaseDigest()
     {
+#ifndef Q_OS_WIN
+        QSKIP("Windows only: off Windows the card opens the release page, there is no setup");
+#endif
         AppState state(m_path);
         UpdateCheck check(&state, "2.0.0");
         check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", "sha256:" + Digest.toUpper()));
         QCOMPARE(check.setupUrl(), Download + "EchoPlay-Setup.exe");
         QCOMPARE(check.setupSha256(), Digest);
+    }
+
+    void noSetupOffWindows()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("Windows installs its setup");
+#endif
+        AppState state(m_path);
+        UpdateCheck check(&state, "2.0.0");
+        check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", "sha256:" + Digest));
+        QVERIFY(check.updateAvailable());
+        QVERIFY(check.setupUrl().isEmpty());
+        QVERIFY(check.setupSha256().isEmpty());
     }
 
     void wrongAssetNameGivesNoSetup()
@@ -210,6 +226,9 @@ private slots:
 
     void laterReplyReplacesTheSetup()
     {
+#ifndef Q_OS_WIN
+        QSKIP("Windows only: off Windows the card opens the release page, there is no setup");
+#endif
         AppState state(m_path);
         UpdateCheck check(&state, "2.0.0");
         check.handleReply(release("EchoPlay-Setup.exe", Download + "EchoPlay-Setup.exe", "sha256:" + Digest));

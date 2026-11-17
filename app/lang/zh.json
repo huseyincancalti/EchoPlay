@@ -209,6 +209,8 @@
   "update_ready": "EchoPlay %1 已就绪",
   "update_restart": "安装将会重启 EchoPlay。",
   "install": "安装",
+  "download_update": "下载",
+  "update_page": "在浏览器中打开下载页面。",
   "install_on_close": "关闭时安装",
   "update_on_close": "将在关闭 EchoPlay 时安装。",
   "download_progress_close": "%1 / %2 MB。将在关闭 EchoPlay 时安装。",

@@ -126,10 +126,15 @@ void UpdateCheck::closeWhatsNew()
 
 // The setup is the asset named exactly EchoPlay-Setup.exe. It runs without a click, so a foreign download host or a
 // missing or odd digest means no setup: the card leads to the release page. Nothing from an earlier reply stays.
+// Off Windows there is never a setup: the AppImage and the DMG are downloaded from the release page by hand.
 void UpdateCheck::readSetup(const QJsonArray &assets)
 {
     m_setupUrl.clear();
     m_setupSha256.clear();
+#ifndef Q_OS_WIN
+    Q_UNUSED(assets)
+    return;
+#endif
     for (const QJsonValue &value : assets) {
         const QJsonObject asset = value.toObject();
         if (asset.value("name").toString() != SetupAssetName) continue;

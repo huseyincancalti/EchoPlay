@@ -222,6 +222,8 @@
   "update_ready": "EchoPlay %1 is ready",
   "update_restart": "Installing restarts EchoPlay.",
   "install": "Install",
+  "download_update": "Download",
+  "update_page": "Opens the download page in your browser.",
   "later": "Later",
   "install_on_close": "Install on close",
   "update_on_close": "Installs when you close EchoPlay.",

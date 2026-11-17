@@ -73,7 +73,7 @@ Popover {
                     text: notice.failed ? notice.strings.update_failed_try
                          : Updater.state === "downloading"
                            ? notice.strings.download_progress.arg(Math.round(Updater.received / 1048576)).arg(Math.round(Updater.total / 1048576))
-                         : notice.strings.update_restart
+                         : UpdateCheck.setupUrl ? notice.strings.update_restart : notice.strings.update_page
                     color: notice.glass.textMuted
                     font.pixelSize: Theme.tokens.type.small
                     font.features: {"tnum": 1}
@@ -104,7 +104,7 @@ Popover {
                 objectName: "updateInstall"
                 style: "primary"
                 padding: 16
-                text: notice.failed ? notice.strings.try_again : notice.strings.install
+                text: notice.failed ? notice.strings.try_again : UpdateCheck.setupUrl ? notice.strings.install : notice.strings.download_update
                 onClicked: notice.install()
             }
             TextButton {

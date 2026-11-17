@@ -52,7 +52,8 @@ Rectangle {
             wrapMode: Text.WordWrap
             text: card.failed ? card.strings.update_failed_try
                  : card.downloading ? card.ui.downloadText()
-                 : card.ready ? (Updater.state === "ready" ? card.strings.update_on_close : card.strings.update_restart)
+                 : card.ready ? (Updater.state === "ready" ? card.strings.update_on_close
+                               : UpdateCheck.setupUrl ? card.strings.update_restart : card.strings.update_page)
                  : card.strings.last_checked.arg(Qt.formatDateTime(UpdateCheck.lastChecked, "yyyy-MM-dd HH:mm"))
             color: card.colors.textMuted
             font.pixelSize: Theme.tokens.type.small
@@ -69,7 +70,7 @@ Rectangle {
             objectName: "aboutInstall"
             style: "primary"
             icon: "download"
-            text: card.failed ? card.strings.try_again : card.strings.install
+            text: card.failed ? card.strings.try_again : UpdateCheck.setupUrl ? card.strings.install : card.strings.download_update
             onClicked: card.ui.installUpdate()
         }
         TextButton {

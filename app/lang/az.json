@@ -209,6 +209,8 @@
   "update_ready": "EchoPlay %1 hazırdır",
   "update_restart": "Quraşdırma EchoPlay-i yenidən başladacaq.",
   "install": "Quraşdır",
+  "download_update": "Yüklə",
+  "update_page": "Yükləmə səhifəsini brauzerdə açır.",
   "install_on_close": "Bağlananda quraşdır",
   "update_on_close": "EchoPlay-i bağladığınızda quraşdırılır.",
   "download_progress_close": "%1 / %2 MB. EchoPlay-i bağladığınızda quraşdırılır.",

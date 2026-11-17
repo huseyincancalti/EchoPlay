@@ -14,7 +14,8 @@ class QNetworkReply;
 // Tells the user a newer EchoPlay exists: one GET to GitHub's latest release when EchoPlay starts and on
 // Check now, no query string, no IDs. A dev build (0.0.0-dev) never checks. Every failure is silent. The
 // About page reads the properties; newVersionFound fires on every check that finds a newer version. The
-// release's setup asset (setupUrl, setupSha256) is what Updater downloads.
+// release's setup asset (setupUrl, setupSha256) is what Updater downloads; Windows only, elsewhere the card opens the
+// release page.
 class UpdateCheck : public QObject
 {
     Q_OBJECT

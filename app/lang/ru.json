@@ -209,6 +209,8 @@
   "update_ready": "EchoPlay %1 готов к установке",
   "update_restart": "После установки EchoPlay перезапустится.",
   "install": "Установить",
+  "download_update": "Скачать",
+  "update_page": "Открывает страницу загрузки в браузере.",
   "install_on_close": "Установить при закрытии",
   "update_on_close": "Установится, когда вы закроете EchoPlay.",
   "download_progress_close": "%1 из %2 МБ. Установится при закрытии EchoPlay.",

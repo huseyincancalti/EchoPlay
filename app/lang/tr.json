@@ -222,6 +222,8 @@
   "update_ready": "EchoPlay %1 hazır",
   "update_restart": "Kurulum EchoPlay'i yeniden başlatır.",
   "install": "Kur",
+  "download_update": "İndir",
+  "update_page": "İndirme sayfasını tarayıcıda açar.",
   "later": "Sonra",
   "install_on_close": "Kapanınca kur",
   "update_on_close": "EchoPlay'i kapatınca kurulur.",

@@ -41,24 +41,27 @@ Pick the file for your system from **[Releases](https://github.com/huseyincancal
 
 | System | Version | File |
 |---|---|---|
-| Windows 10 and 11 | 2.0.0 | [EchoPlay-Setup.exe](https://github.com/huseyincancalti/EchoPlay/releases/latest/download/EchoPlay-Setup.exe) |
-| macOS, Apple silicon | 1.4.0 | [EchoPlay-1.4.0-arm64.dmg](https://github.com/huseyincancalti/EchoPlay/releases/download/v1.4.0/EchoPlay-1.4.0-arm64.dmg) |
+| Windows 10 and 11 | 2.1.0 | [EchoPlay-Setup.exe](https://github.com/huseyincancalti/EchoPlay/releases/latest/download/EchoPlay-Setup.exe) |
+| macOS 15+, Apple silicon | 2.1.0 (test build) | [EchoPlay-2.1.0-arm64.dmg](https://github.com/huseyincancalti/EchoPlay/releases/download/v2.1.0/EchoPlay-2.1.0-arm64.dmg) |
+| macOS, Apple silicon, older | 1.4.0 | [EchoPlay-1.4.0-arm64.dmg](https://github.com/huseyincancalti/EchoPlay/releases/download/v1.4.0/EchoPlay-1.4.0-arm64.dmg) |
 | macOS, Intel | 1.4.0 | [EchoPlay-1.4.0-x86_64.dmg](https://github.com/huseyincancalti/EchoPlay/releases/download/v1.4.0/EchoPlay-1.4.0-x86_64.dmg) |
 | Linux | 1.4.0 | [EchoPlay-1.4.0-x86_64.AppImage](https://github.com/huseyincancalti/EchoPlay/releases/download/v1.4.0/EchoPlay-1.4.0-x86_64.AppImage) |
 
-EchoPlay 2 is Windows only for now; macOS and Linux keep 1.4.0 (mpv with EchoPlay's script) until their version 2 is
-ready.
+EchoPlay 2 for macOS is a test build: it is built and started on Apple's machines in GitHub's CI, but not yet on a real
+Mac. Intel Macs, older macOS and Linux keep 1.4.0 (mpv with EchoPlay's script) for now.
 
 - **Windows:** the installer is not code-signed yet, so SmartScreen may say "Windows protected your PC": choose
   **More info → Run anyway**. It installs for your Windows user only, so it does not ask for administrator rights, and
   there is nothing else to install. Coming from 1.x? The setup replaces it in place; the
   [2.0.0 release notes](https://github.com/huseyincancalti/EchoPlay/releases/tag/v2.0.0) have a one-time cleanup command
   if you want every trace of the old version gone first.
-- **macOS:** the app is not notarized by Apple, so the first start says it "is damaged" or that macOS cannot verify the
-  developer. Right-click **EchoPlay** in Applications, choose **Open**, then **Open** again. Only the first time.
+- **macOS:** the app is not notarized by Apple, so the first start is blocked. Drag **EchoPlay** to Applications, open it
+  once, then go to **System Settings → Privacy & Security** and choose **Open Anyway** next to EchoPlay. Only the first
+  time. (On macOS 14 and older, right-click **EchoPlay** → **Open** also works.)
 - **Linux:** run `chmod +x EchoPlay-*.AppImage` and start the file (some file managers need "Allow executing file as
   program" in its Properties first).
-- EchoPlay tells you when a new version is out: a small card, then **Install** now or **Install on close**.
+- EchoPlay tells you when a new version is out: a small card, then **Install** now or **Install on close** (on macOS,
+  **Download** opens the release page).
   **Check now** in Settings → About looks right away.
 
 <details>

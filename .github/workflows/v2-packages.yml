@@ -1,9 +1,10 @@
 name: EchoPlay 2 packages
 
-# The Linux AppImage and the macOS DMG of EchoPlay 2. The Windows setup is still built and published by hand
+# The macOS DMG (and the shelved Linux AppImage) of EchoPlay 2. The Windows setup is still built and published by hand
 # (tools/package-v2.sh). Started by hand (Actions > Run workflow) the packages are only kept as the run's artifacts; on a
-# v2 tag they are also added to that tag's GitHub release when it exists. Each package is opened once on a clean machine
-# before it counts.
+# v2 tag the DMG is also added to that tag's GitHub release when it exists. Each package is opened once on a clean machine
+# before it counts. Linux is shelved (maintainer, 2026-11-18): its jobs run only by hand; on a clean Ubuntu 26.04 the
+# AppImage still needs the host's PipeWire (Ubuntu's libjack is PipeWire's), see HANDOFF.md.
 on:
   workflow_dispatch:
     inputs:
@@ -24,6 +25,7 @@ jobs:
   # Ubuntu 26.04, like the CI build: EchoPlay needs Qt >= 6.9 and libmpv >= 0.38 (Debian 13 has Qt 6.8; Ubuntu 25.10 is
   # out of support). So the AppImage needs that base's glibc or newer (the build prints it). Qt travels inside.
   appimage:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     env:
@@ -160,16 +162,16 @@ jobs:
           name: echoplay-macos-arm64
           path: EchoPlay-*-arm64.dmg
 
-  # A v2 tag: the packages join the release the maintainer published for it. Nothing is created here.
+  # A v2 tag: the DMG joins the release the maintainer published for it. Nothing is created here.
   release:
     if: github.ref_type == 'tag'
-    needs: [appimage-runs, dmg]
+    needs: dmg
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: echoplay-macos-arm64
           path: packages
-          merge-multiple: true
       - name: Add to the release
         env:
           GH_TOKEN: ${{ github.token }}
